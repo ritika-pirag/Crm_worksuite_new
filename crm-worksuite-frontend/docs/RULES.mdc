@@ -1,0 +1,12 @@
+# SYSTEM RULES (DO NOT BREAK)
+
+1. DO NOT create separate apps
+2. DO NOT mix website & app layouts
+3. DO NOT hardcode role logic inside components
+4. DO NOT use inline CSS
+5. DO NOT ignore mobile responsiveness
+6. DO NOT create dead buttons
+7. DO NOT break folder structure
+8. ALWAYS use Tailwind utility classes
+9. ALWAYS open modals for view/edit/create
+10. ALWAYS keep UI consistent

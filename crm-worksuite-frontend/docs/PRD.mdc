@@ -1,0 +1,28 @@
+# PRD – SaaS CRM (Merged Website + Software)
+
+## Vision
+Create a professional SaaS CRM with a public website and a secure role-based application using a single domain and unified UI system.
+
+## Target Users
+- Company Admin
+- Employees
+- Clients
+
+## Key Features
+- Marketing Website
+- Secure Authentication
+- Role-Based Dashboards
+- Responsive UI
+- Modals for CRUD
+- Sidebar Navigation
+- Mobile Support
+
+## Non-Goals
+- No backend implementation required initially
+- No third-party auth dependency
+
+## Success Metrics
+- Clean routing separation
+- Zero UI duplication
+- Fully responsive
+- Easy role expansion

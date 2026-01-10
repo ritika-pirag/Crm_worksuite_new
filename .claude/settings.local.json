@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm outdated:*)",
+      "Bash(test:*)",
+      "Bash(find:*)",
+      "Bash(timeout 5 type:*)",
+      "Bash(npm run build:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
+    ]
+  }
+}
