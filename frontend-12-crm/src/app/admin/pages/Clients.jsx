@@ -181,6 +181,18 @@ const Clients = () => {
   const [newLabel, setNewLabel] = useState('')
   const [newLabelColor, setNewLabelColor] = useState('#22c55e')
 
+  // Advanced Filter Panel States
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false)
+  const [viewMode, setViewMode] = useState('list') // 'list' or 'grid'
+  const [quickFilter, setQuickFilter] = useState('') // Quick filter dropdown
+  const [selectedOwner, setSelectedOwner] = useState('') // Owner filter
+  const [selectedGroup, setSelectedGroup] = useState('') // Client group filter
+  const [selectedLabel, setSelectedLabel] = useState('') // Label filter
+  const [hasDueFilter, setHasDueFilter] = useState(false) // Has due filter
+  const [hasOpenProjectsFilter, setHasOpenProjectsFilter] = useState(false) // Has open projects filter
+  const [myClientsFilter, setMyClientsFilter] = useState(false) // My clients filter
+  const [filterSearchQuery, setFilterSearchQuery] = useState('') // Search in filter bar
+
   // Fetch clients on component mount
   useEffect(() => {
     console.log('useEffect triggered - companyId:', companyId, 'user:', user)
@@ -753,6 +765,68 @@ const Clients = () => {
 
   const handleViewClient = (clientId) => {
     navigate(`/app/admin/clients/${clientId}`)
+  }
+
+  // Apply all filters and fetch filtered clients
+  const handleApplyFilters = async () => {
+    try {
+      setLoading(true)
+      const params = { company_id: companyId }
+
+      if (quickFilter) params.quick_filter = quickFilter
+      if (selectedOwner) params.owner_id = selectedOwner
+      if (selectedGroup) params.client_group = selectedGroup
+      if (selectedLabel) params.label = selectedLabel
+      if (hasDueFilter) params.has_due = true
+      if (hasOpenProjectsFilter) params.has_open_projects = true
+      if (myClientsFilter && user?.id) params.owner_id = user.id
+      if (filterSearchQuery) params.search = filterSearchQuery
+
+      const response = await clientsAPI.getAll(params)
+      if (response.data.success) {
+        setClients(response.data.data || [])
+      }
+      setIsAdvancedFilterOpen(false)
+    } catch (error) {
+      console.error('Error applying filters:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setQuickFilter('')
+    setSelectedOwner('')
+    setSelectedGroup('')
+    setSelectedLabel('')
+    setHasDueFilter(false)
+    setHasOpenProjectsFilter(false)
+    setMyClientsFilter(false)
+    setFilterSearchQuery('')
+    setSearchQuery('')
+    setIsAdvancedFilterOpen(false)
+    fetchClients() // Reload all clients
+  }
+
+  // Export to Excel
+  const handleExportExcel = () => {
+    const csvContent = clients.map(c =>
+      `${c.company_name || c.companyName},${c.email || ''},${c.phone || c.phoneNumber || ''},${c.city || ''},${c.status || ''}`
+    ).join('\n')
+    const header = 'Company Name,Email,Phone,City,Status\n'
+    const blob = new Blob([header + csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'clients.csv'
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  // Print clients
+  const handlePrint = () => {
+    window.print()
   }
 
   const handleDelete = async (client) => {
@@ -1373,13 +1447,226 @@ const Clients = () => {
       {/* Clients Tab */}
       {
         activeTab === 'clients' && (
-          <div className="w-full overflow-x-auto">
+          <div className="space-y-4">
+            {/* Filter Bar */}
+            <Card className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Left Section */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Toggle */}
+                  <button
+                    onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+                    className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    title={viewMode === 'list' ? 'Grid View' : 'List View'}
+                  >
+                    {viewMode === 'list' ? <IoGrid size={18} className="text-gray-600" /> : <IoList size={18} className="text-gray-600" />}
+                  </button>
+
+                  {/* Filters Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
+                      className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700"
+                    >
+                      Filters
+                      <IoChevronDown size={14} className={`transition-transform ${isAdvancedFilterOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+
+                  {/* + Icon Button */}
+                  <button
+                    onClick={() => setIsAdvancedFilterOpen(!isAdvancedFilterOpen)}
+                    className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    title="Advanced Filters"
+                  >
+                    <IoAdd size={18} className="text-gray-600" />
+                  </button>
+
+                  {/* Divider */}
+                  <div className="w-px h-6 bg-gray-300 hidden sm:block" />
+
+                  {/* Quick Filter Buttons */}
+                  <button
+                    onClick={() => {
+                      setHasDueFilter(!hasDueFilter)
+                      handleApplyFilters()
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      hasDueFilter
+                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Has due
+                  </button>
+                  <button
+                    onClick={() => {
+                      setHasOpenProjectsFilter(!hasOpenProjectsFilter)
+                      handleApplyFilters()
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      hasOpenProjectsFilter
+                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Has open projects
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMyClientsFilter(!myClientsFilter)
+                      handleApplyFilters()
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      myClientsFilter
+                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    My Clients
+                  </button>
+                </div>
+
+                {/* Right Section */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Last Activity */}
+                  <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50" title="Last Activity">
+                    <IoTime size={18} className="text-gray-600" />
+                  </button>
+
+                  {/* Excel Export */}
+                  <button
+                    onClick={handleExportExcel}
+                    className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Excel
+                  </button>
+
+                  {/* Print */}
+                  <button
+                    onClick={handlePrint}
+                    className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Print
+                  </button>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={filterSearchQuery}
+                      onChange={(e) => setFilterSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleApplyFilters()}
+                      className="pl-9 pr-4 py-2 w-48 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <IoSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Filter Panel */}
+              {isAdvancedFilterOpen && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Quick Filters Dropdown */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Quick filters</label>
+                      <select
+                        value={quickFilter}
+                        onChange={(e) => setQuickFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">- Quick filters -</option>
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="vip">VIP</option>
+                        <option value="corporate">Corporate</option>
+                      </select>
+                    </div>
+
+                    {/* Owner Dropdown */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Owner</label>
+                      <select
+                        value={selectedOwner}
+                        onChange={(e) => setSelectedOwner(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">- Owner -</option>
+                        {employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.first_name || emp.name} {emp.last_name || ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Client Groups Dropdown */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Client groups</label>
+                      <select
+                        value={selectedGroup}
+                        onChange={(e) => setSelectedGroup(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">- Client groups -</option>
+                        {availableClientGroups.map(group => (
+                          <option key={group.id || group.name} value={group.name || group}>
+                            {group.name || group}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Label Dropdown */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Label</label>
+                      <select
+                        value={selectedLabel}
+                        onChange={(e) => setSelectedLabel(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">- Label -</option>
+                        {labels.map(label => (
+                          <option key={label.id || label.name} value={label.name}>
+                            {label.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={handleApplyFilters}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      <IoCheckmarkCircle size={16} />
+                      Apply Filters
+                    </button>
+                    <button
+                      onClick={handleResetFilters}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                    >
+                      <IoClose size={16} />
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Data Table */}
+            <div className="w-full overflow-x-auto">
             <DataTable
               columns={clientColumns}
               data={clients.filter(c => {
                 // Search filter
-                if (searchQuery) {
-                  const query = searchQuery.toLowerCase()
+                const query = (searchQuery || filterSearchQuery).toLowerCase()
+                if (query) {
                   const matchesSearch =
                     (c.companyName || c.company_name || '').toLowerCase().includes(query) ||
                     (c.city || '').toLowerCase().includes(query) ||
@@ -1387,10 +1674,18 @@ const Clients = () => {
                     (c.email || '').toLowerCase().includes(query)
                   if (!matchesSearch) return false
                 }
+                // Quick filter
+                if (quickFilter === 'active' && c.status !== 'Active') return false
+                if (quickFilter === 'inactive' && c.status !== 'Inactive') return false
                 // Status filter from overview
                 if (statusFilter && c.status !== statusFilter) return false
-                // Owner filter from overview
+                // Owner filter
+                if (selectedOwner && c.owner_id?.toString() !== selectedOwner) return false
                 if (ownerFilter && c.owner_id?.toString() !== ownerFilter) return false
+                // Group filter
+                if (selectedGroup && !c.client_groups?.includes(selectedGroup)) return false
+                // Label filter
+                if (selectedLabel && c.label !== selectedLabel) return false
                 return true
               })}
               searchPlaceholder="Search clients..."
@@ -1406,6 +1701,7 @@ const Clients = () => {
               loading={loading}
               onRowClick={(row) => handleViewClient(row.id)}
             />
+            </div>
           </div>
         )
       }
