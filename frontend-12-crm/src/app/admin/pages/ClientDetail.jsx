@@ -2027,7 +2027,7 @@ const ClientDetail = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4 tabs-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
-            {['Overview', 'Projects', 'Tasks', 'Proposals', 'Estimates', 'Invoices', 'Payments', 'Statement', 'Contracts', 'Expenses', 'Files', 'Notes', 'Orders'].map((tab) => (
+            {['Overview', 'Projects', 'Subscriptions', 'Invoices', 'Payments', 'Statement', 'Orders', 'Estimates', 'Proposals', 'Contracts', 'Files', 'Expenses', 'Notes'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2045,99 +2045,71 @@ const ClientDetail = () => {
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
           {activeTab === 'overview' && (
-            <div className="space-y-6 max-w-7xl mx-auto">
-              <div className="flex flex-col gap-6">
+            <div className="flex gap-6 max-w-7xl mx-auto">
+              {/* LEFT COLUMN - Stats & Invoice Overview */}
+              <div className="flex-1 min-w-0 space-y-6">
+                {/* Stats Cards Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <Card className="p-4 bg-white border border-gray-200 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
+                    <p className="text-sm text-gray-600">Projects</p>
+                  </Card>
+                  <Card className="p-4 bg-white border border-gray-200 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{subscriptions.length}</p>
+                    <p className="text-sm text-gray-600">Subscriptions</p>
+                  </Card>
+                  <Card className="p-4 bg-white border border-gray-200 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
+                    <p className="text-sm text-gray-600">Orders</p>
+                  </Card>
+                  <Card className="p-4 bg-white border border-gray-200 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{estimates.length}</p>
+                    <p className="text-sm text-gray-600">Estimates</p>
+                  </Card>
+                  <Card className="p-4 bg-white border border-gray-200 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{proposals.length}</p>
+                    <p className="text-sm text-gray-600">Proposals</p>
+                  </Card>
+                </div>
 
-                {/* 1. Client Info (Moved to top) */}
+                {/* Invoice Overview Section */}
                 <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                      <IoPerson className="text-white" size={24} />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-6">Invoice Overview</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Not paid</span>
+                      <div className="flex items-center gap-4 flex-1 ml-4">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div className="bg-red-500 h-2 rounded-full" style={{ width: `${invoices.filter(i => i.status === 'unpaid').length > 0 ? (invoices.filter(i => i.status === 'unpaid').reduce((sum, i) => sum + parseFloat(i.total || 0), 0) / invoices.reduce((sum, i) => sum + parseFloat(i.total || 0), 0) * 100) : 0}%` }}></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 min-w-[80px] text-right">
+                          {formatCurrency(invoices.filter(i => i.status === 'unpaid').reduce((sum, i) => sum + parseFloat(i.total || 0), 0))}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{client?.client_name || client?.name || 'Client'}</h3>
-                      <Badge className="text-xs bg-green-100 text-green-800 mt-1">
-                        {client?.status || 'Active'}
-                      </Badge>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Total invoiced</span>
+                      <span className="text-sm font-medium text-gray-900">{formatCurrency(invoices.reduce((sum, i) => sum + parseFloat(i.total || 0), 0))}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Payments</span>
+                      <span className="text-sm font-medium text-gray-900">{formatCurrency(payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0))}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Due</span>
+                      <span className="text-sm font-medium text-red-600">{formatCurrency(invoices.filter(i => i.status === 'unpaid').reduce((sum, i) => sum + parseFloat(i.unpaid || i.total || 0), 0))}</span>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Contact Information */}
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-4">Contact Information</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <IoMail className="text-gray-400" size={16} />
-                          <div>
-                            <p className="text-xs text-gray-500">Email</p>
-                            <p className="text-sm text-gray-900">{client?.email || '-'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <IoCall className="text-gray-400" size={16} />
-                          <div>
-                            <p className="text-xs text-gray-500">Phone</p>
-                            <p className="text-sm text-gray-900">
-                              {client?.phone ? `${client?.phoneCountryCode || ''} ${client?.phone}` : '-'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <IoGlobe className="text-gray-400" size={16} />
-                          <div>
-                            <p className="text-xs text-gray-500">Website</p>
-                            <p className="text-sm text-gray-900">{client?.website || '-'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Address */}
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-4">Address</h4>
-                      <div className="flex items-start gap-3">
-                        <IoLocation className="text-gray-400 mt-1" size={16} />
-                        <div>
-                          <p className="text-sm text-gray-900">
-                            {[
-                              client?.address,
-                              [client?.city, client?.state, client?.zip].filter(Boolean).join(', '),
-                              client?.country,
-                            ]
-                              .filter(Boolean)
-                              .join(', ') || 'No address provided'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Business Details */}
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-4">Business Details</h4>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs text-gray-500">Client Owner</p>
-                          <p className="text-sm text-gray-900">{client?.ownerName || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Created Date</p>
-                          <p className="text-sm text-gray-900">{formatDate(client?.created_at)}</p>
-                        </div>
-                        <div className="flex gap-2 mt-4">
-                          <button
-                            onClick={() => navigate(`/admin/clients/${id}/edit`)}
-                            className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs font-medium"
-                          >
-                            Edit Client
-                          </button>
-                        </div>
-                      </div>
+                  {/* Chart Placeholder */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <p className="text-sm text-gray-500 mb-4">Last 12 months</p>
+                    <div className="h-48 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                      Chart placeholder
                     </div>
                   </div>
                 </Card>
 
-                {/* 2. Contacts */}
+                {/* Contacts Section */}
                 <Card className="p-6 bg-white border border-gray-200">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -2153,7 +2125,7 @@ const ClientDetail = () => {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {contacts.map((contact, idx) => (
                       <div key={idx} className="p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-start justify-between">
@@ -2180,7 +2152,7 @@ const ClientDetail = () => {
                   </div>
                 </Card>
 
-                {/* 3. Projects */}
+                {/* Projects Section */}
                 <Card className="p-6 bg-white border border-gray-200">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -2397,6 +2369,117 @@ const ClientDetail = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </Card>
+              </div>
+
+              {/* RIGHT SIDEBAR - Client Info & Tasks */}
+              <div className="w-80 flex-shrink-0 space-y-6 hidden lg:block">
+                {/* Client Info Section */}
+                <Card className="p-6 bg-white border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <IoBriefcase className="text-gray-600" size={18} />
+                      <h3 className="text-sm font-semibold text-gray-900">Client info</h3>
+                    </div>
+                    <button className="p-1 hover:bg-gray-100 rounded">
+                      <IoEllipsisVertical className="text-gray-400" size={16} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Person</p>
+                      <p className="text-sm text-gray-900">{client?.type || 'Organization'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Status</p>
+                      <Badge className={`text-xs px-2 py-0.5 ${client?.status === 'Inactive' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-800'}`}>
+                        {client?.status || 'Active'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Label</p>
+                      <Badge className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800">
+                        {client?.label || 'VIP'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Primary contact</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <IoPerson className="text-blue-600" size={14} />
+                        </div>
+                        <span className="text-sm text-gray-900">
+                          {contacts.find(c => c.is_primary)?.name || contacts[0]?.name || client?.client_name || '-'}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <button className="text-sm text-blue-600 hover:text-blue-700">
+                        + Add Managers
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Address</p>
+                      <p className="text-sm text-gray-900">
+                        {[client?.address, client?.city, client?.state, client?.country].filter(Boolean).join(', ') || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Phone</p>
+                      <p className="text-sm text-gray-900">{client?.phone ? `${client?.phoneCountryCode || ''} ${client?.phone}` : '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Site</p>
+                      {client?.website ? (
+                        <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                          {client.website}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-gray-500">-</p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Tasks Section */}
+                <Card className="p-6 bg-white border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <IoList className="text-gray-600" size={18} />
+                      <h3 className="text-sm font-semibold text-gray-900">Tasks</h3>
+                    </div>
+                    <button
+                      onClick={() => setIsAddTaskModalOpen(true)}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <IoAdd size={16} />
+                      Add task
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {tasks.slice(0, 5).map((task, idx) => (
+                      <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className={`text-xs px-1.5 py-0.5 ${
+                            task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {task.priority || 'Medium'}
+                          </Badge>
+                          {task.due_date && (
+                            <span className="text-xs text-gray-500">{formatDate(task.due_date)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {tasks.length === 0 && (
+                      <p className="text-sm text-gray-500 text-center py-4">No tasks yet</p>
+                    )}
                   </div>
                 </Card>
               </div>
