@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { contractsAPI, clientsAPI, companiesAPI } from '../../../api'
+import { contractsAPI, clientsAPI, companiesAPI, itemsAPI } from '../../../api'
 import baseUrl from '../../../api/baseUrl'
 import { useSettings } from '../../../context/SettingsContext'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
+import RichTextEditor from '../../../components/ui/RichTextEditor'
 import {
   IoArrowBack,
   IoBriefcase,
@@ -23,15 +24,18 @@ import {
   IoEye,
   IoClose,
   IoChevronDown,
+  IoChevronForward,
   IoEllipsisVertical,
   IoAttach,
-  IoMic,
   IoOpenOutline,
   IoMailOutline,
   IoCopy,
   IoCheckmark,
   IoPerson,
-  IoLink
+  IoLink,
+  IoList,
+  IoSettings,
+  IoStorefront
 } from 'react-icons/io5'
 
 const ContractDetail = () => {
@@ -57,24 +61,25 @@ const ContractDetail = () => {
   const [tasks, setTasks] = useState([])
   const [note, setNote] = useState('')
   const [editorContent, setEditorContent] = useState('')
+  const [isItemsExpanded, setIsItemsExpanded] = useState(true)
+
+  // Items from catalog
+  const [catalogItems, setCatalogItems] = useState([])
+  const [itemSearchQuery, setItemSearchQuery] = useState('')
+  const [itemCategoryFilter, setItemCategoryFilter] = useState('')
 
   // Modal states
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false)
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false)
   const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false)
+  const [isEditDiscountModalOpen, setIsEditDiscountModalOpen] = useState(false)
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false)
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
 
   // Form states
   const [editingItem, setEditingItem] = useState(null)
-  const [newItem, setNewItem] = useState({
-    item_name: '',
-    description: '',
-    quantity: 1,
-    unit: 'PC',
-    unit_price: 0
-  })
+  const [discountData, setDiscountData] = useState({ discount: 0, discount_type: '%' })
   const [newTask, setNewTask] = useState({ title: '', due_date: '' })
 
   // Status options
@@ -82,7 +87,20 @@ const ContractDetail = () => {
 
   useEffect(() => {
     fetchContract()
+    fetchCatalogItems()
   }, [id])
+
+  const fetchCatalogItems = async () => {
+    try {
+      const response = await itemsAPI.getAll({ company_id: companyId })
+      if (response.data.success) {
+        setCatalogItems(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching catalog items:', error)
+      setCatalogItems([])
+    }
+  }
 
   const fetchContract = async () => {
     try {
@@ -127,6 +145,10 @@ const ContractDetail = () => {
         })
         setNote(data.note || '')
         setEditorContent(data.content || data.contract_content || '')
+        setDiscountData({
+          discount: parseFloat(data.discount) || 0,
+          discount_type: data.discount_type || '%'
+        })
 
         // Fetch company details
         try {
@@ -197,6 +219,36 @@ const ContractDetail = () => {
     expired: 'bg-orange-500 text-white',
   }
 
+  // Calculate totals
+  const calculateSubTotal = () => {
+    return (contract?.items || []).reduce((sum, item) => sum + (item.amount || (item.quantity * item.unit_price) || 0), 0)
+  }
+
+  const calculateDiscountAmount = () => {
+    const subTotal = calculateSubTotal()
+    if (discountData.discount_type === '%') {
+      return (subTotal * (discountData.discount || 0)) / 100
+    }
+    return discountData.discount || 0
+  }
+
+  const calculateTotal = () => {
+    const subTotal = calculateSubTotal()
+    const discountAmount = calculateDiscountAmount()
+    let taxAmount = 0
+
+    if (contract?.tax) {
+      const taxRate = parseFloat(contract.tax.match(/\d+/)?.[0] || 0)
+      taxAmount += ((subTotal - discountAmount) * taxRate) / 100
+    }
+    if (contract?.second_tax) {
+      const taxRate = parseFloat(contract.second_tax.match(/\d+/)?.[0] || 0)
+      taxAmount += ((subTotal - discountAmount) * taxRate) / 100
+    }
+
+    return subTotal - discountAmount + taxAmount
+  }
+
   // Action handlers
   const handlePreview = () => {
     setIsPreviewModalOpen(true)
@@ -251,7 +303,7 @@ const ContractDetail = () => {
             <tfoot>
               <tr class="total-row">
                 <td colspan="3">Total:</td>
-                <td>${localFormatCurrency(contract.total)}</td>
+                <td>${localFormatCurrency(calculateTotal())}</td>
               </tr>
             </tfoot>
           </table>
@@ -304,39 +356,70 @@ const ContractDetail = () => {
     }
   }
 
-  const handleAddItem = async () => {
+  // Add item from catalog
+  const handleAddItemFromCatalog = async (item) => {
     try {
-      const itemData = {
-        ...newItem,
-        amount: newItem.quantity * newItem.unit_price
+      const currentItems = contract.items || []
+      const newItem = {
+        item_name: item.title || '',
+        description: item.description || '',
+        quantity: 1,
+        unit: item.unit_type || 'PC',
+        unit_price: parseFloat(item.rate || 0),
+        amount: parseFloat(item.rate || 0)
       }
-      const updatedItems = [...(contract.items || []), itemData]
+      const updatedItems = [...currentItems, newItem]
+
       const response = await contractsAPI.update(id, { items: updatedItems }, { company_id: companyId })
       if (response.data.success) {
-        await fetchContract()
         setIsAddItemModalOpen(false)
-        setNewItem({ item_name: '', description: '', quantity: 1, unit: 'PC', unit_price: 0 })
+        await fetchContract()
+      } else {
+        alert(response.data.error || 'Failed to add item')
       }
     } catch (error) {
       console.error('Error adding item:', error)
-      alert('Failed to add item')
+      alert(error.response?.data?.error || 'Failed to add item')
     }
   }
 
-  const handleEditItem = async () => {
+  const handleEditItem = (itemIndex) => {
+    const item = contract.items[itemIndex]
+    setEditingItem({
+      ...item,
+      index: itemIndex
+    })
+    setIsEditItemModalOpen(true)
+  }
+
+  const handleUpdateItem = async () => {
     try {
-      const updatedItems = (contract.items || []).map((item, idx) =>
-        idx === editingItem.index ? { ...editingItem, amount: editingItem.quantity * editingItem.unit_price } : item
-      )
-      const response = await contractsAPI.update(id, { items: updatedItems }, { company_id: companyId })
+      const currentItems = [...contract.items]
+      const quantity = parseFloat(editingItem.quantity || 0)
+      const unitPrice = parseFloat(editingItem.unit_price || 0)
+      const amount = quantity * unitPrice
+
+      currentItems[editingItem.index] = {
+        ...currentItems[editingItem.index],
+        item_name: editingItem.item_name,
+        description: editingItem.description,
+        quantity: quantity,
+        unit: editingItem.unit,
+        unit_price: unitPrice,
+        amount: amount
+      }
+
+      const response = await contractsAPI.update(id, { items: currentItems }, { company_id: companyId })
       if (response.data.success) {
-        await fetchContract()
         setIsEditItemModalOpen(false)
         setEditingItem(null)
+        await fetchContract()
+      } else {
+        alert(response.data.error || 'Failed to update item')
       }
     } catch (error) {
-      console.error('Error editing item:', error)
-      alert('Failed to update item')
+      console.error('Error updating item:', error)
+      alert(error.response?.data?.error || 'Failed to update item')
     }
   }
 
@@ -354,28 +437,57 @@ const ContractDetail = () => {
     }
   }
 
-  const handleSaveNote = async () => {
+  const handleUpdateDiscount = async () => {
     try {
-      const response = await contractsAPI.update(id, { note }, { company_id: companyId })
+      const subTotal = calculateSubTotal()
+      const discountAmount = discountData.discount_type === '%'
+        ? (subTotal * (discountData.discount || 0)) / 100
+        : (discountData.discount || 0)
+
+      const response = await contractsAPI.update(id, {
+        discount: discountData.discount,
+        discount_type: discountData.discount_type,
+        discount_amount: discountAmount
+      }, { company_id: companyId })
+
       if (response.data.success) {
+        setIsEditDiscountModalOpen(false)
         await fetchContract()
+      } else {
+        alert(response.data.error || 'Failed to update discount')
       }
     } catch (error) {
-      console.error('Error saving note:', error)
+      console.error('Error updating discount:', error)
+      alert(error.response?.data?.error || 'Failed to update discount')
     }
   }
 
-  const handleSaveContent = async () => {
+  const handleSave = async () => {
     try {
-      const response = await contractsAPI.update(id, { content: editorContent, contract_content: editorContent }, { company_id: companyId })
+      const response = await contractsAPI.update(id, {
+        note: note,
+        content: editorContent,
+        contract_content: editorContent,
+      }, { company_id: companyId })
       if (response.data.success) {
+        alert('Contract saved successfully!')
         await fetchContract()
-        alert('Content saved successfully!')
+      } else {
+        alert(response.data.error || 'Failed to save contract')
       }
     } catch (error) {
-      console.error('Error saving content:', error)
-      alert('Failed to save content')
+      console.error('Error saving contract:', error)
+      alert(error.response?.data?.error || 'Failed to save contract')
     }
+  }
+
+  const handleSaveAndShow = async () => {
+    await handleSave()
+    setIsPreviewModalOpen(true)
+  }
+
+  const handleChangeTemplate = () => {
+    navigate('/app/admin/finance-templates')
   }
 
   const handleAddTask = () => {
@@ -396,26 +508,14 @@ const ContractDetail = () => {
     alert('Public contract URL copied to clipboard!')
   }
 
-  // Calculate totals
-  const calculateSubTotal = () => {
-    return (contract?.items || []).reduce((sum, item) => sum + (item.amount || (item.quantity * item.unit_price) || 0), 0)
-  }
-
-  const calculateTotal = () => {
-    const subTotal = calculateSubTotal()
-    let taxAmount = 0
-
-    if (contract?.tax) {
-      const taxRate = parseFloat(contract.tax.match(/\d+/)?.[0] || 0)
-      taxAmount += (subTotal * taxRate) / 100
-    }
-    if (contract?.second_tax) {
-      const taxRate = parseFloat(contract.second_tax.match(/\d+/)?.[0] || 0)
-      taxAmount += (subTotal * taxRate) / 100
-    }
-
-    return subTotal + taxAmount - (contract?.discount_amount || 0)
-  }
+  // Filter catalog items
+  const filteredCatalogItems = catalogItems.filter(item => {
+    const matchesSearch = !itemSearchQuery ||
+      item.title?.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(itemSearchQuery.toLowerCase())
+    const matchesCategory = !itemCategoryFilter || item.category === itemCategoryFilter
+    return matchesSearch && matchesCategory
+  })
 
   // Loading state
   if (loading) {
@@ -466,11 +566,10 @@ const ContractDetail = () => {
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${isExpired() ? statusColors.expired : (statusColors[contract.status] || statusColors.draft)}`}>
               {isExpired() ? 'Expired' : contract.status.charAt(0).toUpperCase() + contract.status.slice(1)}
             </span>
-            {contract.email_sent && (
-              <span className="flex items-center gap-1 text-green-600 text-sm">
-                <IoMail size={16} /> Email sent
-              </span>
-            )}
+            <div className="flex items-center gap-1 text-gray-500 text-sm">
+              <IoMail size={16} />
+              <span>{localFormatDate(contract.contract_date)}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -496,214 +595,199 @@ const ContractDetail = () => {
       <div className="flex gap-6 p-6">
         {/* Left Column - Main Content (70%) */}
         <div className="flex-1" style={{ maxWidth: '70%' }}>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            {/* Company Info Header */}
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center text-white font-bold text-lg">
-                    {company?.name?.substring(0, 1) || 'C'}
-                  </div>
-                  <span className="text-3xl font-bold text-blue-600">{company?.name || 'Company'}</span>
-                </div>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p className="font-semibold text-gray-800">{company?.name || 'Company Name'}</p>
-                  {company?.address && <p>{company.address}</p>}
-                  {company?.city && <p>{company.city}, {company?.state || ''}</p>}
-                  {company?.phone && <p>Phone: {company.phone}</p>}
-                  {company?.email && <p>Email: {company.email}</p>}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="inline-block bg-gray-900 text-white font-bold text-lg px-4 py-2 mb-3">
-                  {contract.contract_number}
-                </div>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>Contract date: <span className="font-medium">{localFormatDate(contract.contract_date)}</span></p>
-                  <p>Valid until: <span className={`font-medium ${isExpired() ? 'text-red-600' : ''}`}>
-                    {localFormatDate(contract.valid_until)} {isExpired() && '(Expired)'}
-                  </span></p>
-                </div>
-              </div>
+          {/* Contract Items Section */}
+          <Card className="p-0 overflow-hidden mb-6">
+            <div
+              className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 cursor-pointer"
+              onClick={() => setIsItemsExpanded(!isItemsExpanded)}
+            >
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <IoList size={20} />
+                Contract Items
+              </h3>
+              {isItemsExpanded ? <IoChevronDown size={20} /> : <IoChevronForward size={20} />}
             </div>
 
-            {/* Client Section */}
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Client</h3>
-              <div className="text-gray-800">
-                <p className="font-semibold">{client?.company_name || client?.name || contract.client_name}</p>
-                {client?.address && <p className="text-sm text-gray-600">{client.address}</p>}
-                {client?.city && <p className="text-sm text-gray-600">{client.city}, {client?.country || ''}</p>}
-                {client?.email && <p className="text-sm text-gray-600">{client.email}</p>}
-                {client?.phone && <p className="text-sm text-gray-600">{client.phone}</p>}
-              </div>
-            </div>
-
-            {/* Contract Items Table */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Contract Items</h3>
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left p-3 text-sm font-semibold text-gray-600">Item</th>
-                    <th className="text-center p-3 text-sm font-semibold text-gray-600">Quantity</th>
-                    <th className="text-right p-3 text-sm font-semibold text-gray-600">Rate</th>
-                    <th className="text-right p-3 text-sm font-semibold text-gray-600">Total</th>
-                    <th className="w-20"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contract.items && contract.items.length > 0 ? (
-                    contract.items.map((item, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="p-3">
-                          <div>
-                            <p className="font-medium text-gray-800">{item.item_name || 'Item'}</p>
-                            {item.description && (
-                              <p className="text-sm text-gray-500 mt-0.5">{item.description}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3 text-center text-gray-600">
-                          {item.quantity || 0} {item.unit || 'PC'}
-                        </td>
-                        <td className="p-3 text-right text-gray-600">
-                          {localFormatCurrency(item.unit_price || 0)}
-                        </td>
-                        <td className="p-3 text-right font-semibold text-gray-800">
-                          {localFormatCurrency(item.amount || (item.quantity * item.unit_price) || 0)}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1 justify-end">
-                            <button
-                              onClick={() => {
-                                setEditingItem({ ...item, index: idx })
-                                setIsEditItemModalOpen(true)
-                              }}
-                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
-                              title="Edit"
-                            >
-                              <IoCreate size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(idx)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                              title="Delete"
-                            >
-                              <IoClose size={16} />
-                            </button>
-                          </div>
-                        </td>
+            {isItemsExpanded && (
+              <>
+                {/* Items Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/5">Item</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase w-1/6">Quantity</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase w-1/6">Rate</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase w-1/6">Total</th>
+                        <th className="px-4 py-3 text-center w-20"></th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-400 italic">
-                        No items found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              {/* Add Item Button */}
-              <div className="mt-4">
-                <button
-                  onClick={() => setIsAddItemModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  <IoAdd size={18} /> Add item
-                </button>
-              </div>
-
-              {/* Totals Section */}
-              <div className="mt-6 flex justify-end">
-                <div className="w-72 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Sub Total:</span>
-                    <span className="text-gray-800">{localFormatCurrency(calculateSubTotal())}</span>
-                  </div>
-                  {contract.discount_amount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Discount:</span>
-                      <span className="text-gray-800">-{localFormatCurrency(contract.discount_amount)}</span>
-                    </div>
-                  )}
-                  {contract.tax && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">{contract.tax}:</span>
-                      <span className="text-gray-800">
-                        {localFormatCurrency((calculateSubTotal() * parseFloat(contract.tax.match(/\d+/)?.[0] || 0)) / 100)}
-                      </span>
-                    </div>
-                  )}
-                  {contract.second_tax && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">{contract.second_tax}:</span>
-                      <span className="text-gray-800">
-                        {localFormatCurrency((calculateSubTotal() * parseFloat(contract.second_tax.match(/\d+/)?.[0] || 0)) / 100)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
-                    <span className="text-gray-800">Total:</span>
-                    <span className="text-gray-800">{localFormatCurrency(calculateTotal())}</span>
-                  </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {contract.items && contract.items.length > 0 ? (
+                        contract.items.map((item, idx) => (
+                          <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{item.item_name || 'Item'}</p>
+                                {item.description && (
+                                  <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-600 whitespace-nowrap">
+                              {item.quantity || 0} {item.unit || 'PC'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-600 whitespace-nowrap">
+                              {localFormatCurrency(item.unit_price || 0)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-semibold text-gray-800 whitespace-nowrap">
+                              {localFormatCurrency(item.amount || (item.quantity * item.unit_price) || 0)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => handleEditItem(idx)}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <IoCreate size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem(idx)}
+                                  className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <IoClose size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
+                            No items added yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </div>
 
-            {/* Rich Text Editor Section */}
-            <div className="mt-8 border-t pt-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase">Contract Content</h3>
-                <button
-                  onClick={handleSaveContent}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
-                >
-                  <IoCheckmark size={16} /> Save Content
-                </button>
+                {/* Add Item Button */}
+                <div className="p-4 border-t border-gray-200">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsAddItemModalOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <IoAdd size={16} />
+                    Add item
+                  </Button>
+                </div>
+              </>
+            )}
+          </Card>
+
+          {/* Totals Section */}
+          <Card className="p-4 mb-6">
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Sub Total:</span>
+                <span className="font-semibold text-gray-800">{localFormatCurrency(calculateSubTotal())}</span>
               </div>
-              <div className="border border-gray-200 rounded-lg">
-                {/* Simple Toolbar */}
-                <div className="flex items-center gap-2 p-2 border-b border-gray-200 bg-gray-50">
-                  <button className="p-1.5 hover:bg-gray-200 rounded font-bold text-gray-600">B</button>
-                  <button className="p-1.5 hover:bg-gray-200 rounded italic text-gray-600">I</button>
-                  <button className="p-1.5 hover:bg-gray-200 rounded underline text-gray-600">U</button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button className="p-1.5 hover:bg-gray-200 rounded text-gray-600 text-sm">H1</button>
-                  <button className="p-1.5 hover:bg-gray-200 rounded text-gray-600 text-sm">H2</button>
-                  <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                  <button className="p-1.5 hover:bg-gray-200 rounded text-gray-600">
-                    <IoAttach size={16} />
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 flex items-center gap-2">
+                  Discount:
+                  <button
+                    onClick={() => setIsEditDiscountModalOpen(true)}
+                    className="text-blue-500 hover:text-blue-700 transition-colors"
+                    title="Edit Discount"
+                  >
+                    <IoCreate size={14} />
                   </button>
+                </span>
+                <span className="font-semibold text-red-500">
+                  -{localFormatCurrency(calculateDiscountAmount())}
+                </span>
+              </div>
+              {contract.tax && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">{contract.tax}:</span>
+                  <span className="font-semibold text-gray-800">
+                    {localFormatCurrency(((calculateSubTotal() - calculateDiscountAmount()) * parseFloat(contract.tax.match(/\d+/)?.[0] || 0)) / 100)}
+                  </span>
                 </div>
-                <textarea
-                  value={editorContent}
-                  onChange={(e) => setEditorContent(e.target.value)}
-                  placeholder="Enter contract content here... You can include terms, conditions, scope of work, deliverables, etc."
-                  rows={10}
-                  className="w-full p-4 outline-none resize-none text-gray-700"
-                />
+              )}
+              {contract.second_tax && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">{contract.second_tax}:</span>
+                  <span className="font-semibold text-gray-800">
+                    {localFormatCurrency(((calculateSubTotal() - calculateDiscountAmount()) * parseFloat(contract.second_tax.match(/\d+/)?.[0] || 0)) / 100)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between pt-3 border-t border-gray-300">
+                <span className="text-lg font-bold text-gray-800">Total:</span>
+                <span className="text-lg font-bold text-green-600">{localFormatCurrency(calculateTotal())}</span>
               </div>
             </div>
-          </div>
+          </Card>
+
+          {/* Rich Text Editor Section */}
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Contract Terms</h3>
+            <RichTextEditor
+              value={editorContent}
+              onChange={setEditorContent}
+              placeholder="Write your contract terms here..."
+            />
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleChangeTemplate}
+                className="flex items-center gap-2"
+              >
+                <IoSettings size={16} />
+                Change template
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSave}
+                className="flex items-center gap-2"
+              >
+                <IoCheckmark size={16} />
+                Save
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveAndShow}
+                className="flex items-center gap-2"
+              >
+                <IoEye size={16} />
+                Save & show
+              </Button>
+            </div>
+          </Card>
         </div>
 
         {/* Right Column - Sidebar (30%) */}
         <div className="w-80 space-y-4">
           {/* Contract Info Card */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <IoDocumentText className="text-gray-500" size={18} />
                 Contract info
               </h3>
-              <button
-                onClick={() => setIsStatusModalOpen(true)}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                Change status
+              <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                <IoEllipsisVertical size={16} className="text-gray-400" />
               </button>
             </div>
             <div className="space-y-3">
@@ -711,9 +795,9 @@ const ContractDetail = () => {
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-bold">
                   {(client?.name || contract.client_name || 'C').substring(0, 2).toUpperCase()}
                 </div>
-                <span className="text-sm text-blue-600 hover:underline cursor-pointer">
+                <a href="#" className="text-sm text-blue-600 hover:underline">
                   {client?.name || contract.client_name}
-                </span>
+                </a>
               </div>
               {contract.project_name && contract.project_name !== '--' && (
                 <div className="flex items-center gap-3">
@@ -734,74 +818,72 @@ const ContractDetail = () => {
                     {localFormatDate(contract.valid_until)} {isExpired() && '(Expired)'}
                   </span>
                 </p>
-                <p className="flex justify-between py-1">
-                  <span>Total:</span>
-                  <span className="font-medium">{localFormatCurrency(calculateTotal())}</span>
-                </p>
-                <p className="flex justify-between py-1">
-                  <span>Status:</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isExpired() ? statusColors.expired : (statusColors[contract.status] || statusColors.draft)}`}>
-                    {isExpired() ? 'Expired' : contract.status.charAt(0).toUpperCase() + contract.status.slice(1)}
-                  </span>
-                </p>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Action Buttons Grid */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <button
+          <Card className="p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handlePreview}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center justify-center gap-2 hover:bg-gray-100"
               >
-                <IoEye size={16} className="text-gray-500" />
+                <IoEye size={16} />
                 Preview
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handlePrint}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center justify-center gap-2 hover:bg-gray-100"
               >
-                <IoPrint size={16} className="text-gray-500" />
+                <IoPrint size={16} />
                 Print
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleViewPDF}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center justify-center gap-2 hover:bg-gray-100"
               >
-                <IoDocumentText size={16} className="text-gray-500" />
+                <IoDocumentText size={16} />
                 View PDF
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-200"
+                className="flex items-center justify-center gap-2 hover:bg-gray-100"
               >
-                <IoDownload size={16} className="text-gray-500" />
-                Download
-              </button>
+                <IoDownload size={16} />
+                Download PDF
+              </Button>
             </div>
-          </div>
+          </Card>
 
           {/* Note Section */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">Note</h3>
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <IoDocumentText size={16} className="text-gray-500" />
+              <h3 className="font-semibold text-gray-800">Note</h3>
+            </div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              onBlur={handleSaveNote}
-              placeholder="Add a note..."
+              placeholder="Add internal notes here..."
               rows={3}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
             />
-          </div>
+          </Card>
 
           {/* Signer Info Section */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                <IoPerson className="text-gray-500" size={18} />
-                Signer (Client)
-              </h3>
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <IoPerson size={16} className="text-gray-500" />
+              <h3 className="font-semibold text-gray-800">Signer info (Client)</h3>
             </div>
             <div className="space-y-2">
               {contract.signer_name ? (
@@ -830,49 +912,231 @@ const ContractDetail = () => {
                 <p className="text-sm text-gray-400 italic">No signer assigned yet</p>
               )}
             </div>
-          </div>
+          </Card>
 
           {/* Tasks Section */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
+          <Card className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                <IoCheckmarkCircle className="text-gray-500" size={18} />
-                Tasks
-              </h3>
+              <div className="flex items-center gap-2">
+                <IoCheckmarkCircle size={16} className="text-gray-500" />
+                <h3 className="font-semibold text-gray-800">Tasks</h3>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsAddTaskModalOpen(true)}
+                className="flex items-center gap-1 text-xs px-2 py-1"
+              >
+                <IoAdd size={14} />
+                Add task
+              </Button>
             </div>
-            <div className="space-y-2 mb-3">
-              {tasks.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">No tasks yet</p>
-              ) : (
-                tasks.map(task => (
-                  <div key={task.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">{task.title}</span>
+            {tasks.length > 0 ? (
+              <div className="space-y-2">
+                {tasks.map((task) => (
+                  <div key={task.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm">
+                    <input type="checkbox" className="rounded" />
+                    <span className="flex-1 truncate">{task.title}</span>
                     <button
                       onClick={() => handleDeleteTask(task.id)}
                       className="text-red-500 hover:text-red-600"
                     >
-                      <IoClose size={16} />
+                      <IoClose size={14} />
                     </button>
                   </div>
-                ))
-              )}
-            </div>
-            <button
-              onClick={() => setIsAddTaskModalOpen(true)}
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              <IoAdd size={16} /> Add task
-            </button>
-          </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No tasks yet</p>
+            )}
+          </Card>
         </div>
       </div>
+
+      {/* MODALS */}
+
+      {/* Add Item Modal - Using Catalog Items */}
+      <Modal
+        isOpen={isAddItemModalOpen}
+        onClose={() => setIsAddItemModalOpen(false)}
+        title="Add Items to Contract"
+        size="xl"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={itemSearchQuery}
+                onChange={(e) => setItemSearchQuery(e.target.value)}
+                className="w-full pl-4 pr-10 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+            <select
+              value={itemCategoryFilter}
+              onChange={(e) => setItemCategoryFilter(e.target.value)}
+              className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+            >
+              <option value="">All Categories</option>
+              {[...new Set(catalogItems.map(item => item.category).filter(Boolean))].map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {filteredCatalogItems.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No items found. Add items in the Items section first.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+              {filteredCatalogItems.map((item) => (
+                <Card
+                  key={item.id}
+                  className="p-4 hover:shadow-md transition-all cursor-pointer hover:border-blue-500"
+                  onClick={() => handleAddItemFromCatalog(item)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <IoStorefront size={20} className="text-gray-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-800 text-sm truncate">{item.title}</h3>
+                      <p className="text-blue-600 font-bold text-sm">
+                        ${parseFloat(item.rate || 0).toFixed(2)}
+                        <span className="text-gray-400 font-normal text-xs">/{item.unit_type || 'PC'}</span>
+                      </p>
+                      <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                        <IoCheckmark size={12} />
+                        <span>Click to add</span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={() => setIsAddItemModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Item Modal */}
+      <Modal
+        isOpen={isEditItemModalOpen}
+        onClose={() => { setIsEditItemModalOpen(false); setEditingItem(null) }}
+        title="Edit Item"
+        size="md"
+      >
+        {editingItem && (
+          <div className="space-y-4">
+            <Input
+              label="Item Name"
+              value={editingItem.item_name || ''}
+              onChange={(e) => setEditingItem({ ...editingItem, item_name: e.target.value })}
+              placeholder="Item name"
+            />
+            <Input
+              label="Description"
+              value={editingItem.description || ''}
+              onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              placeholder="Description"
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <Input
+                label="Quantity"
+                type="number"
+                value={editingItem.quantity || 1}
+                onChange={(e) => {
+                  const qty = parseFloat(e.target.value) || 0
+                  const unitPrice = parseFloat(editingItem.unit_price || 0)
+                  setEditingItem({ ...editingItem, quantity: qty, amount: qty * unitPrice })
+                }}
+                min="0"
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+                <Input
+                  value={editingItem.unit || 'PC'}
+                  onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                />
+              </div>
+              <Input
+                label="Unit Price"
+                type="number"
+                value={editingItem.unit_price || 0}
+                onChange={(e) => {
+                  const price = parseFloat(e.target.value) || 0
+                  const qty = parseFloat(editingItem.quantity || 0)
+                  setEditingItem({ ...editingItem, unit_price: price, amount: qty * price })
+                }}
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div className="text-right">
+              <span className="text-sm text-gray-500">Amount: </span>
+              <span className="font-semibold text-gray-800">{localFormatCurrency(editingItem.amount || 0)}</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+              <Button variant="outline" onClick={() => { setIsEditItemModalOpen(false); setEditingItem(null) }}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleUpdateItem}>
+                Update Item
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Discount Modal */}
+      <Modal
+        isOpen={isEditDiscountModalOpen}
+        onClose={() => setIsEditDiscountModalOpen(false)}
+        title="Edit Discount"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Discount"
+              type="number"
+              value={discountData.discount || 0}
+              onChange={(e) => setDiscountData({ ...discountData, discount: parseFloat(e.target.value) || 0 })}
+              min="0"
+              step="0.01"
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+              <select
+                value={discountData.discount_type}
+                onChange={(e) => setDiscountData({ ...discountData, discount_type: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              >
+                <option value="%">Percentage (%)</option>
+                <option value="fixed">Fixed Amount</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={() => setIsEditDiscountModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleUpdateDiscount}>Update Discount</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Preview Modal */}
       <Modal
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
         title="Contract Preview"
-        size="lg"
+        size="xl"
       >
         <div className="space-y-6">
           <div className="text-center border-b pb-4">
@@ -924,8 +1188,9 @@ const ContractDetail = () => {
               <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: editorContent.replace(/\n/g, '<br/>') }} />
             </div>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsPreviewModalOpen(false)}>Close</Button>
+            <Button variant="primary" onClick={handlePrint}><IoPrint size={16} className="mr-2" />Print</Button>
           </div>
         </div>
       </Modal>
@@ -982,156 +1247,32 @@ const ContractDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Item Modal */}
-      <Modal
-        isOpen={isAddItemModalOpen}
-        onClose={() => setIsAddItemModalOpen(false)}
-        title="Add Item"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-            <Input
-              value={newItem.item_name}
-              onChange={(e) => setNewItem({ ...newItem, item_name: e.target.value })}
-              placeholder="Enter item name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={newItem.description}
-              onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-              placeholder="Enter description"
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-              <Input
-                type="number"
-                value={newItem.quantity}
-                onChange={(e) => setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-              <Input
-                value={newItem.unit}
-                onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rate</label>
-              <Input
-                type="number"
-                value={newItem.unit_price}
-                onChange={(e) => setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => setIsAddItemModalOpen(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button onClick={handleAddItem} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-              Add Item
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Item Modal */}
-      <Modal
-        isOpen={isEditItemModalOpen}
-        onClose={() => setIsEditItemModalOpen(false)}
-        title="Edit Item"
-      >
-        {editingItem && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-              <Input
-                value={editingItem.item_name}
-                onChange={(e) => setEditingItem({ ...editingItem, item_name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={editingItem.description || ''}
-                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                <Input
-                  type="number"
-                  value={editingItem.quantity}
-                  onChange={(e) => setEditingItem({ ...editingItem, quantity: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                <Input
-                  value={editingItem.unit}
-                  onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rate</label>
-                <Input
-                  type="number"
-                  value={editingItem.unit_price}
-                  onChange={(e) => setEditingItem({ ...editingItem, unit_price: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button variant="outline" onClick={() => setIsEditItemModalOpen(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleEditItem} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
       {/* Add Task Modal */}
       <Modal
         isOpen={isAddTaskModalOpen}
-        onClose={() => setIsAddTaskModalOpen(false)}
+        onClose={() => { setIsAddTaskModalOpen(false); setNewTask({ title: '', due_date: '' }) }}
         title="Add Task"
+        size="md"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
-            <Input
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              placeholder="Enter task title"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-            <Input
-              type="date"
-              value={newTask.due_date}
-              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => setIsAddTaskModalOpen(false)} className="flex-1">
+          <Input
+            label="Task Title"
+            value={newTask.title}
+            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            placeholder="Enter task title"
+            required
+          />
+          <Input
+            label="Due Date"
+            type="date"
+            value={newTask.due_date}
+            onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+          />
+          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={() => { setIsAddTaskModalOpen(false); setNewTask({ title: '', due_date: '' }) }}>
               Cancel
             </Button>
-            <Button onClick={handleAddTask} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+            <Button variant="primary" onClick={handleAddTask}>
               Add Task
             </Button>
           </div>

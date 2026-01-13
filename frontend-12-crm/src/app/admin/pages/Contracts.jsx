@@ -10,6 +10,7 @@ import {
   clientsAPI,
   projectsAPI,
   leadsAPI,
+  itemsAPI,
 } from "../../../api";
 import {
   IoAdd,
@@ -53,6 +54,7 @@ const Contracts = () => {
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState(null);
+  const [catalogItems, setCatalogItems] = useState([]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,7 +82,65 @@ const Contracts = () => {
     note: "",
     amount: 0,
     status: "Draft",
+    items: [],
   });
+
+  // Calculate totals helper
+  const calculateTotals = (items) => {
+    return items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  };
+
+  const handleAddItem = () => {
+    const newItem = {
+      item_name: "",
+      description: "",
+      quantity: 1,
+      unit: "Pcs",
+      unit_price: 0,
+      amount: 0,
+    };
+    setFormData((prev) => {
+      const updatedItems = [...(prev.items || []), newItem];
+      return {
+        ...prev,
+        items: updatedItems,
+        amount: calculateTotals(updatedItems),
+      };
+    });
+  };
+
+  const handleRemoveItem = (index) => {
+    setFormData((prev) => {
+      const updatedItems = [...prev.items];
+      updatedItems.splice(index, 1);
+      return {
+        ...prev,
+        items: updatedItems,
+        amount: calculateTotals(updatedItems),
+      };
+    });
+  };
+
+  const handleItemChange = (index, field, value) => {
+    setFormData((prev) => {
+      const updatedItems = [...prev.items];
+      const item = { ...updatedItems[index], [field]: value };
+
+      // Auto-calculate amount
+      if (field === "quantity" || field === "unit_price") {
+        const qty = parseFloat(field === "quantity" ? value : item.quantity) || 0;
+        const price = parseFloat(field === "unit_price" ? value : item.unit_price) || 0;
+        item.amount = qty * price;
+      }
+
+      updatedItems[index] = item;
+      return {
+        ...prev,
+        items: updatedItems,
+        amount: calculateTotals(updatedItems),
+      };
+    });
+  };
 
   // Status options
   const statusOptions = ["Draft", "Sent", "Accepted", "Declined", "Expired"];
@@ -167,12 +227,25 @@ const Contracts = () => {
     }
   }, [companyId]);
 
+  const fetchCatalogItems = useCallback(async () => {
+    try {
+      const response = await itemsAPI.getAll({ company_id: companyId });
+      if (response.data.success) {
+        setCatalogItems(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching catalog items:", error);
+      setCatalogItems([]);
+    }
+  }, [companyId]);
+
   useEffect(() => {
     fetchContracts();
     fetchClients();
     fetchLeads();
     fetchProjects();
-  }, [fetchContracts, fetchClients, fetchLeads, fetchProjects]);
+    fetchCatalogItems();
+  }, [fetchContracts, fetchClients, fetchLeads, fetchProjects, fetchCatalogItems]);
 
   // Filter projects by client
   useEffect(() => {
@@ -203,6 +276,7 @@ const Contracts = () => {
       note: "",
       amount: 0,
       status: "Draft",
+      items: [],
     });
   };
 
@@ -237,6 +311,7 @@ const Contracts = () => {
         description: formData.note || null,
         amount: formData.amount || 0,
         status: formData.status || "Draft",
+        items: formData.items || [],
       };
 
       if (isEditModalOpen && selectedContract) {
@@ -280,8 +355,9 @@ const Contracts = () => {
           tax: data.tax || "",
           second_tax: data.second_tax || "",
           note: data.note || data.description || "",
-          amount: data.amount || 0,
+          amount: data.amount || data.total || 0,
           status: data.status || "Draft",
+          items: data.items || [],
         });
         setIsEditModalOpen(true);
       }
@@ -948,6 +1024,132 @@ const Contracts = () => {
               rows={3}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none"
             />
+          </div>
+
+          {/* Items Section */}
+          <div className="mt-4 border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Contract Items
+              </label>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                <IoAdd size={16} />
+                Add Item
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-gray-200 rounded-lg mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left w-1/4">Item Name</th>
+                    <th className="px-3 py-2 text-left w-1/3">Description</th>
+                    <th className="px-3 py-2 text-right w-20">Qty</th>
+                    <th className="px-3 py-2 text-right w-24">Unit Price</th>
+                    <th className="px-3 py-2 text-right w-24">Amount</th>
+                    <th className="px-3 py-2 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {formData.items && formData.items.map((item, index) => (
+                    <tr key={index}>
+                      <td className="p-2 align-top">
+                        <select
+                          value={item.item_name}
+                          onChange={(e) => {
+                            const selectedItem = catalogItems.find((ci) => ci.title === e.target.value);
+                            if (selectedItem) {
+                              const updatedItems = [...formData.items];
+                              updatedItems[index] = {
+                                ...updatedItems[index],
+                                item_name: selectedItem.title,
+                                description: selectedItem.description || "",
+                                unit_price: parseFloat(selectedItem.rate) || 0,
+                                unit: selectedItem.unit_type || "",
+                                amount: (updatedItems[index].quantity || 1) * (parseFloat(selectedItem.rate) || 0),
+                              };
+                              setFormData({
+                                ...formData,
+                                items: updatedItems,
+                                amount: calculateTotals(updatedItems),
+                              });
+                            } else {
+                              handleItemChange(index, "item_name", e.target.value);
+                            }
+                          }}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                        >
+                          <option value="">-- Select Item --</option>
+                          {catalogItems.map((ci) => (
+                            <option key={ci.id} value={ci.title}>{ci.title}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-2 align-top">
+                        <textarea
+                          value={item.description}
+                          onChange={(e) => handleItemChange(index, "description", e.target.value)}
+                          placeholder="Description"
+                          rows={1}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none resize-y"
+                        />
+                      </td>
+                      <td className="p-2 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-right"
+                        />
+                      </td>
+                      <td className="p-2 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(e) => handleItemChange(index, "unit_price", e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none text-right"
+                        />
+                      </td>
+                      <td className="p-2 align-top text-right font-medium pt-3">
+                        {parseFloat(item.amount || 0).toFixed(2)}
+                      </td>
+                      <td className="p-2 align-top text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <IoTrash size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!formData.items || formData.items.length === 0) && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500 italic">
+                        No items added yet. Click "Add Item" to start.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end mb-4">
+              <div className="w-64 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="flex justify-between items-center text-lg font-bold text-gray-800">
+                  <span>Total:</span>
+                  <span>${formData.amount ? parseFloat(formData.amount).toFixed(2) : "0.00"}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Bottom Actions */}
