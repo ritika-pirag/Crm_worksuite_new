@@ -2264,30 +2264,59 @@ const ClientDetail = () => {
                   )}
                 </Card>
 
-                {/* 6. Activity (Events) */}
+                {/* 6. Events Calendar */}
                 <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <IoCalendar className="text-primary-accent" size={20} />
-                      <h3 className="text-lg font-semibold text-primary-text">Recent Events</h3>
+                      <h3 className="text-lg font-semibold text-primary-text">Events</h3>
                     </div>
-                    <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                      View All
+                    <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                      <IoAdd size={14} />
+                      Add event
                     </button>
                   </div>
 
-                  <div className="space-y-4">
-                    {/* Placeholder for now as actual 'events' state usage wasn't explicit in snippet, but assuming static provided structure or if 'events' state exists */}
-                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                        <IoCheckmarkCircle className="text-green-600" size={14} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">Invoice paid</p>
-                        <p className="text-xs text-gray-600 mt-1">Invoice #INV-001 was paid</p>
-                        <p className="text-xs text-gray-500 mt-2">2 hours ago</p>
-                      </div>
-                    </div>
+                  {/* Month Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <button className="p-1 hover:bg-gray-100 rounded">
+                      <IoChevronDown className="rotate-90 text-gray-600" size={16} />
+                    </button>
+                    <h4 className="text-sm font-semibold text-gray-900">January 2026</h4>
+                    <button className="p-1 hover:bg-gray-100 rounded">
+                      <IoChevronDown className="-rotate-90 text-gray-600" size={16} />
+                    </button>
+                  </div>
+
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                    {/* Days of Week */}
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="py-2 text-gray-500 font-medium">{day}</div>
+                    ))}
+                    {/* Previous month days */}
+                    {[28, 29, 30, 31].map(day => (
+                      <button key={`prev-${day}`} className="py-2 text-gray-300 hover:bg-gray-50 rounded">
+                        {day}
+                      </button>
+                    ))}
+                    {/* Current month days */}
+                    {[...Array(31)].map((_, i) => {
+                      const day = i + 1;
+                      const isToday = day === 13;
+                      return (
+                        <button
+                          key={day}
+                          className={`py-2 rounded transition-colors ${
+                            isToday
+                              ? 'bg-blue-600 text-white font-medium'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
                   </div>
                 </Card>
 
