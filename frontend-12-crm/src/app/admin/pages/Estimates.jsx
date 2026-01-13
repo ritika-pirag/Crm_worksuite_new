@@ -112,8 +112,11 @@ const Estimates = () => {
   // Filter states
   const [periodFilter, setPeriodFilter] = useState('yearly') // monthly, yearly, custom, dynamic
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [customDateStart, setCustomDateStart] = useState('')
   const [customDateEnd, setCustomDateEnd] = useState('')
+  const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [activeFilters, setActiveFilters] = useState([]) // Track active filters
 
   const [formData, setFormData] = useState({
     company: '',
@@ -159,9 +162,17 @@ const Estimates = () => {
         console.log('Fetched estimates count:', fetchedEstimates.length)
 
         // Transform API data to match component format
-        const transformedEstimates = fetchedEstimates.map(estimate => ({
+        const transformedEstimates = fetchedEstimates.map(estimate => {
+          // Fix estimate number format - convert any format to "ESTIMATE #XXX"
+          let estNumber = estimate.estimate_number || ''
+          // Extract numeric part from any format (EST#, PROP#, ESTIMATE#, etc.)
+          const numMatch = estNumber.match(/\d+/)
+          const numPart = numMatch ? numMatch[0].padStart(3, '0') : String(estimate.id).padStart(3, '0')
+          const formattedEstimateNumber = `ESTIMATE #${numPart}`
+
+          return {
           id: estimate.id,
-          estimateNumber: estimate.estimate_number ? estimate.estimate_number.replace('EST#', 'ESTIMATE #') : `ESTIMATE #${estimate.id}`,
+          estimateNumber: formattedEstimateNumber,
           company_id: estimate.company_id,
           company_name: estimate.company_name || '--',
           project: estimate.project_name || '--',
@@ -177,7 +188,8 @@ const Estimates = () => {
           estimateRequestNumber: estimate.estimate_request_number || '--',
           status: (estimate.status || 'Draft').charAt(0).toUpperCase() + (estimate.status || 'Draft').slice(1).toLowerCase(),
           items: estimate.items || [],
-        }))
+        }
+        })
         console.log('Transformed estimates:', transformedEstimates)
         setEstimates(transformedEstimates)
       } else {
@@ -810,10 +822,14 @@ const Estimates = () => {
   // Reset filters
   const handleResetFilters = () => {
     setStatusFilter('All')
+    setClientFilter('All')
     setPeriodFilter('yearly')
     setSelectedYear(new Date().getFullYear())
+    setSelectedMonth(new Date().getMonth() + 1)
     setCustomDateStart('')
     setCustomDateEnd('')
+    setSearchQuery('')
+    setShowFilterPanel(false)
     fetchEstimates()
   }
 
@@ -839,12 +855,59 @@ const Estimates = () => {
 
   const filteredEstimates = (estimates || []).filter(estimate => {
     if (!estimate) return false
+
+    // Search filter
     if (searchQuery && !estimate.estimateNumber?.toLowerCase().includes(searchQuery.toLowerCase()) && !estimate.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false
     }
+
+    // Status filter
     if (statusFilter !== 'All' && estimate.status !== statusFilter) {
       return false
     }
+
+    // Client filter
+    if (clientFilter !== 'All') {
+      const clientId = parseInt(clientFilter)
+      const estimateClientName = estimate.client?.name || ''
+      const matchingClient = clients.find(c => c.id === clientId)
+      if (matchingClient && estimateClientName !== matchingClient.client_name && estimateClientName !== matchingClient.name) {
+        return false
+      }
+    }
+
+    // Date filters
+    const estimateDate = estimate.created ? new Date(estimate.created) : null
+
+    // Period filter (Monthly/Yearly)
+    if (periodFilter === 'yearly' && estimateDate) {
+      if (estimateDate.getFullYear() !== selectedYear) {
+        return false
+      }
+    }
+
+    if (periodFilter === 'monthly' && estimateDate) {
+      if (estimateDate.getFullYear() !== selectedYear || estimateDate.getMonth() + 1 !== selectedMonth) {
+        return false
+      }
+    }
+
+    // Custom date range filter
+    if (customDateStart && estimateDate) {
+      const startDate = new Date(customDateStart)
+      if (estimateDate < startDate) {
+        return false
+      }
+    }
+
+    if (customDateEnd && estimateDate) {
+      const endDate = new Date(customDateEnd)
+      endDate.setHours(23, 59, 59, 999) // Include the entire end day
+      if (estimateDate > endDate) {
+        return false
+      }
+    }
+
     return true
   })
 
@@ -910,10 +973,30 @@ const Estimates = () => {
                 <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
                   <IoGrid size={16} className="text-gray-500" />
                 </button>
-                <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
+                <button
+                  onClick={() => setShowFilterPanel(!showFilterPanel)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${showFilterPanel ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-300 hover:bg-gray-50 text-gray-600'}`}
+                >
                   <IoAdd size={16} />
                   Add new filter
                 </button>
+                {/* Active filter tags */}
+                {statusFilter !== 'All' && (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                    Status: {statusFilter}
+                    <button onClick={() => setStatusFilter('All')} className="hover:text-blue-900">
+                      <IoClose size={14} />
+                    </button>
+                  </span>
+                )}
+                {clientFilter !== 'All' && (
+                  <span className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                    Client: {clients.find(c => c.id === parseInt(clientFilter))?.client_name || clientFilter}
+                    <button onClick={() => setClientFilter('All')} className="hover:text-green-900">
+                      <IoClose size={14} />
+                    </button>
+                  </span>
+                )}
               </div>
 
               {/* Right side - Filters */}
@@ -930,7 +1013,7 @@ const Estimates = () => {
                     <option value="Draft">Draft</option>
                     <option value="Sent">Sent</option>
                     <option value="Accepted">Accepted</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="Declined">Declined</option>
                   </select>
                   <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
                 </div>
@@ -962,6 +1045,31 @@ const Estimates = () => {
                     Dynamic
                   </button>
                 </div>
+
+                {/* Month Selector (for Monthly filter) */}
+                {periodFilter === 'monthly' && (
+                  <div className="relative">
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      className="appearance-none px-3 py-2 pr-8 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none bg-white"
+                    >
+                      <option value={1}>January</option>
+                      <option value={2}>February</option>
+                      <option value={3}>March</option>
+                      <option value={4}>April</option>
+                      <option value={5}>May</option>
+                      <option value={6}>June</option>
+                      <option value={7}>July</option>
+                      <option value={8}>August</option>
+                      <option value={9}>September</option>
+                      <option value={10}>October</option>
+                      <option value={11}>November</option>
+                      <option value={12}>December</option>
+                    </select>
+                    <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
+                )}
 
                 {/* Year Selector */}
                 <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
@@ -997,6 +1105,94 @@ const Estimates = () => {
                 </button>
               </div>
             </div>
+
+            {/* Expandable Filter Panel */}
+            {showFilterPanel && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Client Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                    <div className="relative">
+                      <select
+                        value={clientFilter}
+                        onChange={(e) => setClientFilter(e.target.value)}
+                        className="w-full appearance-none px-3 py-2 pr-8 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none bg-white"
+                      >
+                        <option value="All">All Clients</option>
+                        {clients.map(client => (
+                          <option key={client.id} value={client.id}>
+                            {client.client_name || client.name || `Client #${client.id}`}
+                          </option>
+                        ))}
+                      </select>
+                      <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                    </div>
+                  </div>
+
+                  {/* Date Range - Start */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                    <input
+                      type="date"
+                      value={customDateStart}
+                      onChange={(e) => setCustomDateStart(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+                    />
+                  </div>
+
+                  {/* Date Range - End */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                    <input
+                      type="date"
+                      value={customDateEnd}
+                      onChange={(e) => setCustomDateEnd(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+                    />
+                  </div>
+
+                  {/* Search */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search estimates..."
+                        className="w-full px-3 py-2 pl-9 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+                      />
+                      <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Actions */}
+                <div className="flex items-center justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => {
+                      setClientFilter('All')
+                      setCustomDateStart('')
+                      setCustomDateEnd('')
+                      setSearchQuery('')
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Clear Filters
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleApplyFilters()
+                      setShowFilterPanel(false)
+                    }}
+                    className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Estimates Table */}
