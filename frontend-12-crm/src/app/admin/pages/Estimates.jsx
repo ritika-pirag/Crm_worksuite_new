@@ -30,8 +30,12 @@ import {
   IoPrint,
   IoCopy,
   IoOpenOutline,
-  IoCamera, // Added for new item image
-  IoCalendar
+  IoCamera,
+  IoCalendar,
+  IoGrid,
+  IoCheckmark,
+  IoChevronBack,
+  IoChevronForward
 } from 'react-icons/io5'
 
 const Estimates = () => {
@@ -104,6 +108,13 @@ const Estimates = () => {
   const [loading, setLoading] = useState(true)
   const [selectedEstimate, setSelectedEstimate] = useState(null)
   const [estimates, setEstimates] = useState([]) // Moved before useEffect
+
+  // Filter states
+  const [periodFilter, setPeriodFilter] = useState('yearly') // monthly, yearly, custom, dynamic
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [customDateStart, setCustomDateStart] = useState('')
+  const [customDateEnd, setCustomDateEnd] = useState('')
+
   const [formData, setFormData] = useState({
     company: '',
     estimateNumber: '',
@@ -282,11 +293,6 @@ const Estimates = () => {
     }
   }, [formData.client, projects])
 
-  /* 
-   * Dynamic products are now fetched from API (productItems state)
-   * Replacing hardcoded productTemplates
-   */
-
   const taxOptions = [
     { value: '', label: 'Nothing selected' },
     { value: 'GST: 10%', label: 'GST: 10%', rate: 10 },
@@ -305,15 +311,10 @@ const Estimates = () => {
   }
 
   // Filter products based on search and exclude already selected items
-  // Using dynamic productItems from API (mapped to match UI expected fields locally if needed, or used directly)
   const filteredProducts = productItems.filter(product => {
-    // Check match on title/name
     const productName = product.title || product.name || ''
     const matchesSearch = productName.toLowerCase().includes(productSearchQuery.toLowerCase())
-
-    // Check if any existing item has the same name
     const isAlreadyAdded = estimateItems.some(item => item.itemName === productName)
-
     return matchesSearch && !isAlreadyAdded
   })
 
@@ -362,24 +363,10 @@ const Estimates = () => {
       const response = await itemsAPI.create(submitData)
 
       if (response.data.success) {
-        // alert('Item created successfully!') // Optional feedback
-
-        // 1. Refresh product items list
         fetchProductItems()
 
-        // 2. Add the new item to the estimate items list immediately
-        const newItemProduct = response.data.data // Assuming backend returns the created item structure
-        // If backend response structure differs, we might need to rely on the form data or fetchById
-        // For now, let's construct it from the form data + id from response if available, or just fetchItems and find it?
-        // Better: Use the response data.
-
-        // Items API create usually returns the created item. Let's assume response.data.data is the item object or contains it. 
-        // Based on typical API, it might be response.data.item. Let's start with basic assumption or re-fetch.
-        // Safer approach: re-fetch products, then find the one we just added? No, that might be async race.
-        // Let's use the local data to append to estimate immediately.
-
         const createdItem = {
-          id: response.data.data?.id || Date.now(), // Fallback if ID not returned
+          id: response.data.data?.id || Date.now(),
           itemName: newItemFormData.title,
           description: newItemFormData.description,
           quantity: 1,
@@ -427,11 +414,11 @@ const Estimates = () => {
 
     const newItem = {
       id: Date.now(),
-      itemName: product.title || product.name, // API uses title, fallback to name
+      itemName: product.title || product.name,
       description: product.description || '',
       quantity: 1,
-      unit: product.unit_type || product.unit || 'Pcs', // API uses unit_type
-      unitPrice: parseFloat(product.rate || product.unitPrice || 0), // API uses rate
+      unit: product.unit_type || product.unit || 'Pcs',
+      unitPrice: parseFloat(product.rate || product.unitPrice || 0),
       tax: '',
       taxRate: 0,
       file: null,
@@ -444,8 +431,6 @@ const Estimates = () => {
     setProductSearchQuery('')
     setShowProductDropdown(false)
   }
-
-
 
   // Update estimate item
   const handleItemChange = (id, field, value) => {
@@ -529,16 +514,15 @@ const Estimates = () => {
   }
 
   const resetForm = async () => {
-    // Auto-set company_id from session and generate dates
     const today = new Date()
     const validTillDate = new Date(today)
-    validTillDate.setDate(validTillDate.getDate() + 30) // Valid for 30 days
+    validTillDate.setDate(validTillDate.getDate() + 30)
 
     setFormData({
-      company: companyId, // Auto-set from localStorage
-      estimateNumber: generateEstimateNumber(), // Auto-generate estimate number
-      estimateDate: today.toISOString().split('T')[0], // Today's date
-      validTill: validTillDate.toISOString().split('T')[0], // 30 days from today
+      company: companyId,
+      estimateNumber: generateEstimateNumber(),
+      estimateDate: today.toISOString().split('T')[0],
+      validTill: validTillDate.toISOString().split('T')[0],
       currency: 'USD',
       client: '',
       project: '',
@@ -557,7 +541,6 @@ const Estimates = () => {
     setSelectedProduct('')
     setProductSearchQuery('')
 
-    // Auto-fetch clients for admin's company
     try {
       const response = await clientsAPI.getAll({ company_id: companyId })
       if (response.data.success) {
@@ -570,7 +553,6 @@ const Estimates = () => {
   }
 
   const handleSave = async (asDraft = false) => {
-    // Company is auto-set, no validation needed
     if (!formData.client) {
       alert('Client is required')
       return
@@ -580,13 +562,11 @@ const Estimates = () => {
       return
     }
 
-
     try {
       const selectedClient = filteredClients.find(c => c.id === parseInt(formData.client)) || clients.find(c => c.id === parseInt(formData.client))
       const selectedProject = filteredProjects.find(p => p.id === parseInt(formData.project)) || projects.find(p => p.id === parseInt(formData.project))
 
-      // Use admin's company_id from localStorage
-      const adminCompanyId = companyId // Auto-set from session
+      const adminCompanyId = companyId
 
       const estimateData = {
         company_id: parseInt(adminCompanyId),
@@ -646,7 +626,6 @@ const Estimates = () => {
 
   const handleEdit = async (estimate) => {
     try {
-      // Fetch clients directly before opening modal
       const adminCompanyId = parseInt(localStorage.getItem('companyId') || 1, 10)
       try {
         const clientsResponse = await clientsAPI.getAll({ company_id: adminCompanyId })
@@ -658,7 +637,6 @@ const Estimates = () => {
         console.error('Error fetching clients:', err)
       }
 
-      // Fetch full estimate data
       const response = await estimatesAPI.getById(estimate.id)
       if (response.data.success) {
         const data = response.data.data
@@ -712,6 +690,33 @@ const Estimates = () => {
 
   const handleView = (estimate) => {
     navigate(`/app/admin/estimates/${estimate.id}`)
+  }
+
+  const handleCopy = async (estimate) => {
+    try {
+      const response = await estimatesAPI.getById(estimate.id)
+      if (response.data.success) {
+        const data = response.data.data
+        // Create a copy with new estimate number
+        const copyData = {
+          ...data,
+          estimate_number: generateEstimateNumber(),
+          status: 'Draft',
+        }
+        delete copyData.id
+        delete copyData.created_at
+        delete copyData.updated_at
+
+        const createResponse = await estimatesAPI.create(copyData)
+        if (createResponse.data.success) {
+          alert('Estimate copied successfully!')
+          await fetchEstimates()
+        }
+      }
+    } catch (error) {
+      console.error('Error copying estimate:', error)
+      alert('Failed to copy estimate')
+    }
   }
 
   // Handle Excel Export
@@ -797,127 +802,40 @@ const Estimates = () => {
     printWindow.document.close()
   }
 
-  const columns = [
-    {
-      key: 'estimateNumber',
-      label: 'Estimate',
-      render: (value, row) => (
-        <button
-          onClick={() => handleView(row)}
-          className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-        >
-          {value}
-        </button>
-      ),
-    },
-    {
-      key: 'client',
-      label: 'Client',
-      render: (value, row) => (
-        <button
-          onClick={() => handleView(row)}
-          className="text-blue-600 hover:text-blue-800 hover:underline"
-        >
-          {row.client?.name || 'Unknown Client'}
-        </button>
-      ),
-    },
-    {
-      key: 'created',
-      label: 'Estimate date',
-      render: (value) => (
-        <span className="text-primary-text">{formatDate(value)}</span>
-      ),
-    },
-    {
-      key: 'created_by',
-      label: 'Created by',
-      render: (value, row) => {
-        if (row.created_by_name && row.created_by_name !== '-') {
-          return (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <span className="text-xs font-semibold text-blue-600">
-                  {row.created_by_name.substring(0, 2).toUpperCase()}
-                </span>
-              </div>
-              <button
-                onClick={() => handleView(row)}
-                className="text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                {row.created_by_name}
-              </button>
-            </div>
-          )
-        }
-        return <span className="text-primary-text">-</span>
-      },
-    },
-    {
-      key: 'total',
-      label: 'Amount',
-      render: (value) => (
-        <span className="text-primary-text font-medium">{formatCurrency(value)}</span>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (value) => {
-        const statusStyles = {
-          'Sent': 'bg-blue-100 text-blue-800',
-          'Accepted': 'bg-blue-800 text-white',
-          'Waiting': 'bg-yellow-100 text-yellow-800',
-          'Draft': 'bg-gray-100 text-gray-800',
-          'Declined': 'bg-red-100 text-red-800',
-          'Rejected': 'bg-red-100 text-red-800',
-        }
-        return (
-          <Badge variant="default" className={`${statusStyles[value] || 'bg-gray-100 text-gray-800'} px-3 py-1 rounded-full text-sm font-medium`}>
-            {value}
-          </Badge>
-        )
-      },
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (value, row) => (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleView(row)
-            }}
-            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            title="View"
-          >
-            <IoEye size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleEdit(row)
-            }}
-            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            title="Edit"
-          >
-            <IoCreate size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDelete(row)
-            }}
-            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-            title="Delete"
-          >
-            <IoTrash size={16} />
-          </button>
-        </div>
-      ),
-    },
-  ]
+  // Apply filters
+  const handleApplyFilters = () => {
+    fetchEstimates()
+  }
+
+  // Reset filters
+  const handleResetFilters = () => {
+    setStatusFilter('All')
+    setPeriodFilter('yearly')
+    setSelectedYear(new Date().getFullYear())
+    setCustomDateStart('')
+    setCustomDateEnd('')
+    fetchEstimates()
+  }
+
+  // Status colors with background
+  const getStatusStyle = (status) => {
+    const statusLower = status?.toLowerCase() || ''
+    switch (statusLower) {
+      case 'accepted':
+        return 'bg-blue-600 text-white'
+      case 'sent':
+        return 'bg-blue-400 text-white'
+      case 'draft':
+        return 'bg-gray-500 text-white'
+      case 'declined':
+      case 'rejected':
+        return 'bg-red-500 text-white'
+      case 'waiting':
+        return 'bg-yellow-500 text-white'
+      default:
+        return 'bg-gray-400 text-white'
+    }
+  }
 
   const filteredEstimates = (estimates || []).filter(estimate => {
     if (!estimate) return false
@@ -931,7 +849,7 @@ const Estimates = () => {
   })
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 bg-gray-100 min-h-screen p-4">
       {/* Header with Tabs */}
       <div className="bg-white rounded-lg shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-4 border-b border-gray-200">
@@ -966,7 +884,6 @@ const Estimates = () => {
           </div>
           <AddButton onClick={async () => {
             resetForm();
-            // Fetch clients directly before opening modal
             try {
               const adminCompanyId = parseInt(localStorage.getItem('companyId') || 1, 10)
               const response = await clientsAPI.getAll({ company_id: adminCompanyId })
@@ -978,129 +895,226 @@ const Estimates = () => {
               console.error('Error fetching clients:', err)
             }
             setIsAddModalOpen(true);
-          }} label="Add estimate" className="py-3 h-11" />
+          }} label="Add estimate" className="py-3 h-11 bg-green-500 hover:bg-green-600" />
         </div>
       </div>
 
       {/* Content based on active tab */}
       {activeTab === 'estimates' && (
         <>
-
-          {/* Filters */}
+          {/* Filter Bar */}
           <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex flex-wrap items-center gap-4 mb-4">
-              <div className="flex items-center gap-2 text-sm text-secondary-text">
-                <span>Duration</span>
-                <span>Start Date To End Date</span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Left side - Add new filter */}
+              <div className="flex items-center gap-3">
+                <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <IoGrid size={16} className="text-gray-500" />
+                </button>
+                <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
+                  <IoAdd size={16} />
+                  Add new filter
+                </button>
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              >
-                <option value="All">Status All</option>
-                <option value="All">All</option>
-                <option value="Waiting">Waiting</option>
-                <option value="Draft">Draft</option>
-                <option value="Sent">Sent</option>
-                <option value="Accepted">Accepted</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-              <div className="ml-auto flex items-center gap-2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Start typing to search"
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-                  />
-                  <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-secondary-text" size={18} />
-                </div>
-              </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200">
-              <Button variant="outline" onClick={handleExportExcel} className="flex items-center gap-2 hover:bg-gray-800 hover:text-white">
-                <IoDownload size={18} />
-                Excel
-              </Button>
-              <Button variant="outline" onClick={handlePrint} className="flex items-center gap-2 hover:bg-gray-800 hover:text-white">
-                <IoPrint size={18} />
-                Print
-              </Button>
+              {/* Right side - Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status Dropdown */}
+                <div className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none bg-white"
+                  >
+                    <option value="All">- Status -</option>
+                    <option value="Waiting">Waiting</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Sent">Sent</option>
+                    <option value="Accepted">Accepted</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                  <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                </div>
+
+                {/* Period Buttons */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setPeriodFilter('monthly')}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${periodFilter === 'monthly' ? 'bg-white shadow text-gray-800' : 'text-gray-600 hover:text-gray-800'}`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setPeriodFilter('yearly')}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${periodFilter === 'yearly' ? 'bg-white shadow text-gray-800' : 'text-gray-600 hover:text-gray-800'}`}
+                  >
+                    Yearly
+                  </button>
+                  <button
+                    onClick={() => setPeriodFilter('custom')}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${periodFilter === 'custom' ? 'bg-white shadow text-gray-800' : 'text-gray-600 hover:text-gray-800'}`}
+                  >
+                    Custom
+                  </button>
+                  <button
+                    onClick={() => setPeriodFilter('dynamic')}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${periodFilter === 'dynamic' ? 'bg-white shadow text-gray-800' : 'text-gray-600 hover:text-gray-800'}`}
+                  >
+                    Dynamic
+                  </button>
+                </div>
+
+                {/* Year Selector */}
+                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setSelectedYear(prev => prev - 1)}
+                    className="px-2 py-2 hover:bg-gray-100 border-r border-gray-300"
+                  >
+                    <IoChevronBack size={16} />
+                  </button>
+                  <span className="px-4 py-2 text-sm font-medium">{selectedYear}</span>
+                  <button
+                    onClick={() => setSelectedYear(prev => prev + 1)}
+                    className="px-2 py-2 hover:bg-gray-100 border-l border-gray-300"
+                  >
+                    <IoChevronForward size={16} />
+                  </button>
+                </div>
+
+                {/* Apply & Reset Buttons */}
+                <button
+                  onClick={handleApplyFilters}
+                  className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                  title="Apply filters"
+                >
+                  <IoCheckmark size={18} />
+                </button>
+                <button
+                  onClick={handleResetFilters}
+                  className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  title="Reset filters"
+                >
+                  <IoClose size={18} />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Estimates Table */}
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
-                      <button className="flex items-center gap-1 hover:text-primary-accent">
-                        Estimate
-                        <IoChevronDown size={14} className="opacity-60" />
-                      </button>
+                    <th className="w-[15%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Estimate
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
+                    <th className="w-[20%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Client
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
+                    <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Estimate date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
+                    <th className="w-[15%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Created by
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
+                    <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Amount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
+                    <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">
-                      
-                    </th>
+                    <th className="w-[14%] px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={columns.length} className="px-4 py-8 text-center text-secondary-text">
+                      <td colSpan={7} className="px-4 py-8 text-center text-secondary-text">
                         Loading estimates...
                       </td>
                     </tr>
                   ) : filteredEstimates.length === 0 ? (
                     <tr>
-                      <td colSpan={columns.length} className="px-4 py-8 text-center text-secondary-text">
+                      <td colSpan={7} className="px-4 py-8 text-center text-secondary-text">
                         No estimates found
                       </td>
                     </tr>
                   ) : (
                     filteredEstimates.map((estimate) => (
                       <tr key={estimate.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[0].render(estimate.estimateNumber, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleView(estimate)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                          >
+                            {estimate.estimateNumber}
+                          </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[1].render(estimate.client, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleView(estimate)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {estimate.client?.name || 'Unknown Client'}
+                          </button>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[2].render(estimate.created, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap text-gray-600">
+                          {formatDate(estimate.created)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[3].render(estimate.created_by_name, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {estimate.created_by_name && estimate.created_by_name !== '-' ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-xs font-semibold text-blue-600">
+                                  {estimate.created_by_name.substring(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="text-gray-700">{estimate.created_by_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[4].render(estimate.total, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-medium">
+                          {formatCurrency(estimate.total)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[5].render(estimate.status, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(estimate.status)}`}>
+                            {estimate.status}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {columns[6].render(null, estimate)}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCopy(estimate)
+                              }}
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                              title="Copy"
+                            >
+                              <IoCopy size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEdit(estimate)
+                              }}
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <IoCreate size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                              }}
+                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                              title="More"
+                            >
+                              <IoEllipsisVertical size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1109,43 +1123,36 @@ const Estimates = () => {
                 {filteredEstimates.length > 0 && (
                   <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-right font-semibold text-primary-text">
-                        Total
+                      <td colSpan={4} className="px-4 py-4 text-right font-semibold text-gray-700">
+                        Total:
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap"></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-primary-text font-bold">
+                      <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-bold">
                         {formatCurrency(filteredEstimates.reduce((sum, est) => sum + (parseFloat(est.total) || 0), 0))}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap"></td>
-                      <td className="px-6 py-4 whitespace-nowrap"></td>
+                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
-            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-secondary-text">
-                <span>Show</span>
+            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
                 <select className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none">
                   <option>10</option>
                   <option>25</option>
                   <option>50</option>
                   <option>100</option>
                 </select>
-                <span>entries</span>
               </div>
-              <div className="text-sm text-secondary-text">
-                Showing 1 to {(filteredEstimates || []).length} of {(filteredEstimates || []).length} entries
+              <div className="text-sm text-gray-600">
+                1-{(filteredEstimates || []).length} / {(filteredEstimates || []).length}
               </div>
-              <div className="flex items-center gap-2">
-                <button disabled className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-400 cursor-not-allowed">
-                  Previous
+              <div className="flex items-center gap-1">
+                <button disabled className="p-1.5 border border-gray-300 rounded text-gray-400 cursor-not-allowed">
+                  <IoChevronBack size={16} />
                 </button>
-                <button className="px-2 py-0.5 text-xs border border-gray-300 rounded bg-primary-accent text-white hover:bg-primary-accent/90">
-                  1
-                </button>
-                <button disabled={(filteredEstimates || []).length <= 10} className="px-3 py-1 border border-gray-300 rounded text-gray-400 cursor-not-allowed">
-                  Next
+                <button disabled className="p-1.5 border border-gray-300 rounded text-gray-400 cursor-not-allowed">
+                  <IoChevronForward size={16} />
                 </button>
               </div>
             </div>
@@ -1169,7 +1176,7 @@ const Estimates = () => {
         </Card>
       )}
 
-      {/* Create/Edit Estimate Modal - Simplified to match UI */}
+      {/* Create/Edit Estimate Modal */}
       <Modal
         isOpen={isAddModalOpen || isEditModalOpen}
         onClose={() => {
@@ -1336,117 +1343,7 @@ const Estimates = () => {
         </div>
       </Modal>
 
-      {/* Estimate Template Modal */}
-      <Modal
-        isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
-        title="Estimate Template"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Start typing to search"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              />
-              <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-secondary-text" size={18} />
-            </div>
-            <Button variant="primary" onClick={() => alert('Add template')} className="flex items-center gap-2">
-              <IoAdd size={18} />
-              Estimate Template
-            </Button>
-          </div>
-          <Card className="p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">
-                      <button className="flex items-center gap-1 hover:text-primary-accent">
-                        Id
-                        <div className="flex flex-col">
-                          <IoChevronUp size={10} className="-mb-1 opacity-30" />
-                          <IoChevronDown size={10} className="opacity-30" />
-                        </div>
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">
-                      <button className="flex items-center gap-1 hover:text-primary-accent">
-                        Name
-                        <div className="flex flex-col">
-                          <IoChevronUp size={10} className="-mb-1 opacity-30" />
-                          <IoChevronDown size={10} className="opacity-30" />
-                        </div>
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">
-                      <button className="flex items-center gap-1 hover:text-primary-accent">
-                        Total
-                        <div className="flex flex-col">
-                          <IoChevronUp size={10} className="-mb-1 opacity-30" />
-                          <IoChevronDown size={10} className="opacity-30" />
-                        </div>
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">
-                      <button className="flex items-center gap-1 hover:text-primary-accent">
-                        Date
-                        <div className="flex flex-col">
-                          <IoChevronUp size={10} className="-mb-1 opacity-30" />
-                          <IoChevronDown size={10} className="opacity-30" />
-                        </div>
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-secondary-text">
-                      No data available in table
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-secondary-text">
-                <span>Show</span>
-                <select className="px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none">
-                  <option>10</option>
-                  <option>25</option>
-                  <option>50</option>
-                  <option>100</option>
-                </select>
-                <span>entries</span>
-              </div>
-              <div className="text-sm text-secondary-text">
-                Showing 0 to 0 of 0 entries
-              </div>
-              <div className="flex items-center gap-2">
-                <button disabled className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-400 cursor-not-allowed">
-                  Previous
-                </button>
-                <button disabled className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-400 cursor-not-allowed">
-                  Next
-                </button>
-              </div>
-            </div>
-          </Card>
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsTemplateModalOpen(false)}
-              className="flex-1"
-            >
-              Close
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* New Item Modal (Added for replacement of inline Add Item) */}
+      {/* New Item Modal */}
       <Modal
         isOpen={isAddItemModalOpen}
         onClose={() => setIsAddItemModalOpen(false)}
