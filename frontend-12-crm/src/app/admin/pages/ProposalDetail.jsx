@@ -787,87 +787,20 @@ const ProposalDetail = () => {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-gray-50">
-      {/* Left Sidebar - Proposals List */}
-      <div className={`${isSidebarOpen ? 'w-full lg:w-80' : 'hidden lg:block lg:w-0'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}>
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => navigate('/app/admin/proposals')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <IoArrowBack size={20} />
-            </button>
-            <h2 className="text-lg font-semibold text-primary-text">← Proposals</h2>
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden ml-auto p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <IoEllipsisVertical size={20} />
-            </button>
-          </div>
-          
-          {/* Search */}
-          <div className="relative">
-            <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search"
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-            />
-          </div>
-        </div>
-        
-        {/* Proposals List */}
-        <div className="flex-1 overflow-y-auto">
-          {filteredProposals.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => navigate(`/app/admin/proposals/${p.id}`)}
-              className={`p-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                p.id === parseInt(id) ? 'bg-blue-50 border-l-4 border-l-primary-accent' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-primary-text truncate">{p.estimate_number}</p>
-                  <p className="text-xs text-secondary-text truncate">{p.client_name}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge className={`text-xs ${
-                      p.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
-                      p.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {p.status === 'accepted' ? 'Accepted' : p.status === 'draft' ? 'Draft' : p.status}
-                    </Badge>
-                    <span className="text-xs text-primary-text font-semibold">{formatCurrency(p.total)}</span>
-                    <span className="text-xs text-secondary-text">{formatDate(p.proposal_date)}</span>
-                  </div>
-                </div>
-                {p.id === parseInt(id) && (
-                  <span className="text-primary-accent ml-2">›</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Pagination */}
-        <div className="p-4 border-t border-gray-200 flex items-center justify-center gap-2">
-          <button className="px-3 py-1 text-sm text-secondary-text hover:text-primary-text">‹</button>
-          <button className="px-3 py-1 text-sm bg-primary-accent text-white rounded">1</button>
-          <button className="px-3 py-1 text-sm text-secondary-text hover:text-primary-text">›</button>
-        </div>
-      </div>
-
+    <div className="flex flex-col lg:flex-row min-h-screen overflow-hidden bg-[#F5F5F5]">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/app/admin/proposals')}
+                className="p-2 hover:bg-white rounded-lg transition-colors border border-gray-200 bg-white shadow-sm"
+                title="Back to Proposals"
+              >
+                <IoArrowBack size={20} />
+              </button>
               <span className="text-2xl">⚓</span>
               <h1 className="text-xl sm:text-2xl font-bold text-primary-text">{proposal.estimate_number}</h1>
             </div>
@@ -875,13 +808,19 @@ const ProposalDetail = () => {
 
           {/* Status and Date */}
           <div className="flex items-center gap-4 flex-wrap">
-            <Badge className={`text-sm ${
-              proposal.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
-              proposal.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-              'bg-gray-100 text-gray-800'
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              proposal.status === 'accepted' ? 'bg-emerald-500 text-white' :
+              proposal.status === 'sent' ? 'bg-green-500 text-white' :
+              proposal.status === 'draft' ? 'bg-blue-500 text-white' :
+              proposal.status === 'declined' ? 'bg-red-500 text-white' :
+              'bg-gray-500 text-white'
             }`}>
-              {proposal.status === 'accepted' ? 'Accepted' : proposal.status === 'draft' ? 'Draft' : proposal.status}
-            </Badge>
+              {proposal.status === 'accepted' ? 'Accepted' :
+               proposal.status === 'sent' ? 'Sent' :
+               proposal.status === 'draft' ? 'Draft' :
+               proposal.status === 'declined' ? 'Declined' :
+               proposal.status ? proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1) : 'Draft'}
+            </span>
             <div className="flex items-center gap-2 text-sm text-secondary-text">
               <IoCalendar size={16} />
               <span>{formatDate(proposal.proposal_date)}</span>
@@ -901,44 +840,46 @@ const ProposalDetail = () => {
             {proposal.items && proposal.items.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                  <table className="w-full table-fixed">
+                    <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase">Item</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase">Quantity</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase">Rate</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase">Total</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-secondary-text uppercase"></th>
+                        <th className="w-2/5 px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Item</th>
+                        <th className="w-1/6 px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                        <th className="w-1/6 px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Rate</th>
+                        <th className="w-1/6 px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                        <th className="w-20 px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-100">
                       {proposal.items.map((item, idx) => (
-                        <tr key={idx}>
+                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <IoDocumentText size={16} className="text-gray-400" />
-                              <div>
-                                <p className="text-sm font-medium text-primary-text">{item.item_name || item.description || '-'}</p>
+                              <IoDocumentText size={16} className="text-gray-400 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-primary-text truncate">{item.item_name || item.description || '-'}</p>
                                 {item.description && item.description !== item.item_name && (
-                                  <p className="text-xs text-secondary-text">{item.description}</p>
+                                  <p className="text-xs text-secondary-text truncate">{item.description}</p>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-primary-text">{item.quantity || 0} Hour</td>
-                          <td className="px-4 py-3 text-right text-sm text-primary-text">{formatCurrency(item.unit_price || 0)}</td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold text-primary-text">{formatCurrency(item.amount || 0)}</td>
+                          <td className="px-4 py-3 text-right text-sm text-primary-text whitespace-nowrap">{item.quantity || 0}</td>
+                          <td className="px-4 py-3 text-right text-sm text-primary-text whitespace-nowrap">{formatCurrency(item.unit_price || 0)}</td>
+                          <td className="px-4 py-3 text-right text-sm font-semibold text-primary-text whitespace-nowrap">{formatCurrency(item.amount || 0)}</td>
                           <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button 
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                                 onClick={() => handleEditItem(idx)}
+                                title="Edit"
                               >
                                 <IoCreate size={16} />
                               </button>
-                              <button 
-                                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              <button
+                                className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
                                 onClick={() => handleRemoveItem(idx)}
+                                title="Remove"
                               >
                                 <IoClose size={16} />
                               </button>
@@ -976,31 +917,31 @@ const ProposalDetail = () => {
             )}
 
             {/* Financial Summary */}
-            <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary-text">Sub Total:</span>
-                <span className="font-semibold text-primary-text">{formatCurrency(proposal.sub_total || 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary-text flex items-center gap-1">
-                  Discount:
-                  <button className="text-primary-accent hover:underline" onClick={handleEditDiscount}>
-                    <IoCreate size={14} />
-                  </button>
-                </span>
-                <span className="font-semibold text-primary-text">{formatCurrency(proposal.discount_amount || 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary-text">Tax (10%):</span>
-                <span className="font-semibold text-primary-text">{formatCurrency(proposal.tax_amount || 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary-text">Tax (10%):</span>
-                <span className="font-semibold text-primary-text">{formatCurrency(proposal.tax_amount || 0)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-gray-300">
-                <span className="text-lg font-bold text-primary-text">Total:</span>
-                <span className="text-lg font-bold text-primary-accent">{formatCurrency(proposal.total || 0)}</span>
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-secondary-text">Sub Total:</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(proposal.sub_total || 0)}</span>
+                </div>
+                {(proposal.discount_amount > 0 || true) && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-secondary-text flex items-center gap-2">
+                      Discount:
+                      <button className="text-blue-500 hover:text-blue-700 transition-colors" onClick={handleEditDiscount} title="Edit Discount">
+                        <IoCreate size={14} />
+                      </button>
+                    </span>
+                    <span className="font-semibold text-red-500">-{formatCurrency(proposal.discount_amount || 0)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-secondary-text">Tax:</span>
+                  <span className="font-semibold text-primary-text">{formatCurrency(proposal.tax_amount || 0)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t border-gray-300">
+                  <span className="text-lg font-bold text-primary-text">Total:</span>
+                  <span className="text-lg font-bold text-green-600">{formatCurrency(proposal.total || 0)}</span>
+                </div>
               </div>
             </div>
           </Card>

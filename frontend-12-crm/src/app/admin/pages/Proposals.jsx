@@ -779,7 +779,8 @@ const Proposals = () => {
   // Handlers for new filter system
   const handleQuickStatusFilter = (status) => {
     setQuickStatusFilter(status)
-    // Apply filter logic here
+    // Sync with main status filter for actual filtering
+    setStatusFilter(status)
   }
 
   const toggleColumnVisibility = (column) => {
@@ -978,15 +979,23 @@ const Proposals = () => {
       label: 'Status',
       render: (value) => {
         const statusColors = {
-          draft: 'bg-gray-100 text-gray-800',
-          sent: 'bg-blue-100 text-blue-800',
-          accepted: 'bg-blue-100 text-blue-800',
-          declined: 'bg-red-100 text-red-800',
+          draft: 'bg-blue-500 text-white',
+          sent: 'bg-green-500 text-white',
+          accepted: 'bg-emerald-500 text-white',
+          declined: 'bg-red-500 text-white',
+          pending: 'bg-yellow-500 text-white',
+        }
+        const statusLabels = {
+          draft: 'Draft',
+          sent: 'Sent',
+          accepted: 'Accepted',
+          declined: 'Declined',
+          pending: 'Pending',
         }
         return (
-          <Badge className={`text-xs ${statusColors[value] || 'bg-gray-100 text-gray-800'}`}>
-            {value === 'accepted' ? 'Accepted' : value === 'draft' ? 'Draft' : value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Draft'}
-          </Badge>
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColors[value] || 'bg-gray-500 text-white'}`}>
+            {statusLabels[value] || (value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Draft')}
+          </span>
         )
       },
     },
@@ -1103,7 +1112,7 @@ const Proposals = () => {
   })
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 min-h-screen bg-[#F5F5F5] p-4 sm:p-6 -m-4 sm:-m-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
@@ -1425,20 +1434,30 @@ const Proposals = () => {
       {viewMode === 'list' ? (
         <Card className="p-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="w-full table-fixed">
+              <thead className="bg-gray-100 border-b border-gray-200">
                 <tr>
                   {columns.map((column, idx) => (
                     <th
                       key={idx}
-                      className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider"
+                      className={`px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap ${
+                        column.key === 'estimate_number' ? 'w-36' :
+                        column.key === 'client_name' ? 'w-40' :
+                        column.key === 'proposal_date' ? 'w-32' :
+                        column.key === 'valid_till' ? 'w-32' :
+                        column.key === 'last_email_seen' ? 'w-44' :
+                        column.key === 'last_preview_seen' ? 'w-44' :
+                        column.key === 'total' ? 'w-28' :
+                        column.key === 'status' ? 'w-28' :
+                        column.key === 'actions' ? 'w-32' : ''
+                      }`}
                     >
                       {column.label}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
                     <td colSpan={columns.length} className="px-4 py-8 text-center text-secondary-text">
@@ -1452,10 +1471,13 @@ const Proposals = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredProposals.map((proposal) => (
-                    <tr key={proposal.id} className="hover:bg-gray-50">
+                  filteredProposals.map((proposal, index) => (
+                    <tr
+                      key={proposal.id}
+                      className={`hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                    >
                       {columns.map((column, idx) => (
-                        <td key={idx} className="px-4 py-3">
+                        <td key={idx} className="px-4 py-3 text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                           {column.render ? column.render(proposal[column.key], proposal) : (proposal[column.key] || '')}
                         </td>
                       ))}
