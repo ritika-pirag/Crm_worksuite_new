@@ -1370,65 +1370,6 @@ const Clients = () => {
         </div>
       )}
 
-      {/* Charts Row */}
-      {
-        activeTab === 'overview' && overviewData && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Client Growth Chart */}
-            <Card className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-primary-text">Client Growth</h3>
-                <Button
-                  variant="ghost"
-                  onClick={() => setActiveTab('clients')}
-                  className="text-sm"
-                >
-                  View All
-                </Button>
-              </div>
-              {overviewData.client_growth && overviewData.client_growth.length > 0 ? (
-                <div className="h-64">
-                  <BarChart
-                    data={overviewData.client_growth.map(g => ({ name: g.month, value: g.count }))}
-                    dataKey="value"
-                    name="Clients"
-                    height={250}
-                    color="#0073EA"
-                  />
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-secondary-text">
-                  No growth data available
-                </div>
-              )}
-            </Card>
-
-            {/* Active vs Inactive Chart */}
-            <Card className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-primary-text">Client Status</h3>
-              </div>
-              {overviewData.totals ? (
-                <div className="h-64">
-                  <DonutChart
-                    data={[
-                      { name: 'Active', value: overviewData.totals.active_clients },
-                      { name: 'Inactive', value: overviewData.totals.inactive_clients },
-                    ]}
-                    height={250}
-                  />
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-secondary-text">
-                  No status data available
-                </div>
-              )}
-            </Card>
-          </div>
-        )
-      }
-
-
       {/* Clients Tab */}
       {
         activeTab === 'clients' && (

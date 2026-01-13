@@ -137,6 +137,16 @@ const ClientDetail = () => {
   const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false)
   const [isAddOrderModalOpen, setIsAddOrderModalOpen] = useState(false)
   const [isAddSubscriptionModalOpen, setIsAddSubscriptionModalOpen] = useState(false)
+  const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false)
+
+  // Event form data
+  const [eventFormData, setEventFormData] = useState({
+    title: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '',
+    description: '',
+    type: 'meeting'
+  })
 
   // View modal states
   const [isViewPaymentModalOpen, setIsViewPaymentModalOpen] = useState(false)
@@ -2159,7 +2169,10 @@ const ClientDetail = () => {
                       <IoCalendar className="text-primary-accent" size={20} />
                       <h3 className="text-lg font-semibold text-primary-text">Events</h3>
                     </div>
-                    <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <button
+                      onClick={() => setIsAddEventModalOpen(true)}
+                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
                       <IoAdd size={14} />
                       Add event
                     </button>
@@ -4164,6 +4177,78 @@ const ClientDetail = () => {
             </Button>
             <Button variant="primary" onClick={handleAddTask} className="flex-1">
               Add Task
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Event Modal */}
+      <Modal
+        isOpen={isAddEventModalOpen}
+        onClose={() => setIsAddEventModalOpen(false)}
+        title="Add Event"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Event Title"
+            value={eventFormData.title}
+            onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
+            placeholder="Enter event title"
+            required
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Date"
+              type="date"
+              value={eventFormData.date}
+              onChange={(e) => setEventFormData({ ...eventFormData, date: e.target.value })}
+              required
+            />
+            <Input
+              label="Time"
+              type="time"
+              value={eventFormData.time}
+              onChange={(e) => setEventFormData({ ...eventFormData, time: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-primary-text mb-2">Event Type</label>
+            <select
+              value={eventFormData.type}
+              onChange={(e) => setEventFormData({ ...eventFormData, type: e.target.value })}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+            >
+              <option value="meeting">Meeting</option>
+              <option value="call">Call</option>
+              <option value="deadline">Deadline</option>
+              <option value="reminder">Reminder</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
+            <textarea
+              value={eventFormData.description}
+              onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
+              rows={3}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+              placeholder="Enter event description"
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button variant="outline" onClick={() => setIsAddEventModalOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                alert('Event added successfully!')
+                setIsAddEventModalOpen(false)
+                setEventFormData({ title: '', date: new Date().toISOString().split('T')[0], time: '', description: '', type: 'meeting' })
+              }}
+              className="flex-1"
+            >
+              Add Event
             </Button>
           </div>
         </div>
