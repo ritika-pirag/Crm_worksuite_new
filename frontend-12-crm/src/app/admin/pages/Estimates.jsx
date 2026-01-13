@@ -1219,7 +1219,9 @@ const Estimates = () => {
                     <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="w-[14%] px-4 py-3"></th>
+                    <th className="w-[14%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1304,11 +1306,12 @@ const Estimates = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
+                                handleDelete(estimate)
                               }}
-                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
-                              title="More"
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
                             >
-                              <IoEllipsisVertical size={16} />
+                              <IoTrash size={16} />
                             </button>
                           </div>
                         </td>
