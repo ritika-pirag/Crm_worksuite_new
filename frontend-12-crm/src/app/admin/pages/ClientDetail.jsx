@@ -2027,7 +2027,7 @@ const ClientDetail = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4 tabs-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
-            {['Overview', 'Contacts', 'Projects', 'Tasks', 'Proposals', 'Estimates', 'Invoices', 'Payments', 'Statement', 'Contracts', 'Expenses', 'Files', 'Notes'].map((tab) => (
+            {['Overview', 'Projects', 'Tasks', 'Proposals', 'Estimates', 'Invoices', 'Payments', 'Statement', 'Contracts', 'Expenses', 'Files', 'Notes'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2152,119 +2152,7 @@ const ClientDetail = () => {
                   </div>
                 </Card>
 
-                {/* Projects Section */}
-                <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IoBriefcase className="text-primary-accent" size={20} />
-                      <h3 className="text-lg font-semibold text-primary-text">Projects</h3>
-                    </div>
-                    <button onClick={() => setActiveTab('projects')} className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                      View All <IoChevronDown size={14} className="-rotate-90" />
-                    </button>
-                  </div>
-                  {projects.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="text-gray-500 border-b border-gray-100">
-                          <tr>
-                            <th className="text-left pb-3 font-medium">Project Name</th>
-                            <th className="text-left pb-3 font-medium">Deadline</th>
-                            <th className="text-left pb-3 font-medium">Status</th>
-                            <th className="text-right pb-3 font-medium">Progress</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {projects.slice(0, 5).map(p => (
-                            <tr key={p.id} className="group hover:bg-gray-50">
-                              <td className="py-3 text-blue-600 font-medium cursor-pointer" onClick={() => navigate(`/app/admin/projects/${p.id}`)}>
-                                {p.project_name || p.name}
-                              </td>
-                              <td className="py-3 text-gray-600">{p.deadline ? formatDate(p.deadline) : '-'}</td>
-                              <td className="py-3">
-                                <Badge className={`px-2 py-0.5 text-xs rounded-full ${p.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    p.status === 'in progress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                  {p.status || 'Active'}
-                                </Badge>
-                              </td>
-                              <td className="py-3 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                    <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
-                                  </div>
-                                  <span className="text-xs text-gray-600">{p.progress || 0}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No projects found.</p>
-                  )}
-                </Card>
-
-                {/* 4. Tasks */}
-                <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IoList className="text-primary-accent" size={20} />
-                      <h3 className="text-lg font-semibold text-primary-text">Tasks</h3>
-                    </div>
-                    <button onClick={() => setActiveTab('tasks')} className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                      View All <IoChevronDown size={14} className="-rotate-90" />
-                    </button>
-                  </div>
-                  {tasks.length > 0 ? (
-                    <div className="space-y-3">
-                      {tasks.slice(0, 5).map(task => (
-                        <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => handleViewTask(task)}>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${task.status === 'completed' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                              <p className="text-xs text-gray-500">{task.project_name ? `Project: ${task.project_name}` : 'No Project'} • Due: {task.due_date ? formatDate(task.due_date) : '-'}</p>
-                            </div>
-                          </div>
-                          <Badge className="text-xs bg-white border border-gray-200">
-                            {task.status || 'To Do'}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No tasks found.</p>
-                  )}
-                </Card>
-
-                {/* 5. Notes */}
-                <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IoDocumentText className="text-primary-accent" size={20} />
-                      <h3 className="text-lg font-semibold text-primary-text">Notes</h3>
-                    </div>
-                    <button onClick={() => setActiveTab('notes')} className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                      View All <IoChevronDown size={14} className="-rotate-90" />
-                    </button>
-                  </div>
-                  {notes.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {notes.slice(0, 3).map(note => (
-                        <div key={note.id} className="p-4 bg-yellow-50 border border-yellow-100 rounded-lg cursor-pointer hover:shadow-sm" onClick={() => handleViewNote(note)}>
-                          <p className="text-sm text-gray-800 line-clamp-3">{note.content || note.note}</p>
-                          <p className="text-xs text-gray-500 mt-2">{formatDate(note.created_at)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No notes found.</p>
-                  )}
-                </Card>
-
-                {/* 6. Events Calendar */}
+                {/* Events Calendar */}
                 <Card className="p-6 bg-white border border-gray-200">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
