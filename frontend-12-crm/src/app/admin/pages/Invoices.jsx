@@ -45,6 +45,7 @@ import {
   IoCopy,
   IoWarning,
   IoColorPalette,
+  IoNotifications,
 } from "react-icons/io5";
 
 const Invoices = () => {
@@ -59,6 +60,7 @@ const Invoices = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isManageLabelsModalOpen, setIsManageLabelsModalOpen] = useState(false);
+  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
 
   // Labels state
   const [labels, setLabels] = useState([
@@ -91,6 +93,10 @@ const Invoices = () => {
   const [customDateStart, setCustomDateStart] = useState("");
   const [customDateEnd, setCustomDateEnd] = useState("");
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   // Invoice items state
   const [invoiceItems, setInvoiceItems] = useState([]);
 
@@ -109,7 +115,7 @@ const Invoices = () => {
     tds: "",
     note: "",
     labels: "",
-    isRecurring: false,
+    isRecurring: true,
     repeatEvery: 1,
     repeatType: "Month",
     cycles: "",
@@ -129,10 +135,9 @@ const Invoices = () => {
       if (response.data.success) {
         const fetchedInvoices = response.data.data || [];
         const transformedInvoices = fetchedInvoices.map((invoice) => {
-          // Fix invoice number format
           let invNumber = invoice.invoice_number || "";
           const numMatch = invNumber.match(/\d+/);
-          const numPart = numMatch ? numMatch[0].padStart(3, "0") : String(invoice.id).padStart(3, "0");
+          const numPart = numMatch ? numMatch[0] : String(invoice.id);
           const formattedInvoiceNumber = `INV #${numPart}`;
 
           return {
@@ -190,7 +195,6 @@ const Invoices = () => {
     fetchProjects();
   }, [fetchInvoices, fetchClients, fetchProjects]);
 
-  // Filter projects by client
   useEffect(() => {
     if (formData.client) {
       const clientId = parseInt(formData.client);
@@ -201,13 +205,11 @@ const Invoices = () => {
     }
   }, [formData.client, projects]);
 
-  // Generate invoice number
   const generateInvoiceNumber = () => {
     const nextNum = invoices.length + 1;
     return `INV#${String(nextNum).padStart(3, "0")}`;
   };
 
-  // Reset form
   const resetForm = () => {
     const today = new Date();
     const dueDate = new Date(today);
@@ -227,7 +229,7 @@ const Invoices = () => {
       tds: "",
       note: "",
       labels: "",
-      isRecurring: false,
+      isRecurring: true,
       repeatEvery: 1,
       repeatType: "Month",
       cycles: "",
@@ -237,7 +239,6 @@ const Invoices = () => {
     setInvoiceItems([]);
   };
 
-  // Handle save
   const handleSave = async () => {
     if (!formData.client) {
       alert("Client is required");
@@ -308,7 +309,6 @@ const Invoices = () => {
     }
   };
 
-  // Handle edit
   const handleEdit = async (invoice) => {
     try {
       const response = await invoicesAPI.getById(invoice.id);
@@ -345,7 +345,6 @@ const Invoices = () => {
     }
   };
 
-  // Handle delete
   const handleDelete = async (invoice) => {
     if (window.confirm(`Are you sure you want to delete ${invoice.invoiceNumber}?`)) {
       try {
@@ -361,12 +360,10 @@ const Invoices = () => {
     }
   };
 
-  // Handle view
   const handleView = (invoice) => {
     navigate(`/app/admin/invoices/${invoice.id}`);
   };
 
-  // Handle copy
   const handleCopy = async (invoice) => {
     try {
       const response = await invoicesAPI.getById(invoice.id);
@@ -393,7 +390,6 @@ const Invoices = () => {
     }
   };
 
-  // Handle print
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     const tableHTML = `
@@ -408,6 +404,7 @@ const Invoices = () => {
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
             th { background-color: #f5f5f5; font-weight: bold; }
             tr:nth-child(even) { background-color: #fafafa; }
+            .total-row { font-weight: bold; background-color: #f0f0f0; }
             @media print { button { display: none; } }
           </style>
         </head>
@@ -416,10 +413,10 @@ const Invoices = () => {
           <table>
             <thead>
               <tr>
-                <th>Invoice #</th>
+                <th>Invoice</th>
                 <th>Client</th>
-                <th>Bill Date</th>
-                <th>Due Date</th>
+                <th>Bill date</th>
+                <th>Due date</th>
                 <th>Amount</th>
                 <th>Status</th>
               </tr>
@@ -435,6 +432,11 @@ const Invoices = () => {
                   <td>${inv.status}</td>
                 </tr>
               `).join("")}
+              <tr class="total-row">
+                <td colspan="4" style="text-align: right;">Total:</td>
+                <td>$${filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0).toFixed(2)}</td>
+                <td></td>
+              </tr>
             </tbody>
           </table>
           <script>window.onload = function() { window.print(); }</script>
@@ -445,15 +447,14 @@ const Invoices = () => {
     printWindow.document.close();
   };
 
-  // Handle export Excel
   const handleExportExcel = () => {
     const csvData = filteredInvoices.map((inv) => ({
-      "Invoice #": inv.invoiceNumber,
-      Client: inv.client?.name || "",
-      "Bill Date": formatDate(inv.invoiceDate),
-      "Due Date": formatDate(inv.dueDate),
-      Amount: inv.total,
-      Status: inv.status,
+      "Invoice": inv.invoiceNumber,
+      "Client": inv.client?.name || "",
+      "Bill date": formatDate(inv.invoiceDate),
+      "Due date": formatDate(inv.dueDate),
+      "Amount": inv.total,
+      "Status": inv.status,
     }));
 
     const headers = Object.keys(csvData[0] || {});
@@ -469,7 +470,6 @@ const Invoices = () => {
     link.click();
   };
 
-  // Filter handlers
   const handleApplyFilters = () => {
     fetchInvoices();
   };
@@ -487,7 +487,6 @@ const Invoices = () => {
     fetchInvoices();
   };
 
-  // Label handlers
   const handleAddLabel = () => {
     if (!newLabelName.trim()) return;
     if (labels.some((l) => l.name.toLowerCase() === newLabelName.trim().toLowerCase())) {
@@ -504,7 +503,6 @@ const Invoices = () => {
     setLabels(labels.filter((l) => l.name !== labelName));
   };
 
-  // Format helpers
   const formatDate = (dateString) => {
     if (!dateString) return "--";
     const date = new Date(dateString);
@@ -522,7 +520,6 @@ const Invoices = () => {
     })}`;
   };
 
-  // Status styles
   const getStatusStyle = (status) => {
     const s = status?.toLowerCase() || "";
     switch (s) {
@@ -547,18 +544,15 @@ const Invoices = () => {
   const filteredInvoices = invoices.filter((invoice) => {
     if (!invoice) return false;
 
-    // Search filter
     if (searchQuery && !invoice.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !invoice.client?.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
 
-    // Status filter
     if (statusFilter !== "All" && invoice.status?.toLowerCase() !== statusFilter.toLowerCase()) {
       return false;
     }
 
-    // Client filter
     if (clientFilter !== "All") {
       const clientId = parseInt(clientFilter);
       const matchingClient = clients.find((c) => c.id === clientId);
@@ -567,7 +561,6 @@ const Invoices = () => {
       }
     }
 
-    // Date filters
     const invoiceDate = invoice.invoiceDate ? new Date(invoice.invoiceDate) : null;
 
     if (periodFilter === "yearly" && invoiceDate) {
@@ -591,6 +584,12 @@ const Invoices = () => {
     return true;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+
   // Tax options
   const taxOptions = [
     { value: "", label: "-" },
@@ -599,49 +598,97 @@ const Invoices = () => {
     { value: "VAT: 10%", label: "VAT: 10%", rate: 10 },
   ];
 
+  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0);
+
   return (
     <div className="space-y-4 bg-gray-100 min-h-screen p-4">
-      {/* Header with Tabs */}
+      {/* Top Bar */}
       <div className="bg-white rounded-lg shadow-sm">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setActiveTab("invoices")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "invoices" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Invoices
+        <div className="flex items-center justify-between p-4">
+          {/* Left Side */}
+          <div className="flex items-center gap-3">
+            <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <IoGrid size={18} className="text-gray-500" />
             </button>
+
+            {/* Filters Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
+                className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Filters
+                <IoChevronDown size={16} className="text-gray-500" />
+              </button>
+              {showFiltersDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <button
+                    onClick={() => { setStatusFilter("All"); setShowFiltersDropdown(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    All Invoices
+                  </button>
+                  <button
+                    onClick={() => { setStatusFilter("Paid"); setShowFiltersDropdown(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Paid
+                  </button>
+                  <button
+                    onClick={() => { setStatusFilter("Unpaid"); setShowFiltersDropdown(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Not Paid
+                  </button>
+                  <button
+                    onClick={() => { setStatusFilter("Overdue"); setShowFiltersDropdown(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Overdue
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => setActiveTab("credit-notes")}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "credit-notes" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
+                activeTab === "credit-notes" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
               }`}
             >
               + Credit Notes
             </button>
+
             <button
-              onClick={() => setIsManageLabelsModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              onClick={() => setActiveTab("invoices")}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "invoices" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
+              }`}
             >
-              <IoPricetag size={16} />
-              Manage Labels
+              Invoices
+            </button>
+
+            <button
+              onClick={() => setStatusFilter("Overdue")}
+              className="p-2 text-orange-500 border border-orange-300 rounded-lg hover:bg-orange-50"
+              title="View Overdue Invoices"
+            >
+              <IoNotifications size={18} />
             </button>
           </div>
+
+          {/* Right Side */}
           <div className="flex items-center gap-3">
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              <IoDownload size={16} />
               Excel
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
             >
-              <IoPrint size={16} />
               Print
             </button>
             <div className="relative">
@@ -666,153 +713,6 @@ const Invoices = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-              <IoGrid size={16} className="text-gray-500" />
-            </button>
-            <button
-              onClick={() => setShowFilterPanel(!showFilterPanel)}
-              className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
-                showFilterPanel ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-300 hover:bg-gray-50 text-gray-600"
-              }`}
-            >
-              <IoFilter size={16} />
-              Filters
-            </button>
-            {/* Active filter tags */}
-            {statusFilter !== "All" && (
-              <span className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                Status: {statusFilter}
-                <button onClick={() => setStatusFilter("All")}><IoClose size={14} /></button>
-              </span>
-            )}
-            <button
-              onClick={() => navigate("/app/admin/invoices?filter=overdue")}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50"
-            >
-              <IoWarning size={16} />
-              Overdue
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Status Dropdown */}
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
-              >
-                <option value="All">- Status -</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Not Paid</option>
-                <option value="Partially Paid">Partially Paid</option>
-                <option value="Overdue">Overdue</option>
-              </select>
-              <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-            </div>
-
-            {/* Period Buttons */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              {["monthly", "yearly", "custom", "dynamic"].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setPeriodFilter(period)}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    periodFilter === period ? "bg-white shadow text-gray-800" : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  {period.charAt(0).toUpperCase() + period.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            {/* Month Selector */}
-            {periodFilter === "monthly" && (
-              <div className="relative">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                  className="appearance-none px-3 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
-                >
-                  {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((month, idx) => (
-                    <option key={month} value={idx + 1}>{month}</option>
-                  ))}
-                </select>
-                <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-              </div>
-            )}
-
-            {/* Year Selector */}
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-              <button onClick={() => setSelectedYear((y) => y - 1)} className="px-2 py-2 hover:bg-gray-100 border-r border-gray-300">
-                <IoChevronBack size={16} />
-              </button>
-              <span className="px-4 py-2 text-sm font-medium">{selectedYear}</span>
-              <button onClick={() => setSelectedYear((y) => y + 1)} className="px-2 py-2 hover:bg-gray-100 border-l border-gray-300">
-                <IoChevronForward size={16} />
-              </button>
-            </div>
-
-            <button onClick={handleApplyFilters} className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600" title="Apply filters">
-              <IoCheckmark size={18} />
-            </button>
-            <button onClick={handleResetFilters} className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600" title="Reset filters">
-              <IoClose size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Expandable Filter Panel */}
-        {showFilterPanel && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                <select
-                  value={clientFilter}
-                  onChange={(e) => setClientFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none"
-                >
-                  <option value="All">All Clients</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.client_name || client.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-                <input type="date" value={customDateStart} onChange={(e) => setCustomDateStart(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-                <input type="date" value={customDateEnd} onChange={(e) => setCustomDateEnd(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <div className="relative">
-                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search invoices..." className="w-full px-3 py-2 pl-9 text-sm border border-gray-300 rounded-lg outline-none" />
-                  <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => { setClientFilter("All"); setCustomDateStart(""); setCustomDateEnd(""); setSearchQuery(""); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
-                Clear Filters
-              </button>
-              <button onClick={() => { handleApplyFilters(); setShowFilterPanel(false); }} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Invoices Table */}
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
@@ -825,7 +725,7 @@ const Invoices = () => {
                 <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Due date</th>
                 <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Amount</th>
                 <th className="w-[14%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="w-[18%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Action</th>
+                <th className="w-[18%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"></th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -833,29 +733,27 @@ const Invoices = () => {
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Loading invoices...</td>
                 </tr>
-              ) : filteredInvoices.length === 0 ? (
+              ) : paginatedInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No invoices found</td>
                 </tr>
               ) : (
-                filteredInvoices.map((invoice) => (
+                paginatedInvoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4 whitespace-nowrap">
                       <button onClick={() => handleView(invoice)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
                         {invoice.invoiceNumber}
                       </button>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <button onClick={() => handleView(invoice)} className="text-blue-600 hover:text-blue-800 hover:underline">
-                        {invoice.client?.name || "Unknown Client"}
-                      </button>
+                    <td className="px-4 py-4 whitespace-nowrap text-gray-700">
+                      {invoice.client?.name || "Unknown Client"}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-gray-600">{formatDate(invoice.invoiceDate)}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-gray-600">{formatDate(invoice.dueDate)}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-medium">{formatCurrency(invoice.total)}</td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(invoice.status)}`}>
-                        {invoice.status}
+                        {invoice.status === "Unpaid" ? "Not paid" : invoice.status}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -867,7 +765,10 @@ const Invoices = () => {
                           <IoCreate size={16} />
                         </button>
                         <button onClick={() => handleDelete(invoice)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">
-                          <IoTrash size={16} />
+                          <IoClose size={16} />
+                        </button>
+                        <button onClick={() => handleView(invoice)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="More">
+                          <IoEllipsisVertical size={16} />
                         </button>
                       </div>
                     </td>
@@ -875,50 +776,83 @@ const Invoices = () => {
                 ))
               )}
             </tbody>
-            {filteredInvoices.length > 0 && (
-              <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-                <tr>
-                  <td colSpan={4} className="px-4 py-4 text-right font-semibold text-gray-700">Total:</td>
-                  <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-bold">
-                    {formatCurrency(filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0))}
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
+
+        {/* Footer with Pagination and Total */}
         <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <select className="px-2 py-1 text-sm border border-gray-300 rounded">
-            <option>10</option>
-            <option>25</option>
-            <option>50</option>
-          </select>
-          <div className="text-sm text-gray-600">1-{filteredInvoices.length} / {filteredInvoices.length}</div>
+          <div className="flex items-center gap-4">
+            <select
+              value={itemsPerPage}
+              onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
+              className="px-2 py-1 text-sm border border-gray-300 rounded"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            <span className="text-sm text-gray-600">
+              {startIndex + 1}-{Math.min(endIndex, filteredInvoices.length)} / {filteredInvoices.length}
+            </span>
+          </div>
+          <div className="text-sm font-semibold text-gray-700">
+            Total: {formatCurrency(totalAmount)}
+          </div>
           <div className="flex items-center gap-1">
-            <button disabled className="p-1.5 border border-gray-300 rounded text-gray-400"><IoChevronBack size={16} /></button>
-            <button disabled className="p-1.5 border border-gray-300 rounded text-gray-400"><IoChevronForward size={16} /></button>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`p-1.5 border border-gray-300 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+            >
+              <IoChevronBack size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className={`p-1.5 border border-gray-300 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+            >
+              <IoChevronForward size={16} />
+            </button>
           </div>
         </div>
       </Card>
 
       {/* Add/Edit Invoice Modal */}
-      <Modal isOpen={isAddModalOpen || isEditModalOpen} onClose={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }} title={isEditModalOpen ? "Edit invoice" : "Add invoice"}>
+      <Modal
+        isOpen={isAddModalOpen || isEditModalOpen}
+        onClose={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }}
+        title={isEditModalOpen ? "Edit invoice" : "Add invoice"}
+      >
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bill date</label>
-              <Input type="date" value={formData.billDate} onChange={(e) => setFormData({ ...formData, billDate: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due date</label>
-              <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
-            </div>
+          {/* Bill date & Due date */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Bill date</label>
+            <Input
+              type="date"
+              value={formData.billDate}
+              onChange={(e) => setFormData({ ...formData, billDate: e.target.value })}
+              className="flex-1"
+            />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Client <span className="text-red-500">*</span></label>
-            <select value={formData.client} onChange={(e) => setFormData({ ...formData, client: e.target.value, project: "" })} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Due date</label>
+            <Input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+
+          {/* Client */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Client</label>
+            <select
+              value={formData.client}
+              onChange={(e) => setFormData({ ...formData, client: e.target.value, project: "" })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none"
+            >
               <option value="">Select Client</option>
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>{client.client_name || client.name}</option>
@@ -926,9 +860,14 @@ const Invoices = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-            <select value={formData.project} onChange={(e) => setFormData({ ...formData, project: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
+          {/* Project */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Project</label>
+            <select
+              value={formData.project}
+              onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none"
+            >
               <option value="">Select Project</option>
               {filteredProjects.map((project) => (
                 <option key={project.id} value={project.id}>{project.project_name || project.name}</option>
@@ -936,68 +875,120 @@ const Invoices = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">TAX</label>
-              <select value={formData.tax} onChange={(e) => { const t = taxOptions.find((o) => o.value === e.target.value); setFormData({ ...formData, tax: e.target.value, taxRate: t?.rate || 0 }); }} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
-                {taxOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Second TAX</label>
-              <select value={formData.secondTax} onChange={(e) => { const t = taxOptions.find((o) => o.value === e.target.value); setFormData({ ...formData, secondTax: e.target.value, secondTaxRate: t?.rate || 0 }); }} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
-                {taxOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">TDS</label>
-              <select value={formData.tds} onChange={(e) => setFormData({ ...formData, tds: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
-                <option value="">-</option>
-                <option value="TDS 1%">TDS 1%</option>
-                <option value="TDS 2%">TDS 2%</option>
-                <option value="TDS 5%">TDS 5%</option>
-              </select>
-            </div>
+          {/* TAX */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">TAX</label>
+            <select
+              value={formData.tax}
+              onChange={(e) => {
+                const t = taxOptions.find((o) => o.value === e.target.value);
+                setFormData({ ...formData, tax: e.target.value, taxRate: t?.rate || 0 });
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none"
+            >
+              {taxOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+
+          {/* Second TAX */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Second TAX</label>
+            <select
+              value={formData.secondTax}
+              onChange={(e) => {
+                const t = taxOptions.find((o) => o.value === e.target.value);
+                setFormData({ ...formData, secondTax: e.target.value, secondTaxRate: t?.rate || 0 });
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none"
+            >
+              {taxOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+
+          {/* TDS */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">TDS</label>
+            <select
+              value={formData.tds}
+              onChange={(e) => setFormData({ ...formData, tds: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none"
+            >
+              <option value="">-</option>
+              <option value="TDS 1%">TDS 1%</option>
+              <option value="TDS 2%">TDS 2%</option>
+              <option value="TDS 5%">TDS 5%</option>
+            </select>
           </div>
 
           {/* Recurring Section */}
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <input type="checkbox" id="recurring" checked={formData.isRecurring} onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })} className="w-4 h-4" />
-              <label htmlFor="recurring" className="text-sm font-medium text-gray-700">Recurring</label>
-              <IoInformationCircle className="text-gray-400" size={16} title="Enable recurring invoices" />
-            </div>
-            {formData.isRecurring && (
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Repeat every</label>
-                  <Input type="number" min="1" value={formData.repeatEvery} onChange={(e) => setFormData({ ...formData, repeatEvery: parseInt(e.target.value) || 1 })} />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Frequency</label>
-                  <select value={formData.repeatType} onChange={(e) => setFormData({ ...formData, repeatType: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none">
+          <div className="flex items-start">
+            <label className="w-32 text-sm font-medium text-gray-700 pt-2">Recurring</label>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="recurring"
+                  checked={formData.isRecurring}
+                  onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-600">Enable recurring</span>
+              </div>
+              {formData.isRecurring && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-gray-600">Repeat every:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.repeatEvery}
+                    onChange={(e) => setFormData({ ...formData, repeatEvery: parseInt(e.target.value) || 1 })}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <select
+                    value={formData.repeatType}
+                    onChange={(e) => setFormData({ ...formData, repeatType: e.target.value })}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
                     <option value="Day">Day(s)</option>
                     <option value="Week">Week(s)</option>
                     <option value="Month">Month(s)</option>
                     <option value="Year">Year(s)</option>
                   </select>
+                  <span className="text-sm text-gray-600">Cycles:</span>
+                  <input
+                    type="number"
+                    placeholder="∞"
+                    value={formData.cycles}
+                    onChange={(e) => setFormData({ ...formData, cycles: e.target.value })}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <IoHelpCircle className="text-gray-400" size={16} title="Leave empty for infinite cycles" />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Cycles</label>
-                  <Input type="number" placeholder="Infinite" value={formData.cycles} onChange={(e) => setFormData({ ...formData, cycles: e.target.value })} />
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
-            <textarea value={formData.note} onChange={(e) => setFormData({ ...formData, note: e.target.value })} placeholder="Add a note..." rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none" />
+          {/* Note */}
+          <div className="flex items-start">
+            <label className="w-32 text-sm font-medium text-gray-700 pt-2">Note</label>
+            <textarea
+              value={formData.note}
+              onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+              placeholder="Add a note..."
+              rows={3}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none"
+            />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Labels</label>
-            <Input value={formData.labels} onChange={(e) => setFormData({ ...formData, labels: e.target.value })} placeholder="Urgent, Taxable (comma-separated)" />
+          {/* Labels */}
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Labels</label>
+            <Input
+              value={formData.labels}
+              onChange={(e) => setFormData({ ...formData, labels: e.target.value })}
+              placeholder="Urgent, Taxable"
+              className="flex-1"
+            />
           </div>
 
           {/* Bottom Actions */}
@@ -1011,11 +1002,14 @@ const Invoices = () => {
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }}>
-                <IoClose size={18} className="mr-1" /> Close
+              <Button
+                variant="outline"
+                onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }}
+              >
+                Close
               </Button>
               <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <IoCheckmarkCircle size={18} className="mr-1" /> Save
+                <IoCheckmark size={18} className="mr-1" /> Save
               </Button>
             </div>
           </div>
@@ -1025,7 +1019,6 @@ const Invoices = () => {
       {/* Manage Labels Modal */}
       <Modal isOpen={isManageLabelsModalOpen} onClose={() => setIsManageLabelsModalOpen(false)} title="Manage Labels">
         <div className="space-y-4">
-          {/* Add New Label */}
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <Input value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)} placeholder="Label name" />
@@ -1036,7 +1029,6 @@ const Invoices = () => {
             </Button>
           </div>
 
-          {/* Labels List */}
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {labels.map((label) => (
               <div key={label.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
