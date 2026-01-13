@@ -2027,7 +2027,7 @@ const ClientDetail = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4 tabs-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
-            {['Overview', 'Projects', 'Subscriptions', 'Invoices', 'Payments', 'Statement', 'Orders', 'Estimates', 'Proposals', 'Contracts', 'Files', 'Expenses', 'Notes'].map((tab) => (
+            {['Overview', 'Contacts', 'Projects', 'Subscriptions', 'Invoices', 'Payments', 'Statement', 'Orders', 'Estimates', 'Proposals', 'Contracts', 'Files', 'Expenses', 'Notes'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2482,6 +2482,159 @@ const ClientDetail = () => {
                     )}
                   </div>
                 </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Contacts Tab */}
+          {activeTab === 'contacts' && (
+            <div className="space-y-4 max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IoPerson className="text-gray-600" size={20} />
+                  <h2 className="text-lg font-semibold text-gray-900">Contacts</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <IoMail size={16} />
+                    Send invitation
+                  </button>
+                  <button
+                    onClick={() => setIsAddContactModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+                  >
+                    <IoAdd size={16} />
+                    Add contact
+                  </button>
+                </div>
+              </div>
+
+              {/* 2-Column Layout */}
+              <div className="flex gap-6">
+                {/* Left Column - Contact Cards */}
+                <div className="flex-1 space-y-4">
+                  {contacts.length > 0 ? (
+                    contacts.map((contact, idx) => (
+                      <Card key={idx} className="p-6 bg-white border border-gray-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                              <IoPerson className="text-blue-600" size={20} />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">{contact.name || 'Contact Name'}</h3>
+                              {contact.job_title && (
+                                <p className="text-sm text-gray-600 mt-1">{contact.job_title}</p>
+                              )}
+                              <div className="mt-3 space-y-1">
+                                <p className="text-sm text-gray-600">
+                                  <span className="text-gray-500">Email:</span> {contact.email || '-'}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  <span className="text-gray-500">Phone:</span> {contact.phone || '-'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors">
+                              <IoCreate size={16} />
+                            </button>
+                            <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors">
+                              <IoTrash size={16} />
+                            </button>
+                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                              <IoEllipsisVertical size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        {contact.is_primary && (
+                          <Badge className="mt-3 text-xs bg-blue-100 text-blue-800">Primary Contact</Badge>
+                        )}
+                      </Card>
+                    ))
+                  ) : (
+                    <Card className="p-12 bg-white border border-gray-200 text-center">
+                      <IoPerson className="mx-auto text-gray-300 mb-4" size={48} />
+                      <p className="text-gray-500">No contacts found</p>
+                      <button
+                        onClick={() => setIsAddContactModalOpen(true)}
+                        className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        + Add your first contact
+                      </button>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Right Column - Tickets & Events */}
+                <div className="w-96 flex-shrink-0 space-y-6 hidden lg:block">
+                  {/* Tickets Section */}
+                  <Card className="p-6 bg-white border border-gray-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <IoReceipt className="text-gray-600" size={18} />
+                      <h3 className="text-sm font-semibold text-gray-900">Tickets</h3>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <button className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg">Open</button>
+                      <button className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Closed</button>
+                      <div className="flex-1">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Search..."
+                            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <IoSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      No record found.
+                    </div>
+                  </Card>
+
+                  {/* Events Section */}
+                  <Card className="p-6 bg-white border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <IoCalendar className="text-gray-600" size={18} />
+                        <h3 className="text-sm font-semibold text-gray-900">Events</h3>
+                      </div>
+                      <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                        <IoAdd size={14} />
+                        Add event
+                      </button>
+                    </div>
+
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-medium text-gray-900">January 2026</h4>
+                      <div className="flex items-center gap-1">
+                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">month</button>
+                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">week</button>
+                        <button className="px-2 py-1 text-xs text-blue-600 bg-blue-100 rounded">day</button>
+                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">list</button>
+                      </div>
+                    </div>
+
+                    {/* Mini Calendar */}
+                    <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                        <div key={day} className="py-1 text-gray-500 font-medium">{day}</div>
+                      ))}
+                      {[...Array(31)].map((_, i) => (
+                        <button
+                          key={i}
+                          className={`py-1.5 rounded-full ${i === 12 ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                </div>
               </div>
             </div>
           )}
