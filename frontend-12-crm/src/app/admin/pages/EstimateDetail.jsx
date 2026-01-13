@@ -37,7 +37,8 @@ import {
   IoCopy,
   IoLocation,
   IoGlobe,
-  IoCall
+  IoCall,
+  IoPerson
 } from 'react-icons/io5'
 
 const EstimateDetail = () => {
