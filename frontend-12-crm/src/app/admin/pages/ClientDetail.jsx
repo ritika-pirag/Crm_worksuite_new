@@ -2027,7 +2027,7 @@ const ClientDetail = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4 tabs-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
-            {['Overview', 'Contacts', 'Projects', 'Subscriptions', 'Invoices', 'Payments', 'Statement', 'Orders', 'Estimates', 'Proposals', 'Contracts', 'Files', 'Expenses', 'Notes'].map((tab) => (
+            {['Overview', 'Contacts', 'Projects', 'Tasks', 'Proposals', 'Estimates', 'Invoices', 'Payments', 'Statement', 'Contracts', 'Expenses', 'Files', 'Notes'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2291,86 +2291,6 @@ const ClientDetail = () => {
                   </div>
                 </Card>
 
-                {/* 7. Invoices (Moved to bottom) */}
-                <Card className="p-6 bg-white border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <IoDocumentText className="text-primary-accent" size={20} />
-                      <h3 className="text-lg font-semibold text-primary-text">Invoice Overview</h3>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab('invoices')}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                    >
-                      View All
-                      <IoChevronDown size={16} className="-rotate-90" />
-                    </button>
-                  </div>
-
-                  {/* Invoice Stats */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <p className="text-2xl font-bold text-gray-900">{invoices.filter(inv => inv.status === 'paid').length}</p>
-                      <p className="text-sm text-gray-600 mt-1">Paid</p>
-                    </div>
-                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                      <p className="text-2xl font-bold text-yellow-700">{invoices.filter(inv => inv.status === 'unpaid').length}</p>
-                      <p className="text-sm text-gray-600 mt-1">Unpaid</p>
-                    </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-700">{invoices.filter(inv => inv.status === 'sent').length}</p>
-                      <p className="text-sm text-gray-600 mt-1">Sent</p>
-                    </div>
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <p className="text-2xl font-bold text-green-700">
-                        {formatCurrency(invoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0))}
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">Total Amount</p>
-                    </div>
-                  </div>
-
-                  {/* Recent Invoices Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Invoice #</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Date</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Amount</th>
-                          <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoices.slice(0, 5).map((invoice) => (
-                          <tr key={invoice.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="py-3 px-4">
-                              <button
-                                onClick={() => navigate(`/admin/invoices/${invoice.id}`)}
-                                className="text-blue-600 hover:text-blue-700 font-medium"
-                              >
-                                {invoice.invoice_number || `INV-${invoice.id}`}
-                              </button>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-gray-600">
-                              {formatDate(invoice.invoice_date)}
-                            </td>
-                            <td className="py-3 px-4 text-sm font-medium text-gray-900">
-                              {formatCurrency(invoice.total)}
-                            </td>
-                            <td className="py-3 px-4">
-                              <Badge className={`text-xs ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                invoice.status === 'unpaid' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-blue-100 text-blue-800'
-                                }`}>
-                                {invoice.status ? invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1) : 'Draft'}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
               </div>
 
               {/* RIGHT SIDEBAR - Client Info & Tasks */}
@@ -2490,152 +2410,177 @@ const ClientDetail = () => {
           {activeTab === 'contacts' && (
             <div className="space-y-4 max-w-7xl mx-auto">
               {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <IoPerson className="text-gray-600" size={20} />
-                  <h2 className="text-lg font-semibold text-gray-900">Contacts</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-primary-text">Contacts</h2>
+                  <p className="text-sm text-secondary-text mt-1">Manage client contacts</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                     <IoMail size={16} />
                     Send invitation
                   </button>
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => setIsAddContactModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+                    className="flex items-center gap-2"
                   >
-                    <IoAdd size={16} />
-                    Add contact
-                  </button>
+                    <IoPersonAdd size={18} />
+                    Add Contact
+                  </Button>
                 </div>
               </div>
 
-              {/* 2-Column Layout */}
-              <div className="flex gap-6">
-                {/* Left Column - Contact Cards */}
-                <div className="flex-1 space-y-4">
-                  {contacts.length > 0 ? (
-                    contacts.map((contact, idx) => (
-                      <Card key={idx} className="p-6 bg-white border border-gray-200">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                              <IoPerson className="text-blue-600" size={20} />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">{contact.name || 'Contact Name'}</h3>
-                              {contact.job_title && (
-                                <p className="text-sm text-gray-600 mt-1">{contact.job_title}</p>
-                              )}
-                              <div className="mt-3 space-y-1">
-                                <p className="text-sm text-gray-600">
-                                  <span className="text-gray-500">Email:</span> {contact.email || '-'}
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                  <span className="text-gray-500">Phone:</span> {contact.phone || '-'}
-                                </p>
+              {/* Contacts Table */}
+              {contacts.length === 0 ? (
+                <Card className="p-6">
+                  <div className="text-center py-8">
+                    <IoPerson size={48} className="mx-auto mb-4 text-gray-300" />
+                    <p className="text-secondary-text">No contacts found</p>
+                    <Button
+                      variant="primary"
+                      onClick={() => setIsAddContactModalOpen(true)}
+                      className="mt-4 flex items-center gap-2 mx-auto"
+                    >
+                      <IoPersonAdd size={18} />
+                      Add First Contact
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-0 overflow-hidden border border-gray-200 shadow-sm">
+                  {/* Mobile: Cards View */}
+                  <div className="block sm:hidden">
+                    <div className="space-y-3 p-4">
+                      {contacts.map((contact, idx) => (
+                        <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <IoPerson className="text-blue-600" size={20} />
+                              </div>
+                              <div>
+                                <p className="font-medium text-primary-text">{contact.name}</p>
+                                <p className="text-xs text-secondary-text">{contact.job_title || 'No title'}</p>
                               </div>
                             </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Edit"
+                              >
+                                <IoCreate size={18} />
+                              </button>
+                              <button
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Delete"
+                              >
+                                <IoTrash size={18} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors">
-                              <IoCreate size={16} />
-                            </button>
-                            <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors">
-                              <IoTrash size={16} />
-                            </button>
-                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                              <IoEllipsisVertical size={16} />
-                            </button>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-secondary-text">Email:</span>
+                              <a href={`mailto:${contact.email}`} className="text-primary-text">{contact.email}</a>
+                            </div>
+                            {contact.phone && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-secondary-text">Phone:</span>
+                                <a href={`tel:${contact.phone}`} className="text-primary-text">{contact.phone}</a>
+                              </div>
+                            )}
                           </div>
+                          {contact.is_primary && (
+                            <Badge className="mt-2 text-xs bg-blue-100 text-blue-800">Primary</Badge>
+                          )}
                         </div>
-                        {contact.is_primary && (
-                          <Badge className="mt-3 text-xs bg-blue-100 text-blue-800">Primary Contact</Badge>
-                        )}
-                      </Card>
-                    ))
-                  ) : (
-                    <Card className="p-12 bg-white border border-gray-200 text-center">
-                      <IoPerson className="mx-auto text-gray-300 mb-4" size={48} />
-                      <p className="text-gray-500">No contacts found</p>
-                      <button
-                        onClick={() => setIsAddContactModalOpen(true)}
-                        className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        + Add your first contact
-                      </button>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Right Column - Tickets & Events */}
-                <div className="w-96 flex-shrink-0 space-y-6 hidden lg:block">
-                  {/* Tickets Section */}
-                  <Card className="p-6 bg-white border border-gray-200">
-                    <div className="flex items-center gap-2 mb-4">
-                      <IoReceipt className="text-gray-600" size={18} />
-                      <h3 className="text-sm font-semibold text-gray-900">Tickets</h3>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <button className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg">Open</button>
-                      <button className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Closed</button>
-                      <div className="flex-1">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            placeholder="Search..."
-                            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <IoSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      No record found.
-                    </div>
-                  </Card>
-
-                  {/* Events Section */}
-                  <Card className="p-6 bg-white border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <IoCalendar className="text-gray-600" size={18} />
-                        <h3 className="text-sm font-semibold text-gray-900">Events</h3>
-                      </div>
-                      <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                        <IoAdd size={14} />
-                        Add event
-                      </button>
-                    </div>
-
-                    {/* Calendar Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-medium text-gray-900">January 2026</h4>
-                      <div className="flex items-center gap-1">
-                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">month</button>
-                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">week</button>
-                        <button className="px-2 py-1 text-xs text-blue-600 bg-blue-100 rounded">day</button>
-                        <button className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200">list</button>
-                      </div>
-                    </div>
-
-                    {/* Mini Calendar */}
-                    <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-                        <div key={day} className="py-1 text-gray-500 font-medium">{day}</div>
-                      ))}
-                      {[...Array(31)].map((_, i) => (
-                        <button
-                          key={i}
-                          className={`py-1.5 rounded-full ${i === 12 ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                        >
-                          {i + 1}
-                        </button>
                       ))}
                     </div>
-                  </Card>
-                </div>
-              </div>
+                  </div>
+
+                  {/* Desktop: Table View */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full min-w-[700px]">
+                      <thead className="bg-white border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Job Title</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>
+                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {contacts.map((contact, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                  <IoPerson className="text-blue-600" size={14} />
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">{contact.name || '-'}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{contact.job_title || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {contact.email ? (
+                                <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {contact.phone ? (
+                                <a href={`tel:${contact.phone}`} className="text-gray-900">{contact.phone}</a>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              {contact.is_primary ? (
+                                <Badge className="text-xs bg-blue-100 text-blue-800">Primary</Badge>
+                              ) : (
+                                <Badge className="text-xs bg-gray-100 text-gray-600">Contact</Badge>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 border border-gray-200 rounded-full hover:bg-blue-50 transition-colors"
+                                  title="Edit"
+                                >
+                                  <IoCreate size={14} />
+                                </button>
+                                <button
+                                  className="p-1.5 text-gray-400 hover:text-red-600 border border-gray-200 rounded-full hover:bg-red-50 transition-colors"
+                                  title="Delete"
+                                >
+                                  <IoTrash size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-white">
+                    <div className="flex items-center gap-2">
+                      <select className="border border-gray-300 rounded p-1 text-xs text-gray-600 outline-none">
+                        <option>10</option>
+                        <option>20</option>
+                        <option>50</option>
+                      </select>
+                      <span className="text-xs text-gray-500">1-{contacts.length}/{contacts.length}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 disabled:opacity-50 text-gray-500"><IoChevronDown className="rotate-90" size={14} /></button>
+                      <button className="w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-700 text-xs font-medium">1</button>
+                      <button className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"><IoChevronDown className="-rotate-90" size={14} /></button>
+                    </div>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
 
@@ -5762,63 +5707,6 @@ const ClientDetail = () => {
             </div>
           </div>
         )}
-      </Modal>
-      {/* Add Contact Modal */}
-      <Modal
-        isOpen={isAddContactModalOpen}
-        onClose={() => setIsAddContactModalOpen(false)}
-        title="Add New Contact"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name <span className="text-red-500">*</span></label>
-            <Input
-              value={contactFormData.name}
-              onChange={(e) => setContactFormData({ ...contactFormData, name: e.target.value })}
-              placeholder="Full Name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
-            <Input
-              type="email"
-              value={contactFormData.email}
-              onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
-              placeholder="Email Address"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <Input
-              value={contactFormData.phone}
-              onChange={(e) => setContactFormData({ ...contactFormData, phone: e.target.value })}
-              placeholder="Phone Number"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-            <Input
-              value={contactFormData.job_title}
-              onChange={(e) => setContactFormData({ ...contactFormData, job_title: e.target.value })}
-              placeholder="Job Title"
-            />
-          </div>
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
-            <Button
-              variant="outline"
-              onClick={() => setIsAddContactModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreateContact}
-              disabled={createContactLoading}
-            >
-              {createContactLoading ? 'Adding...' : 'Add Contact'}
-            </Button>
-          </div>
-        </div>
       </Modal>
     </div>
   )
