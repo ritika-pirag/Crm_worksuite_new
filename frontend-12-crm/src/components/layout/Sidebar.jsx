@@ -93,7 +93,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
       const isExpanded = expandedItems[item.path] || false
 
       return (
-        <li key={item.path} className="mb-1">
+        <li key={item.path} className="mb-0.5">
           <button
             onClick={() => {
               if (!isCollapsed) {
@@ -101,8 +101,8 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
               }
             }}
             className={`w-full flex items-center transition-all duration-200 ${isCollapsed
-              ? 'justify-center px-3 py-3 rounded-xl cursor-default'
-              : 'gap-3 px-4 py-3 justify-between rounded-xl cursor-pointer'
+              ? 'justify-center px-2 py-2 rounded-lg cursor-default'
+              : 'gap-2 px-3 py-2 justify-between rounded-lg cursor-pointer'
               } ${hasActiveChild
                 ? 'bg-primary-accent text-white shadow-soft'
                 : ''
@@ -112,15 +112,15 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
             }}
             title={isCollapsed ? t(item.label) : ''}
           >
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <Icon size={20} className="flex-shrink-0" />
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Icon size={18} className="flex-shrink-0" />
               {!isCollapsed && (
                 <span className="truncate text-sm font-medium">{t(item.label)}</span>
               )}
             </div>
             {!isCollapsed && (
               <IoChevronDown
-                size={16}
+                size={14}
                 className={`flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''
                   }`}
               />
@@ -128,7 +128,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           </button>
           {!isCollapsed && isExpanded && (
             <div className="overflow-hidden animate-slideDown">
-              <ul className="space-y-1 pl-4 mt-1">
+              <ul className="space-y-0.5 pl-3 mt-0.5">
                 {item.children.map((child) => {
                   const childActive = isActive(child.path)
                   const ChildIcon = child.icon
@@ -137,7 +137,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
                       <Link
                         to={child.path}
                         onClick={handleMenuItemClick}
-                        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm ${childActive
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-sm ${childActive
                           ? 'text-primary-accent font-semibold bg-primary-accent/10'
                           : ''
                           }`}
@@ -145,7 +145,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
                           color: childActive ? undefined : (isDark ? '#b0b0b0' : '#6B7280'),
                         }}
                       >
-                        {ChildIcon && <ChildIcon size={18} className="flex-shrink-0" />}
+                        {ChildIcon && <ChildIcon size={16} className="flex-shrink-0" />}
                         <span className="truncate">{t(child.label)}</span>
                       </Link>
                     </li>
@@ -164,13 +164,13 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
       const active = isActive(item.path)
 
       return (
-        <li key={item.path} className="mb-1">
+        <li key={item.path} className="mb-0.5">
           <Link
             to={item.path}
             onClick={handleMenuItemClick}
             className={`flex items-center transition-all duration-200 ${isCollapsed
-              ? 'justify-center px-3 py-3 rounded-xl'
-              : 'gap-3 px-4 py-3 rounded-xl'
+              ? 'justify-center px-2 py-2 rounded-lg'
+              : 'gap-2 px-3 py-2 rounded-lg'
               } ${active
                 ? 'bg-primary-accent text-white shadow-soft'
                 : ''
@@ -180,7 +180,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
             }}
             title={isCollapsed ? t(item.label) : ''}
           >
-            <Icon size={20} className="flex-shrink-0" />
+            <Icon size={18} className="flex-shrink-0" />
             {!isCollapsed && (
               <span className="flex-1 truncate text-sm font-medium">{t(item.label)}</span>
             )}
@@ -206,54 +206,54 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
       <aside
         className={`fixed left-0 border-r z-40 transform transition-all duration-300 ease-smooth shadow-elevated ${isOpen ? 'translate-x-0' : '-translate-x-full'
           } lg:translate-x-0 ${isCollapsed
-            ? 'w-20'
-            : 'w-64'
-          } top-20`}
+            ? 'w-16'
+            : 'w-56'
+          } top-14`}
         style={{
-          height: 'calc(100vh - 5rem)',
-          maxHeight: 'calc(100vh - 5rem)',
+          height: 'calc(100vh - 3.5rem)',
+          maxHeight: 'calc(100vh - 3.5rem)',
           backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
           borderColor: isDark ? '#404040' : '#e5e7eb',
         }}
       >
         <div className="flex flex-col h-full">
           {/* Close button for mobile only */}
-          <div className="p-4 flex items-center justify-end flex-shrink-0 lg:hidden border-b border-border-light">
+          <div className="p-2 flex items-center justify-end flex-shrink-0 lg:hidden border-b border-border-light">
             <button
               onClick={onClose}
-              className="text-secondary-text hover:text-primary-text p-2 rounded-lg hover:bg-sidebar-hover transition-all duration-200"
+              className="text-secondary-text hover:text-primary-text p-1.5 rounded-lg hover:bg-sidebar-hover transition-all duration-200"
               aria-label="Close sidebar"
             >
-              <IoClose size={24} />
+              <IoClose size={20} />
             </button>
           </div>
 
           {/* Menu Items - Scrollable */}
           <nav
-            className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+            className="flex-1 overflow-y-auto overflow-x-hidden p-2"
             style={{
               scrollbarWidth: 'thin',
               scrollbarColor: '#D1D5DB #F7F8FA',
             }}
           >
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {menuData.map((item) => renderMenuItem(item))}
             </ul>
           </nav>
 
           {/* Logout - Fixed at bottom */}
           <div
-            className="p-4 border-t flex-shrink-0"
+            className="p-2 border-t flex-shrink-0"
             style={{ borderColor: isDark ? '#404040' : '#e5e7eb' }}
           >
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${isCollapsed ? 'justify-center' : ''
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${isCollapsed ? 'justify-center' : ''
                 } hover:bg-red-50 hover:text-red-600`}
               style={{ color: isDark ? '#e0e0e0' : '#6B7280' }}
               title={isCollapsed ? t('Logout') : ''}
             >
-              <IoLogOut size={20} className="flex-shrink-0" />
+              <IoLogOut size={18} className="flex-shrink-0" />
               {!isCollapsed && <span className="truncate">{t('Logout')}</span>}
             </button>
           </div>

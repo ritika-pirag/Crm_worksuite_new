@@ -149,8 +149,8 @@ const DataTable = ({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
       {/* Search and Filters Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Search Input */}
           <div className="flex-1 relative">
             <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -349,7 +349,7 @@ const DataTable = ({
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               {(actions || bulkActions) && (
-                <th key="bulk-actions" className="w-12 px-4 py-3 text-left">
+                <th key="bulk-actions" className="w-10 px-2 py-2 text-left">
                   <input
                     type="checkbox"
                     checked={selectedRows.length === filteredData.length && filteredData.length > 0}
@@ -361,13 +361,13 @@ const DataTable = ({
               {columns.filter(col => visibleColumns[col.key] !== false).map((col, index) => (
                 <th
                   key={col.key || `col-${index}`}
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+                  className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
                 >
                   {col.label}
                 </th>
               ))}
               {actions && (
-                <th key="actions-header" className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th key="actions-header" className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Actions
                 </th>
               )}
@@ -397,7 +397,7 @@ const DataTable = ({
                   className={`bg-white hover:bg-blue-50/50 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
                 >
                   {(actions || bulkActions) && (
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <input
                         type="checkbox"
                         checked={selectedRows.includes(row.id)}
@@ -408,12 +408,12 @@ const DataTable = ({
                     </td>
                   )}
                   {columns.filter(col => visibleColumns[col.key] !== false).map((col, colIndex) => (
-                    <td key={`${row.id || index}-${col.key || colIndex}`} className="px-4 py-3 text-sm text-gray-700">
+                    <td key={`${row.id || index}-${col.key || colIndex}`} className="px-3 py-2 text-sm text-gray-700">
                       {col.render ? col.render(row[col.key], row) : row[col.key]}
                     </td>
                   ))}
                   {actions && (
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                       {actions(row)}
                     </td>
                   )}

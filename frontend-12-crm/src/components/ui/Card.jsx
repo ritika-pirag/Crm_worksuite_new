@@ -2,10 +2,10 @@ import React from 'react'
 
 const Card = ({ children, className = '', onClick, variant = 'default', ...props }) => {
   const variants = {
-    default: 'bg-white rounded-xl shadow-md border border-gray-100 p-6 lg:p-8',
-    elevated: 'bg-white rounded-xl shadow-lg border border-gray-100 p-6 lg:p-8',
-    flat: 'bg-white rounded-xl border border-gray-200 p-6 lg:p-8',
-    compact: 'bg-white rounded-lg shadow-md border border-gray-100 p-4',
+    default: 'bg-white rounded-lg shadow-sm border border-gray-100 p-3 lg:p-4',
+    elevated: 'bg-white rounded-lg shadow-md border border-gray-100 p-3 lg:p-4',
+    flat: 'bg-white rounded-lg border border-gray-200 p-3 lg:p-4',
+    compact: 'bg-white rounded-md shadow-sm border border-gray-100 p-2',
   }
 
   return (

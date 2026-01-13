@@ -1168,15 +1168,15 @@ const Clients = () => {
   )
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header with Tabs */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+      <div className="bg-white rounded-lg shadow-sm p-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 border-b-2 border-gray-200">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`px-4 py-2 font-medium transition-colors ${activeTab === 'overview'
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'overview'
                   ? 'text-primary-accent border-b-2 border-primary-accent -mb-[2px]'
                   : 'text-secondary-text hover:text-primary-text'
                   }`}
@@ -1185,7 +1185,7 @@ const Clients = () => {
               </button>
               <button
                 onClick={() => setActiveTab('clients')}
-                className={`px-4 py-2 font-medium transition-colors ${activeTab === 'clients'
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'clients'
                   ? 'text-primary-accent border-b-2 border-primary-accent -mb-[2px]'
                   : 'text-secondary-text hover:text-primary-text'
                   }`}
@@ -1194,7 +1194,7 @@ const Clients = () => {
               </button>
               <button
                 onClick={() => setActiveTab('contacts')}
-                className={`px-4 py-2 font-medium transition-colors ${activeTab === 'contacts'
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'contacts'
                   ? 'text-primary-accent border-b-2 border-primary-accent -mb-[2px]'
                   : 'text-secondary-text hover:text-primary-text'
                   }`}
@@ -1228,105 +1228,105 @@ const Clients = () => {
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {overviewLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="p-6">
-                  <div className="h-16 bg-gray-200 rounded animate-pulse" />
+                <Card key={i}>
+                  <div className="h-14 bg-gray-200 rounded animate-pulse" />
                 </Card>
               ))}
             </div>
           ) : overviewData ? (
             <>
               {/* Top Stats Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                    <IoBriefcaseOutline size={24} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+                    <IoBriefcaseOutline size={20} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overviewData.totals?.total_clients || 0}</h3>
-                    <p className="text-sm text-gray-500">Total clients</p>
+                    <h3 className="text-xl font-bold text-gray-900">{overviewData.totals?.total_clients || 0}</h3>
+                    <p className="text-xs text-gray-500">Total clients</p>
                   </div>
                 </Card>
 
-                <Card className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-yellow-500 flex items-center justify-center text-white">
-                    <IoPeopleOutline size={24} />
+                <Card className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-500 flex items-center justify-center text-white">
+                    <IoPeopleOutline size={20} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overviewData.contacts?.total_contacts || 0}</h3>
-                    <p className="text-sm text-gray-500">Total contacts</p>
+                    <h3 className="text-xl font-bold text-gray-900">{overviewData.contacts?.total_contacts || 0}</h3>
+                    <p className="text-xs text-gray-500">Total contacts</p>
                   </div>
                 </Card>
 
-                <Card className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-500 flex items-center justify-center text-white">
-                    <IoCheckboxOutline size={24} />
+                <Card className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center text-white">
+                    <IoCheckboxOutline size={20} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overviewData.contacts?.today || 0}</h3>
-                    <p className="text-sm text-gray-500">Contacts logged in today</p>
+                    <h3 className="text-xl font-bold text-gray-900">{overviewData.contacts?.today || 0}</h3>
+                    <p className="text-xs text-gray-500">Contacts logged in today</p>
                   </div>
                 </Card>
 
-                <Card className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-400 flex items-center justify-center text-white">
-                    <IoCalendarOutline size={24} />
+                <Card className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-400 flex items-center justify-center text-white">
+                    <IoCalendarOutline size={20} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overviewData.contacts?.last_7_days || 0}</h3>
-                    <p className="text-sm text-gray-500">Contacts logged in last 7 days</p>
+                    <h3 className="text-xl font-bold text-gray-900">{overviewData.contacts?.last_7_days || 0}</h3>
+                    <p className="text-xs text-gray-500">Contacts logged in last 7 days</p>
                   </div>
                 </Card>
               </div>
 
               {/* Invoice Stats Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-gray-700">Clients has unpaid invoices</h4>
-                    <span className="text-2xl font-bold text-gray-900">{overviewData.invoices?.clients_unpaid || 0}</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card>
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-semibold text-gray-700 text-sm">Clients has unpaid invoices</h4>
+                    <span className="text-xl font-bold text-gray-900">{overviewData.invoices?.clients_unpaid || 0}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-gray-500 mb-2">
                     {Math.round(((overviewData.invoices?.clients_unpaid || 0) / (overviewData.totals?.total_clients || 1)) * 100)}% of total clients
                   </p>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div className="w-full bg-gray-200 rounded-full h-1">
                     <div
-                      className="bg-yellow-500 h-1.5 rounded-full"
+                      className="bg-yellow-500 h-1 rounded-full"
                       style={{ width: `${Math.min(((overviewData.invoices?.clients_unpaid || 0) / (overviewData.totals?.total_clients || 1)) * 100, 100)}%` }}
                     />
                   </div>
                 </Card>
 
-                <Card className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-gray-700">Clients has partially paid invoices</h4>
-                    <span className="text-2xl font-bold text-gray-900">{overviewData.invoices?.clients_partially_paid || 0}</span>
+                <Card>
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-semibold text-gray-700 text-sm">Clients has partially paid invoices</h4>
+                    <span className="text-xl font-bold text-gray-900">{overviewData.invoices?.clients_partially_paid || 0}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-gray-500 mb-2">
                     {Math.round(((overviewData.invoices?.clients_partially_paid || 0) / (overviewData.totals?.total_clients || 1)) * 100)}% of total clients
                   </p>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div className="w-full bg-gray-200 rounded-full h-1">
                     <div
-                      className="bg-blue-600 h-1.5 rounded-full"
+                      className="bg-blue-600 h-1 rounded-full"
                       style={{ width: `${Math.min(((overviewData.invoices?.clients_partially_paid || 0) / (overviewData.totals?.total_clients || 1)) * 100, 100)}%` }}
                     />
                   </div>
                 </Card>
 
-                <Card className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-gray-700">Clients has overdue invoices</h4>
-                    <span className="text-2xl font-bold text-gray-900">{overviewData.invoices?.clients_overdue || 0}</span>
+                <Card>
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="font-semibold text-gray-700 text-sm">Clients has overdue invoices</h4>
+                    <span className="text-xl font-bold text-gray-900">{overviewData.invoices?.clients_overdue || 0}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-gray-500 mb-2">
                     {Math.round(((overviewData.invoices?.clients_overdue || 0) / (overviewData.totals?.total_clients || 1)) * 100)}% of total clients
                   </p>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div className="w-full bg-gray-200 rounded-full h-1">
                     <div
-                      className="bg-red-600 h-1.5 rounded-full"
+                      className="bg-red-600 h-1 rounded-full"
                       style={{ width: `${Math.min(((overviewData.invoices?.clients_overdue || 0) / (overviewData.totals?.total_clients || 1)) * 100, 100)}%` }}
                     />
                   </div>
@@ -1334,11 +1334,11 @@ const Clients = () => {
               </div>
 
               {/* Projects & Estimates Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Projects Section */}
-                <Card className="p-6">
-                  <h4 className="text-gray-500 mb-6 uppercase text-xs font-bold tracking-wider">Projects</h4>
-                  <div className="space-y-6">
+                <Card>
+                  <h4 className="text-gray-500 mb-4 uppercase text-xs font-bold tracking-wider">Projects</h4>
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center group cursor-pointer">
                       <div className="flex items-center gap-3 text-gray-600">
                         <IoGridOutline size={20} />
@@ -1346,99 +1346,99 @@ const Clients = () => {
                       </div>
                       <span className="text-blue-600 font-semibold">{overviewData.projects?.clients_open || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoCheckmarkCircleOutline size={20} />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoCheckmarkCircleOutline size={18} />
                         <span className="group-hover:text-primary-accent transition-colors">Clients has completed projects</span>
                       </div>
-                      <span className="text-green-600 font-semibold">{overviewData.projects?.clients_completed || 0}</span>
+                      <span className="text-green-600 font-semibold text-sm">{overviewData.projects?.clients_completed || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoPauseCircleOutline size={20} />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoPauseCircleOutline size={18} />
                         <span className="group-hover:text-primary-accent transition-colors">Clients has hold projects</span>
                       </div>
-                      <span className="text-orange-500 font-semibold">{overviewData.projects?.clients_hold || 0}</span>
+                      <span className="text-orange-500 font-semibold text-sm">{overviewData.projects?.clients_hold || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoCloseCircleOutline size={20} />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoCloseCircleOutline size={18} />
                         <span className="group-hover:text-primary-accent transition-colors">Clients has canceled projects</span>
                       </div>
-                      <span className="text-red-500 font-semibold">{overviewData.projects?.clients_canceled || 0}</span>
+                      <span className="text-red-500 font-semibold text-sm">{overviewData.projects?.clients_canceled || 0}</span>
                     </div>
                   </div>
                 </Card>
 
                 {/* Estimates Section */}
-                <Card className="p-6">
-                  <h4 className="text-gray-500 mb-6 uppercase text-xs font-bold tracking-wider">Estimates</h4>
-                  <div className="space-y-6">
+                <Card>
+                  <h4 className="text-gray-500 mb-4 uppercase text-xs font-bold tracking-wider">Estimates</h4>
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center group cursor-pointer">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoCubeOutline size={20} />
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoCubeOutline size={18} />
                         <span className="group-hover:text-primary-accent transition-colors">Client has open estimates</span>
                       </div>
-                      <span className="text-orange-500 font-semibold">{overviewData.estimates?.clients_open || 0}</span>
+                      <span className="text-orange-500 font-semibold text-sm">{overviewData.estimates?.clients_open || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoCheckmarkDoneCircleOutline size={20} />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoCheckmarkDoneCircleOutline size={18} />
                         <span className="group-hover:text-primary-accent transition-colors">Clients has accepted estimates</span>
                       </div>
-                      <span className="text-green-600 font-semibold">{overviewData.estimates?.clients_accepted || 0}</span>
+                      <span className="text-green-600 font-semibold text-sm">{overviewData.estimates?.clients_accepted || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
-                          <IoWater size={12} className="text-gray-400" />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <div className="w-4 h-4 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                          <IoWater size={10} className="text-gray-400" />
                         </div>
                         <span className="group-hover:text-primary-accent transition-colors">Clients has new estimate requests</span>
                       </div>
-                      <span className="text-blue-500 font-semibold">{overviewData.estimates?.clients_new || 0}</span>
+                      <span className="text-blue-500 font-semibold text-sm">{overviewData.estimates?.clients_new || 0}</span>
                     </div>
-                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <IoSyncOutline size={20} className="animate-spin-slow" />
+                    <div className="flex justify-between items-center group cursor-pointer border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2 text-gray-600 text-sm">
+                        <IoSyncOutline size={18} className="animate-spin-slow" />
                         <span className="group-hover:text-primary-accent transition-colors">Clients has estimate requests in progress</span>
                       </div>
-                      <span className="text-gray-500 font-semibold">{overviewData.estimates?.clients_in_progress || 0}</span>
+                      <span className="text-gray-500 font-semibold text-sm">{overviewData.estimates?.clients_in_progress || 0}</span>
                     </div>
                   </div>
                 </Card>
               </div>
 
               {/* Tickets & Proposals Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6 flex flex-col justify-end min-h-[140px] relative overflow-hidden group">
-                  <h4 className="text-gray-500 mb-2 font-medium">Clients has open tickets</h4>
-                  <p className="text-sm text-gray-400 mb-3">{Math.round(((overviewData.tickets?.clients_open || 0) / (overviewData.totals?.total_clients || 1)) * 100)}% of total clients</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Card className="flex flex-col justify-end min-h-[120px] relative overflow-hidden group">
+                  <h4 className="text-gray-500 mb-1.5 font-medium text-sm">Clients has open tickets</h4>
+                  <p className="text-xs text-gray-400 mb-2">{Math.round(((overviewData.tickets?.clients_open || 0) / (overviewData.totals?.total_clients || 1)) * 100)}% of total clients</p>
                   <div className="flex items-end justify-between">
-                    <div className="w-full bg-gray-200 rounded-full h-1.5 mr-12">
+                    <div className="w-full bg-gray-200 rounded-full h-1 mr-10">
                       <div
-                        className="bg-red-500 h-1.5 rounded-full"
+                        className="bg-red-500 h-1 rounded-full"
                         style={{ width: `${Math.min(((overviewData.tickets?.clients_open || 0) / (overviewData.totals?.total_clients || 1)) * 100, 100)}%` }}
                       />
                     </div>
-                    <span className="text-3xl font-bold text-gray-800">{overviewData.tickets?.clients_open || 0}</span>
+                    <span className="text-2xl font-bold text-gray-800">{overviewData.tickets?.clients_open || 0}</span>
                   </div>
                 </Card>
 
-                <Card className="p-6 min-h-[140px] flex flex-col justify-between">
+                <Card className="min-h-[100px] flex flex-col justify-between">
                   <h4 className="text-gray-500 uppercase text-xs font-bold tracking-wider">Proposals</h4>
                   <div className="flex justify-between items-end">
-                    <div className="flex items-center gap-3 text-gray-600">
-                      <IoCafeOutline size={20} />
+                    <div className="flex items-center gap-2 text-gray-600 text-sm">
+                      <IoCafeOutline size={18} />
                       <span>Clients has open proposals</span>
                     </div>
-                    <span className="text-orange-500 font-bold text-lg">{overviewData.proposals?.clients_open || 0}</span>
+                    <span className="text-orange-500 font-bold">{overviewData.proposals?.clients_open || 0}</span>
                   </div>
                 </Card>
               </div>
             </>
           ) : (
-            <div className="text-center py-10">
-              <p className="text-gray-500">No overview data available</p>
+            <div className="text-center py-6">
+              <p className="text-gray-500 text-sm">No overview data available</p>
             </div>
           )}
         </div>
@@ -1447,10 +1447,10 @@ const Clients = () => {
       {/* Clients Tab */}
       {
         activeTab === 'clients' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Filter Bar */}
-            <Card className="p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <Card className="!p-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* Left Section */}
                 <div className="flex flex-wrap items-center gap-2">
                   {/* View Toggle */}

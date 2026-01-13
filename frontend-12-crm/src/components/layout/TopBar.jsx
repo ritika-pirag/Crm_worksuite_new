@@ -126,14 +126,14 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 border-b z-50 w-full h-16 lg:h-20 flex items-center shadow-sm"
+        className="fixed top-0 left-0 right-0 border-b z-50 w-full h-14 flex items-center shadow-sm"
         style={{
           zIndex: 1000,
           backgroundColor: isDark ? "#1e1e1e" : "#ffffff",
           borderColor: isDark ? "#404040" : "#e5e7eb",
         }}
       >
-        <div className="px-4 lg:px-6 py-3 flex items-center justify-between w-full h-full gap-4">
+        <div className="px-3 lg:px-4 py-2 flex items-center justify-between w-full h-full gap-3">
           {/* LEFT SIDE */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
             {/* Logo */}
@@ -141,12 +141,12 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
               className="flex items-center gap-3 cursor-pointer flex-shrink-0 group"
               onClick={() => navigate("/app/admin/dashboard")}
             >
-              <div className="w-8 h-8 lg:w-9 lg:h-9 bg-gradient-to-br from-primary-accent to-info rounded-xl flex items-center justify-center flex-shrink-0 shadow-card group-hover:shadow-elevated transition-all duration-200">
-                <span className="text-white font-bold text-sm lg:text-base">
+              <div className="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-primary-accent to-info rounded-lg flex items-center justify-center flex-shrink-0 shadow-card group-hover:shadow-elevated transition-all duration-200">
+                <span className="text-white font-bold text-xs lg:text-sm">
                   D
                 </span>
               </div>
-              <span className="text-lg lg:text-xl font-bold text-primary-text whitespace-nowrap hidden sm:block">
+              <span className="text-base lg:text-lg font-bold text-primary-text whitespace-nowrap hidden sm:block">
                 Develo
               </span>
             </div>
@@ -160,10 +160,10 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
                   onToggleSidebar();
                 }
               }}
-              className="flex items-center justify-center w-8 h-8 lg:w-9 lg:h-9 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200 flex-shrink-0"
+              className="flex items-center justify-center w-7 h-7 lg:w-8 lg:h-8 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200 flex-shrink-0"
             >
               <IoMenu
-                size={20}
+                size={18}
                 className={`transition-transform duration-200 ${
                   isSidebarCollapsed ? "rotate-180" : ""
                 }`}
@@ -174,10 +174,10 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
             <div className="relative ml-1 lg:ml-2" ref={dashboardMenuRef}>
               <button
                 onClick={() => setShowDashboardMenu(!showDashboardMenu)}
-                className="flex items-center justify-center w-8 h-8 lg:w-9 lg:h-9 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200"
+                className="flex items-center justify-center w-7 h-7 lg:w-8 lg:h-8 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200"
                 title="Dashboards"
               >
-                <IoDesktopOutline size={20} />
+                <IoDesktopOutline size={18} />
               </button>
               {showDashboardMenu && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-elevated border border-gray-100 py-2 z-50 animate-fadeIn">
@@ -227,10 +227,10 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
               {!showSearch ? (
                 <button
                   onClick={() => setShowSearch(true)}
-                  className="p-2 lg:p-2.5 rounded-xl transition-all duration-200 flex-shrink-0 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover"
+                  className="p-1.5 lg:p-2 rounded-lg transition-all duration-200 flex-shrink-0 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover"
                   title="Search"
                 >
-                  <IoSearch size={20} />
+                  <IoSearch size={18} />
                 </button>
               ) : (
                 <GlobalSearch
@@ -242,27 +242,27 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
             </div>
 
             {/* Add Button */}
-            <button className="hidden sm:flex items-center justify-center p-2 lg:p-2.5 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200 flex-shrink-0">
-              <IoAdd size={22} />
+            <button className="hidden sm:flex items-center justify-center p-1.5 lg:p-2 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200 flex-shrink-0">
+              <IoAdd size={20} />
             </button>
 
             {/* Globe Icon */}
-            <button className="hidden sm:flex items-center justify-center p-2 lg:p-2.5 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200 flex-shrink-0">
-              <IoGlobeOutline size={20} />
+            <button className="hidden sm:flex items-center justify-center p-1.5 lg:p-2 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200 flex-shrink-0">
+              <IoGlobeOutline size={18} />
             </button>
 
             {/* Clock Icon */}
-            <button className="hidden sm:flex items-center justify-center p-2 lg:p-2.5 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200 flex-shrink-0">
-              <IoTime size={20} />
+            <button className="hidden sm:flex items-center justify-center p-1.5 lg:p-2 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200 flex-shrink-0">
+              <IoTime size={18} />
             </button>
 
             {/* Notification Bell */}
             <div className="relative flex-shrink-0">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 lg:p-2.5 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200 relative"
+                className="p-1.5 lg:p-2 text-secondary-text hover:text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200 relative"
               >
-                <IoNotifications size={20} />
+                <IoNotifications size={18} />
                 {unreadCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-soft animate-pulse">
                     {unreadCount > 9 ? "9+" : unreadCount}
@@ -280,10 +280,10 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
             <div className="relative flex-shrink-0" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 px-1 lg:px-2 py-1.5 text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200"
+                className="flex items-center gap-1.5 px-1 lg:px-1.5 py-1 text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200"
               >
-                <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-br from-primary-accent to-info flex items-center justify-center flex-shrink-0 shadow-card">
-                  <span className="text-white text-xs lg:text-sm font-semibold">
+                <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-gradient-to-br from-primary-accent to-info flex items-center justify-center flex-shrink-0 shadow-card">
+                  <span className="text-white text-[10px] lg:text-xs font-semibold">
                     {user?.role === "SUPERADMIN"
                       ? "SA"
                       : user?.role === "ADMIN"
@@ -311,41 +311,41 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
 
               {showProfileMenu && (
                 <div
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-elevated border border-gray-200 overflow-hidden animate-fadeIn"
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-elevated border border-gray-200 overflow-hidden animate-fadeIn"
                   style={{
                     position: "fixed",
-                    top: "4.5rem",
-                    right: "1rem",
+                    top: "3.75rem",
+                    right: "0.75rem",
                     zIndex: 10000,
                   }}
                 >
-                  <div className="p-5 border-b border-border-light bg-gradient-to-r from-primary-accent/5 to-info/5">
+                  <div className="p-3 border-b border-border-light bg-gradient-to-r from-primary-accent/5 to-info/5">
                     <p className="text-sm font-semibold text-primary-text truncate">
                       {user?.name || "User"}
                     </p>
-                    <p className="text-xs text-secondary-text truncate mt-1">
+                    <p className="text-xs text-secondary-text truncate mt-0.5">
                       {user?.email || ""}
                     </p>
-                    <p className="text-xs font-semibold text-primary-accent mt-1">
+                    <p className="text-xs font-semibold text-primary-accent mt-0.5">
                       {getRoleDisplayName()}
                     </p>
                   </div>
-                  <div className="p-2 space-y-1">
+                  <div className="p-1.5 space-y-0.5">
                     <button
                       onClick={() => {
                         navigate(getProfilePath());
                         setShowProfileMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-primary-text hover:bg-sidebar-hover rounded-xl transition-all duration-200"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary-text hover:bg-sidebar-hover rounded-lg transition-all duration-200"
                     >
-                      <IoPerson size={18} />
+                      <IoPerson size={16} />
                       Profile
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                     >
-                      <IoLogOut size={18} />
+                      <IoLogOut size={16} />
                       Logout
                     </button>
                   </div>

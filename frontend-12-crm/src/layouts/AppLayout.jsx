@@ -35,12 +35,12 @@ const AppLayout = () => {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <div
-          className={`flex-1 flex flex-col transition-all duration-300 ease-smooth min-h-screen w-full relative z-10 pt-16 lg:pt-20 ${sidebarCollapsed
-            ? 'ml-0 lg:ml-20'
-            : 'ml-0 lg:ml-64'
+          className={`flex-1 flex flex-col transition-all duration-300 ease-smooth min-h-screen w-full relative z-10 pt-14 lg:pt-14 ${sidebarCollapsed
+            ? 'ml-0 lg:ml-16'
+            : 'ml-0 lg:ml-56'
             }`}
         >
-          <main className={`flex-1 w-full max-w-full overflow-x-hidden relative z-10 ${isDetailPage ? 'p-0' : 'p-6 lg:p-8 xl:p-10'
+          <main className={`flex-1 w-full max-w-full overflow-x-hidden relative z-10 ${isDetailPage ? 'p-0' : 'p-3 lg:p-4'
             }`}
           >
             <Outlet />
