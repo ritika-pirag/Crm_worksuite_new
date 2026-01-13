@@ -908,23 +908,27 @@ const ClientDetail = () => {
     }
 
     try {
+      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
       const response = await clientsAPI.addContact(id, {
         name: contactFormData.name,
         job_title: contactFormData.jobTitle,
         email: contactFormData.email,
         phone: contactFormData.phone,
-        is_primary: contactFormData.isPrimary
-      })
+        is_primary: contactFormData.isPrimary,
+        company_id: companyId
+      }, { company_id: companyId })
 
       if (response.data.success) {
         alert('Contact added successfully!')
         setIsAddContactModalOpen(false)
         setContactFormData({ name: '', jobTitle: '', email: '', phone: '', isPrimary: false })
         fetchClient()
+      } else {
+        alert(response.data.error || 'Failed to add contact')
       }
     } catch (error) {
       console.error('Error adding contact:', error)
-      alert('Failed to add contact')
+      alert(error.response?.data?.error || 'Failed to add contact')
     }
   }
 
@@ -2023,7 +2027,7 @@ const ClientDetail = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200 overflow-x-auto -mx-3 sm:-mx-4 px-3 sm:px-4 tabs-scrollbar" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 #f1f5f9' }}>
-            {['Overview', 'Projects', 'Subscriptions', 'Invoices', 'Payments', 'Statement', 'Orders', 'Estimates', 'Proposals', 'Contracts', 'Files', 'Expenses', 'Notes', 'Tasks'].map((tab) => (
+            {['Overview', 'Projects', 'Tasks', 'Proposals', 'Estimates', 'Invoices', 'Payments', 'Statement', 'Contracts', 'Expenses', 'Files', 'Notes', 'Orders'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
