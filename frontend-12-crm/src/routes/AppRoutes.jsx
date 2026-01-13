@@ -48,6 +48,7 @@ import AdminPayments from '../app/admin/pages/Payments'
 import AdminCreditNotes from '../app/admin/pages/CreditNotes'
 import BankAccounts from '../app/admin/pages/BankAccounts'
 import AdminContracts from '../app/admin/pages/Contracts'
+import ContractDetail from '../app/admin/pages/ContractDetail'
 import Orders from '../app/admin/pages/Orders'
 import OrderDetail from '../app/admin/pages/OrderDetail'
 import Subscriptions from '../app/admin/pages/Subscriptions'
@@ -253,6 +254,7 @@ function AppRoutes() {
         <Route path="admin/credit-notes" element={<AdminCreditNotes />} />
         <Route path="admin/bank-accounts" element={<BankAccounts />} />
         <Route path="admin/contracts" element={<AdminContracts />} />
+        <Route path="admin/contracts/:id" element={<ContractDetail />} />
         <Route path="admin/orders" element={<Orders />} />
         <Route path="admin/orders/:id" element={<OrderDetail />} />
         <Route path="admin/subscriptions" element={<Subscriptions />} />
