@@ -1667,8 +1667,9 @@ const ProjectDetail = () => {
     }
 
     // Validate project ID
-    if (!id || isNaN(parseInt(id))) {
-      alert('Invalid project ID')
+    const projectId = parseInt(id, 10)
+    if (!id || isNaN(projectId) || projectId <= 0) {
+      alert('Invalid project ID: ' + id)
       return
     }
 
@@ -1678,7 +1679,7 @@ const ProjectDetail = () => {
 
       // Validate userId is a valid number
       if (isNaN(userId) || userId <= 0) {
-        alert('Please select a valid member')
+        alert('Please select a valid member. Selected: ' + timesheetFormData.user_id)
         return
       }
 
@@ -1690,18 +1691,25 @@ const ProjectDetail = () => {
         dateValue = timesheetFormData.date
       }
 
+      // Ensure date is valid
+      if (!dateValue || dateValue === 'Invalid Date') {
+        dateValue = new Date().toISOString().split('T')[0]
+      }
+
       const timesheetData = {
         company_id: companyId,
         user_id: userId,
-        project_id: parseInt(id, 10),
+        project_id: projectId,
         task_id: timesheetFormData.task_id ? parseInt(timesheetFormData.task_id, 10) : null,
         date: dateValue,
         hours: hoursValue,
         description: timesheetFormData.description || ''
       }
 
-      console.log('Sending timesheet data:', timesheetData)
-      const response = await timeTrackingAPI.create(timesheetData, { company_id: companyId })
+      // Debug: Log the exact data being sent
+      console.log('Sending timesheet data:', JSON.stringify(timesheetData, null, 2))
+
+      const response = await timeTrackingAPI.create(timesheetData)
       if (response.data.success) {
         alert('Time logged successfully!')
         setIsAddTimesheetModalOpen(false)
@@ -1712,6 +1720,7 @@ const ProjectDetail = () => {
       }
     } catch (error) {
       console.error('Error adding timesheet:', error)
+      console.error('Error response:', error.response?.data)
       alert(error.response?.data?.error || 'Failed to add timesheet')
     }
   }
