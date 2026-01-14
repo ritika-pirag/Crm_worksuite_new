@@ -345,7 +345,7 @@ const DataTable = ({
 
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full" style={{ tableLayout: 'auto' }}>
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               {(actions || bulkActions) && (
@@ -361,7 +361,8 @@ const DataTable = ({
               {columns.filter(col => visibleColumns[col.key] !== false).map((col, index) => (
                 <th
                   key={col.key || `col-${index}`}
-                  className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+                  className={`px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap ${col.className || 'text-left'}`}
+                  style={col.width ? { width: col.width, minWidth: col.width } : {}}
                 >
                   {col.label}
                 </th>
@@ -408,7 +409,11 @@ const DataTable = ({
                     </td>
                   )}
                   {columns.filter(col => visibleColumns[col.key] !== false).map((col, colIndex) => (
-                    <td key={`${row.id || index}-${col.key || colIndex}`} className="px-3 py-2 text-sm text-gray-700">
+                    <td
+                      key={`${row.id || index}-${col.key || colIndex}`}
+                      className={`px-3 py-2 text-sm text-gray-700 ${col.className || ''}`}
+                      style={col.width ? { width: col.width, minWidth: col.width } : {}}
+                    >
                       {col.render ? col.render(row[col.key], row) : row[col.key]}
                     </td>
                   ))}
