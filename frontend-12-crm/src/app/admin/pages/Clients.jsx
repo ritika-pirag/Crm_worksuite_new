@@ -405,6 +405,8 @@ const Clients = () => {
             totalInvoiced: client.total_invoiced || 0,
             paymentReceived: client.payment_received || 0,
             due: client.due || 0,
+            // Contacts for primary contact display
+            contacts: client.contacts || [],
           }
         }))
         setClients(transformedClients)
@@ -522,6 +524,8 @@ const Clients = () => {
     {
       key: 'id',
       label: 'ID',
+      width: '70px',
+      className: 'text-center',
       render: (value, row) => (
         <span className="text-gray-600 font-medium">#{row.id}</span>
       ),
@@ -529,14 +533,16 @@ const Clients = () => {
     {
       key: 'client_name',
       label: 'Name',
+      width: '180px',
       render: (value, row) => (
         <a
           href="#"
-          className="text-blue-600 hover:underline font-medium"
+          className="text-blue-600 hover:underline font-medium truncate block max-w-[160px]"
           onClick={(e) => {
             e.preventDefault()
             handleViewClient(row.id)
           }}
+          title={value || row.client_name || row.companyName || row.company_name || '-'}
         >
           {value || row.client_name || row.companyName || row.company_name || '-'}
         </a>
@@ -544,9 +550,9 @@ const Clients = () => {
     },
     {
       key: 'primary_contact',
-      label: 'Primary contact',
+      label: 'Primary Contact',
+      width: '160px',
       render: (value, row) => {
-        // Find primary contact
         const contacts = row.contacts || [];
         const primary = contacts.find(c => c.is_primary) || contacts[0];
 
@@ -554,10 +560,10 @@ const Clients = () => {
 
         return (
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-              <IoPerson size={10} />
+            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <IoPerson size={12} className="text-blue-600" />
             </div>
-            <span className="text-sm text-gray-700">{primary.name}</span>
+            <span className="text-sm text-gray-700 truncate" title={primary.name}>{primary.name}</span>
           </div>
         )
       }
@@ -565,34 +571,43 @@ const Clients = () => {
     {
       key: 'phone',
       label: 'Phone',
+      width: '140px',
       render: (value, row) => {
         const phone = value || row.phone_number || row.phoneNumber || '';
         const code = row.phoneCountryCode || row.phone_country_code || '';
-        return phone ? <span className="text-sm text-gray-600 whitespace-nowrap">{code} {phone}</span> : '-';
+        return phone ? <span className="text-sm text-gray-600 whitespace-nowrap">{code} {phone}</span> : <span className="text-gray-400">-</span>;
       }
     },
     {
       key: 'clientGroups',
-      label: 'Client groups',
+      label: 'Client Groups',
+      width: '150px',
       render: (value, row) => {
-        if (!value || value.length === 0) return '-';
+        if (!value || value.length === 0) return <span className="text-gray-400">-</span>;
 
         const getGroupStyle = (group) => {
           const styles = {
             'Gold': 'bg-amber-50 text-amber-700 border-amber-200',
             'Silver': 'bg-slate-50 text-slate-600 border-slate-200',
-            'VIP': 'bg-rose-50 text-rose-700 border-rose-200'
+            'VIP': 'bg-rose-50 text-rose-700 border-rose-200',
+            'Premium': 'bg-purple-50 text-purple-700 border-purple-200',
+            'Enterprise': 'bg-blue-50 text-blue-700 border-blue-200'
           };
           return styles[group] || 'bg-gray-50 text-gray-600 border-gray-200';
         };
 
         return (
           <div className="flex flex-wrap gap-1">
-            {value.map((g, i) => (
-              <span key={i} className={`text-[11px] px-2 py-0.5 rounded-full border ${getGroupStyle(g)}`}>
-                • {g}
+            {value.slice(0, 2).map((g, i) => (
+              <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${getGroupStyle(g)}`}>
+                {g}
               </span>
             ))}
+            {value.length > 2 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                +{value.length - 2}
+              </span>
+            )}
           </div>
         )
       }
@@ -600,23 +615,29 @@ const Clients = () => {
     {
       key: 'labels',
       label: 'Labels',
+      width: '130px',
       render: (value, row) => {
-        if (!value || (Array.isArray(value) && value.length === 0)) return '-'
+        if (!value || (Array.isArray(value) && value.length === 0)) return <span className="text-gray-400">-</span>
         return (
           <div className="flex flex-wrap gap-1">
-            {Array.isArray(value) && value.map((labelName, idx) => {
+            {Array.isArray(value) && value.slice(0, 2).map((labelName, idx) => {
               const labelObj = labels.find(l => l.name === labelName)
               const color = labelObj?.color || '#3b82f6'
               return (
                 <span
                   key={idx}
-                  className="px-2 py-0.5 rounded text-white text-[10px] uppercase font-bold tracking-wide"
+                  className="px-2 py-0.5 rounded text-white text-[10px] uppercase font-semibold"
                   style={{ backgroundColor: color }}
                 >
                   {labelName}
                 </span>
               )
             })}
+            {value.length > 2 && (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-gray-200 text-gray-600">
+                +{value.length - 2}
+              </span>
+            )}
           </div>
         )
       }
@@ -624,30 +645,43 @@ const Clients = () => {
     {
       key: 'totalProjects',
       label: 'Projects',
-      render: (value, row) => <span className="text-center block">{value || 0}</span>
+      width: '80px',
+      className: 'text-center',
+      render: (value, row) => (
+        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-700 font-semibold text-sm">
+          {value || 0}
+        </span>
+      )
     },
     {
       key: 'totalInvoiced',
-      label: 'Total invoiced',
+      label: 'Total Invoiced',
+      width: '120px',
+      className: 'text-right',
       render: (value, row) => {
         const amount = row.totalInvoiced || 0
-        return <span className="text-sm text-gray-700">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        return <span className="text-sm font-medium text-gray-700">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       },
     },
     {
       key: 'paymentReceived',
-      label: 'Payment Received',
+      label: 'Received',
+      width: '110px',
+      className: 'text-right',
       render: (value, row) => {
         const amount = row.paymentReceived || 0
-        return <span className="text-sm text-gray-700">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        return <span className="text-sm font-medium text-green-600">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       },
     },
     {
       key: 'due',
       label: 'Due',
+      width: '100px',
+      className: 'text-right',
       render: (value, row) => {
         const amount = row.due || 0
-        return <span className="text-sm text-gray-700">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        const colorClass = amount > 0 ? 'text-red-600' : 'text-gray-500'
+        return <span className={`text-sm font-medium ${colorClass}`}>${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       },
     },
   ]
@@ -1549,19 +1583,6 @@ const Clients = () => {
                   >
                     Print
                   </button>
-
-                  {/* Search Input */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search..."
-                      value={filterSearchQuery}
-                      onChange={(e) => setFilterSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleApplyFilters()}
-                      className="pl-9 pr-4 py-2 w-48 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <IoSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  </div>
                 </div>
               </div>
 
@@ -1664,16 +1685,6 @@ const Clients = () => {
             <DataTable
               columns={clientColumns}
               data={clients.filter(c => {
-                // Search filter
-                const query = (searchQuery || filterSearchQuery).toLowerCase()
-                if (query) {
-                  const matchesSearch =
-                    (c.companyName || c.company_name || '').toLowerCase().includes(query) ||
-                    (c.city || '').toLowerCase().includes(query) ||
-                    (c.phoneNumber || c.phone_number || '').toLowerCase().includes(query) ||
-                    (c.email || '').toLowerCase().includes(query)
-                  if (!matchesSearch) return false
-                }
                 // Quick filter
                 if (quickFilter === 'active' && c.status !== 'Active') return false
                 if (quickFilter === 'inactive' && c.status !== 'Inactive') return false
@@ -1683,9 +1694,9 @@ const Clients = () => {
                 if (selectedOwner && c.owner_id?.toString() !== selectedOwner) return false
                 if (ownerFilter && c.owner_id?.toString() !== ownerFilter) return false
                 // Group filter
-                if (selectedGroup && !c.client_groups?.includes(selectedGroup)) return false
+                if (selectedGroup && !c.clientGroups?.includes(selectedGroup)) return false
                 // Label filter
-                if (selectedLabel && c.label !== selectedLabel) return false
+                if (selectedLabel && !c.labels?.includes(selectedLabel)) return false
                 return true
               })}
               searchPlaceholder="Search clients..."
