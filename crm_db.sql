@@ -175,6 +175,7 @@ CREATE TABLE `client_labels` (
   `id` int(10) UNSIGNED NOT NULL,
   `client_id` int(10) UNSIGNED NOT NULL,
   `label` varchar(100) NOT NULL,
+  `color` varchar(20) DEFAULT '#3B82F6',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -201,9 +202,22 @@ CREATE TABLE `companies` (
   `id` int(10) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
   `logo` varchar(500) DEFAULT NULL,
+  `industry` varchar(100) DEFAULT NULL,
+  `website` varchar(500) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(100) DEFAULT NULL,
+  `zip` varchar(20) DEFAULT NULL,
+  `country` varchar(100) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
   `currency` varchar(10) DEFAULT 'USD',
   `timezone` varchar(50) DEFAULT 'UTC',
+  `date_format` varchar(20) DEFAULT 'Y-m-d',
+  `time_format` varchar(10) DEFAULT 'H:i',
+  `fiscal_year_start` int(11) DEFAULT 1,
   `package_id` int(10) UNSIGNED DEFAULT NULL,
+  `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `is_deleted` tinyint(1) DEFAULT 0
@@ -266,9 +280,11 @@ CREATE TABLE `credit_notes` (
   `id` int(10) UNSIGNED NOT NULL,
   `company_id` int(10) UNSIGNED NOT NULL,
   `credit_note_number` varchar(50) NOT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
   `invoice_id` int(10) UNSIGNED NOT NULL,
   `amount` decimal(15,2) NOT NULL,
   `date` date NOT NULL,
+  `currency` varchar(10) DEFAULT 'USD',
   `reason` text DEFAULT NULL,
   `status` enum('Pending','Approved','Applied') DEFAULT 'Pending',
   `created_by` int(10) UNSIGNED NOT NULL,
@@ -365,6 +381,9 @@ CREATE TABLE `documents` (
   `id` int(10) UNSIGNED NOT NULL,
   `company_id` int(10) UNSIGNED NOT NULL,
   `user_id` int(10) UNSIGNED DEFAULT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `lead_id` int(10) UNSIGNED DEFAULT NULL,
+  `project_id` int(10) UNSIGNED DEFAULT NULL,
   `title` varchar(255) NOT NULL,
   `category` varchar(100) DEFAULT NULL,
   `file_path` varchar(500) NOT NULL,
@@ -407,9 +426,26 @@ CREATE TABLE `employees` (
   `employee_number` varchar(50) DEFAULT NULL,
   `department_id` int(10) UNSIGNED DEFAULT NULL,
   `position_id` int(10) UNSIGNED DEFAULT NULL,
+  `shift_id` int(10) UNSIGNED DEFAULT NULL,
+  `reporting_to` int(10) UNSIGNED DEFAULT NULL,
   `role` varchar(100) DEFAULT NULL,
+  `salutation` varchar(20) DEFAULT NULL,
+  `date_of_birth` date DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `marital_status` enum('Single','Married','Divorced','Widowed') DEFAULT NULL,
+  `language` varchar(50) DEFAULT 'English',
+  `about` text DEFAULT NULL,
   `joining_date` date DEFAULT NULL,
+  `probation_end_date` date DEFAULT NULL,
+  `contract_end_date` date DEFAULT NULL,
+  `notice_period_start_date` date DEFAULT NULL,
+  `notice_period_end_date` date DEFAULT NULL,
+  `employment_type` enum('Full Time','Part Time','Contract','Intern') DEFAULT 'Full Time',
   `salary` decimal(15,2) DEFAULT NULL,
+  `hourly_rate` decimal(10,2) DEFAULT NULL,
+  `skills` text DEFAULT NULL,
+  `slack_member_id` varchar(100) DEFAULT NULL,
+  `business_address` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -777,6 +813,7 @@ CREATE TABLE `lead_managers` (
 
 CREATE TABLE `lead_status_history` (
   `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
   `lead_id` int(10) UNSIGNED NOT NULL,
   `old_status` varchar(50) DEFAULT NULL,
   `new_status` varchar(50) NOT NULL,
@@ -1170,12 +1207,20 @@ CREATE TABLE `tasks` (
   `sub_description` varchar(500) DEFAULT NULL,
   `task_category` varchar(100) DEFAULT NULL,
   `project_id` int(10) UNSIGNED DEFAULT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `lead_id` int(10) UNSIGNED DEFAULT NULL,
+  `parent_task_id` int(10) UNSIGNED DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `due_date` date DEFAULT NULL,
   `status` enum('Incomplete','Doing','Done') DEFAULT 'Incomplete',
   `priority` enum('High','Medium','Low') DEFAULT NULL,
   `estimated_time` varchar(50) DEFAULT NULL,
   `description` text DEFAULT NULL,
+  `is_recurring` tinyint(1) DEFAULT 0,
+  `recurrence_type` enum('Daily','Weekly','Monthly','Yearly') DEFAULT NULL,
+  `recurrence_interval` int(11) DEFAULT 1,
+  `recurrence_end_date` date DEFAULT NULL,
+  `recurrence_count` int(11) DEFAULT NULL,
   `completed_on` datetime DEFAULT NULL,
   `created_by` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1285,6 +1330,268 @@ CREATE TABLE `users` (
   `avatar` varchar(500) DEFAULT NULL,
   `phone` varchar(50) DEFAULT NULL,
   `address` text DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(100) DEFAULT NULL,
+  `zip` varchar(20) DEFAULT NULL,
+  `country` varchar(100) DEFAULT NULL,
+  `billing_address` text DEFAULT NULL,
+  `billing_city` varchar(100) DEFAULT NULL,
+  `billing_state` varchar(100) DEFAULT NULL,
+  `billing_country` varchar(100) DEFAULT NULL,
+  `billing_postal_code` varchar(20) DEFAULT NULL,
+  `emergency_contact_name` varchar(255) DEFAULT NULL,
+  `emergency_contact_phone` varchar(50) DEFAULT NULL,
+  `emergency_contact_relation` varchar(100) DEFAULT NULL,
+  `bank_name` varchar(255) DEFAULT NULL,
+  `bank_account_name` varchar(255) DEFAULT NULL,
+  `bank_account_number` varchar(100) DEFAULT NULL,
+  `bank_ifsc_code` varchar(50) DEFAULT NULL,
+  `email_notifications` tinyint(1) DEFAULT 1,
+  `last_login` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `attendance_settings`
+--
+
+CREATE TABLE `attendance_settings` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `office_start_time` time DEFAULT '09:00:00',
+  `office_end_time` time DEFAULT '18:00:00',
+  `late_mark_after` int(11) DEFAULT 15,
+  `half_day_after` int(11) DEFAULT 240,
+  `auto_clock_out` tinyint(1) DEFAULT 0,
+  `auto_clock_out_time` time DEFAULT NULL,
+  `allow_self_attendance` tinyint(1) DEFAULT 1,
+  `radius_check` tinyint(1) DEFAULT 0,
+  `office_latitude` decimal(10,8) DEFAULT NULL,
+  `office_longitude` decimal(11,8) DEFAULT NULL,
+  `allowed_radius` int(11) DEFAULT 100,
+  `ip_check` tinyint(1) DEFAULT 0,
+  `allowed_ip_addresses` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `contacts`
+--
+
+CREATE TABLE `contacts` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `lead_id` int(10) UNSIGNED DEFAULT NULL,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `mobile` varchar(50) DEFAULT NULL,
+  `job_title` varchar(100) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(100) DEFAULT NULL,
+  `zip` varchar(20) DEFAULT NULL,
+  `country` varchar(100) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `is_primary` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lead_label_definitions`
+--
+
+CREATE TABLE `lead_label_definitions` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `color` varchar(20) DEFAULT '#3B82F6',
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `leave_types`
+--
+
+CREATE TABLE `leave_types` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `color` varchar(20) DEFAULT '#3B82F6',
+  `max_days_per_year` int(11) DEFAULT NULL,
+  `paid` tinyint(1) DEFAULT 1,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `notes`
+--
+
+CREATE TABLE `notes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `client_id` int(10) UNSIGNED DEFAULT NULL,
+  `lead_id` int(10) UNSIGNED DEFAULT NULL,
+  `project_id` int(10) UNSIGNED DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `content` text DEFAULT NULL,
+  `is_private` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_labels`
+--
+
+CREATE TABLE `project_labels` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `project_id` int(10) UNSIGNED NOT NULL,
+  `label` varchar(100) NOT NULL,
+  `color` varchar(20) DEFAULT '#3B82F6',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `shifts`
+--
+
+CREATE TABLE `shifts` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `late_mark_after` int(11) DEFAULT 15,
+  `early_clock_in` int(11) DEFAULT 30,
+  `color` varchar(20) DEFAULT '#3B82F6',
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `social_media_integrations`
+--
+
+CREATE TABLE `social_media_integrations` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `platform` varchar(50) NOT NULL,
+  `access_token` text DEFAULT NULL,
+  `refresh_token` text DEFAULT NULL,
+  `token_expires_at` datetime DEFAULT NULL,
+  `page_id` varchar(255) DEFAULT NULL,
+  `page_name` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive','Expired') DEFAULT 'Active',
+  `settings` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`settings`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_comments`
+--
+
+CREATE TABLE `task_comments` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `task_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `comment` text NOT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `task_files`
+--
+
+CREATE TABLE `task_files` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `task_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `file_path` varchar(500) NOT NULL,
+  `file_size` bigint(20) DEFAULT NULL,
+  `file_type` varchar(100) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_sticky_notes`
+--
+
+CREATE TABLE `user_sticky_notes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `content` text DEFAULT NULL,
+  `color` varchar(20) DEFAULT '#FFEB3B',
+  `position_x` int(11) DEFAULT 0,
+  `position_y` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_todos`
+--
+
+CREATE TABLE `user_todos` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `due_date` date DEFAULT NULL,
+  `priority` enum('High','Medium','Low') DEFAULT 'Medium',
+  `status` enum('Pending','Completed') DEFAULT 'Pending',
+  `completed_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `is_deleted` tinyint(1) DEFAULT 0
@@ -1403,6 +1710,7 @@ ALTER TABLE `contracts`
 ALTER TABLE `credit_notes`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `credit_note_number` (`credit_note_number`),
+  ADD KEY `idx_credit_note_client` (`client_id`),
   ADD KEY `idx_credit_note_invoice` (`invoice_id`),
   ADD KEY `idx_credit_note_company` (`company_id`),
   ADD KEY `idx_credit_note_deleted` (`is_deleted`);
@@ -1454,6 +1762,9 @@ ALTER TABLE `departments`
 ALTER TABLE `documents`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_document_user` (`user_id`),
+  ADD KEY `idx_document_client` (`client_id`),
+  ADD KEY `idx_document_lead` (`lead_id`),
+  ADD KEY `idx_document_project` (`project_id`),
   ADD KEY `idx_document_category` (`category`),
   ADD KEY `idx_document_company` (`company_id`),
   ADD KEY `idx_document_deleted` (`is_deleted`);
@@ -1473,7 +1784,9 @@ ALTER TABLE `employees`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `user_id` (`user_id`),
   ADD KEY `idx_employee_user` (`user_id`),
-  ADD KEY `idx_employee_dept` (`department_id`);
+  ADD KEY `idx_employee_dept` (`department_id`),
+  ADD KEY `idx_employee_shift` (`shift_id`),
+  ADD KEY `idx_employee_reporting_to` (`reporting_to`);
 
 --
 -- Indexes for table `estimates`
@@ -1620,7 +1933,8 @@ ALTER TABLE `lead_managers`
 --
 ALTER TABLE `lead_status_history`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_lead_status_history_lead` (`lead_id`);
+  ADD KEY `idx_lead_status_history_lead` (`lead_id`),
+  ADD KEY `idx_lead_status_history_company` (`company_id`);
 
 --
 -- Indexes for table `leave_requests`
@@ -1805,6 +2119,9 @@ ALTER TABLE `tasks`
   ADD KEY `idx_task_code` (`code`),
   ADD KEY `idx_task_status` (`status`),
   ADD KEY `idx_task_project` (`project_id`),
+  ADD KEY `idx_task_client` (`client_id`),
+  ADD KEY `idx_task_lead` (`lead_id`),
+  ADD KEY `idx_task_parent` (`parent_task_id`),
   ADD KEY `idx_task_company` (`company_id`),
   ADD KEY `idx_task_deleted` (`is_deleted`);
 
@@ -1867,6 +2184,112 @@ ALTER TABLE `users`
   ADD KEY `idx_user_role` (`role`),
   ADD KEY `idx_user_company` (`company_id`),
   ADD KEY `idx_user_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `attendance_settings`
+--
+ALTER TABLE `attendance_settings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_attendance_settings_company` (`company_id`);
+
+--
+-- Indexes for table `contacts`
+--
+ALTER TABLE `contacts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_contacts_company` (`company_id`),
+  ADD KEY `idx_contacts_client` (`client_id`),
+  ADD KEY `idx_contacts_lead` (`lead_id`),
+  ADD KEY `idx_contacts_email` (`email`),
+  ADD KEY `idx_contacts_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `lead_label_definitions`
+--
+ALTER TABLE `lead_label_definitions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_lead_label_def_company` (`company_id`),
+  ADD KEY `idx_lead_label_def_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `leave_types`
+--
+ALTER TABLE `leave_types`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_leave_types_company` (`company_id`),
+  ADD KEY `idx_leave_types_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `notes`
+--
+ALTER TABLE `notes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_notes_company` (`company_id`),
+  ADD KEY `idx_notes_user` (`user_id`),
+  ADD KEY `idx_notes_client` (`client_id`),
+  ADD KEY `idx_notes_lead` (`lead_id`),
+  ADD KEY `idx_notes_project` (`project_id`),
+  ADD KEY `idx_notes_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `project_labels`
+--
+ALTER TABLE `project_labels`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_project_labels_project` (`project_id`);
+
+--
+-- Indexes for table `shifts`
+--
+ALTER TABLE `shifts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_shifts_company` (`company_id`),
+  ADD KEY `idx_shifts_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `social_media_integrations`
+--
+ALTER TABLE `social_media_integrations`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_social_media_company` (`company_id`),
+  ADD KEY `idx_social_media_platform` (`platform`),
+  ADD KEY `idx_social_media_status` (`status`),
+  ADD KEY `idx_social_media_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `task_comments`
+--
+ALTER TABLE `task_comments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_task_comments_task` (`task_id`),
+  ADD KEY `idx_task_comments_user` (`user_id`),
+  ADD KEY `idx_task_comments_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `task_files`
+--
+ALTER TABLE `task_files`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_task_files_task` (`task_id`),
+  ADD KEY `idx_task_files_user` (`user_id`),
+  ADD KEY `idx_task_files_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `user_sticky_notes`
+--
+ALTER TABLE `user_sticky_notes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_sticky_notes_user` (`user_id`),
+  ADD KEY `idx_user_sticky_notes_deleted` (`is_deleted`);
+
+--
+-- Indexes for table `user_todos`
+--
+ALTER TABLE `user_todos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_todos_user` (`user_id`),
+  ADD KEY `idx_user_todos_status` (`status`),
+  ADD KEY `idx_user_todos_deleted` (`is_deleted`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -2242,6 +2665,78 @@ ALTER TABLE `time_logs`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `attendance_settings`
+--
+ALTER TABLE `attendance_settings`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `contacts`
+--
+ALTER TABLE `contacts`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lead_label_definitions`
+--
+ALTER TABLE `lead_label_definitions`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `leave_types`
+--
+ALTER TABLE `leave_types`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `notes`
+--
+ALTER TABLE `notes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `project_labels`
+--
+ALTER TABLE `project_labels`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `shifts`
+--
+ALTER TABLE `shifts`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `social_media_integrations`
+--
+ALTER TABLE `social_media_integrations`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `task_comments`
+--
+ALTER TABLE `task_comments`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `task_files`
+--
+ALTER TABLE `task_files`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `user_sticky_notes`
+--
+ALTER TABLE `user_sticky_notes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `user_todos`
+--
+ALTER TABLE `user_todos`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 COMMIT;
