@@ -17,10 +17,12 @@ export const attendanceAPI = {
   // Employee attendance for a month
   getEmployeeAttendance: (employeeId, params) => axiosInstance.get(`/attendance/employee/${employeeId}`, { params }),
 
+  // Clock In/Out functionality
+  getTodayStatus: (params) => axiosInstance.get('/attendance/today-status', { params }),
+  checkIn: (data) => axiosInstance.post('/attendance/check-in', data),
+  checkOut: (data) => axiosInstance.post('/attendance/check-out', data),
+
   // Legacy endpoints
   getMonthlyCalendar: (params) => axiosInstance.get('/attendance/calendar', { params }),
   getAttendancePercentage: (params) => axiosInstance.get('/attendance/percentage', { params }),
-  getTodayStatus: (params) => axiosInstance.get('/attendance/today', { params }),
-  checkIn: (data) => axiosInstance.post('/attendance/check-in', data),
-  checkOut: (data) => axiosInstance.post('/attendance/check-out', data),
 }
