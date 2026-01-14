@@ -347,15 +347,40 @@ const Tasks = () => {
     }
   }
 
+  // Get label color dynamically from labels state - matches "Manage Labels" colors exactly
   const getLabelColor = (label) => {
     const labelName = typeof label === 'string' ? label : (label?.name || '')
-    switch (labelName) {
-      case 'Bug': return 'bg-pink-100 text-pink-800'
-      case 'Design': return 'bg-green-100 text-green-800'
-      case 'Enhancement': return 'bg-blue-100 text-blue-800'
-      case 'Feedback': return 'bg-teal-100 text-teal-800'
-      default: return 'bg-gray-100 text-gray-800'
+    // Find the label in our labels array to get the actual color
+    const labelObj = labels.find(l => (l?.name || l) === labelName)
+    if (labelObj && labelObj.color) {
+      // Convert hex color to inline style for exact matching
+      return { backgroundColor: `${labelObj.color}20`, color: labelObj.color, borderColor: labelObj.color }
     }
+    // Default fallback
+    return { backgroundColor: '#f3f4f6', color: '#4b5563' }
+  }
+
+  // Helper to get CSS classes for labels (used in Badge components that don't support style)
+  const getLabelColorClass = (label) => {
+    const labelName = typeof label === 'string' ? label : (label?.name || '')
+    const labelObj = labels.find(l => (l?.name || l) === labelName)
+    if (labelObj && labelObj.color) {
+      // Map common hex colors to Tailwind classes for consistency
+      const colorMap = {
+        '#ef4444': 'bg-red-100 text-red-700 border border-red-200',       // Bug - Red
+        '#3b82f6': 'bg-blue-100 text-blue-700 border border-blue-200',    // Design - Blue
+        '#22c55e': 'bg-green-100 text-green-700 border border-green-200', // Enhancement - Green
+        '#f97316': 'bg-orange-100 text-orange-700 border border-orange-200', // Feedback - Orange
+        '#10b981': 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+        '#6366f1': 'bg-indigo-100 text-indigo-700 border border-indigo-200',
+        '#8b5cf6': 'bg-violet-100 text-violet-700 border border-violet-200',
+        '#eab308': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+        '#ec4899': 'bg-pink-100 text-pink-700 border border-pink-200',
+        '#64748b': 'bg-slate-100 text-slate-700 border border-slate-200',
+      }
+      return colorMap[labelObj.color] || 'bg-gray-100 text-gray-600 border border-gray-200'
+    }
+    return 'bg-gray-100 text-gray-600 border border-gray-200'
   }
 
   const handleAddLabel = () => {
@@ -1301,15 +1326,12 @@ const Tasks = () => {
                       <td className="px-2 sm:px-4 py-3">
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-primary-text truncate">{task.title}</span>
-                          {task.labels && task.labels.length > 0 && (
-                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          {/* Priority indicator only - labels shown in Labels column */}
+                          {(task.priority === 'High' || task.priority === 'Low') && (
+                            <div className="flex items-center gap-1 mt-1">
                               {task.priority === 'High' && <IoArrowUp size={12} className="text-orange-500 flex-shrink-0" />}
                               {task.priority === 'Low' && <IoArrowDown size={12} className="text-gray-500 flex-shrink-0" />}
-                              {task.labels.slice(0, 2).map((label, idx) => (
-                                <Badge key={`${getLabelName(label)}-${idx}`} className={`text-xs ${getLabelColor(label)} flex-shrink-0`}>
-                                  {getLabelName(label)}
-                                </Badge>
-                              ))}
+                              <span className="text-xs text-secondary-text">{task.priority} Priority</span>
                             </div>
                           )}
                         </div>
@@ -1340,14 +1362,15 @@ const Tasks = () => {
                       <td className="px-2 sm:px-4 py-3">
                         {task.labels && task.labels.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {task.labels.slice(0, 2).map((label, idx) => (
-                              <Badge key={`${getLabelName(label)}-${idx}`} className={`text-xs ${getLabelColor(label)}`}>
-                                {getLabelName(label)}
+                            {/* Show unique labels only - no duplicates */}
+                            {[...new Set(task.labels.map(l => getLabelName(l)))].slice(0, 3).map((labelName, idx) => (
+                              <Badge key={`label-${labelName}-${idx}`} className={`text-xs ${getLabelColorClass(labelName)}`}>
+                                {labelName}
                               </Badge>
                             ))}
-                            {task.labels.length > 2 && (
-                              <Badge className="text-xs bg-gray-100 text-gray-600">
-                                +{task.labels.length - 2}
+                            {[...new Set(task.labels.map(l => getLabelName(l)))].length > 3 && (
+                              <Badge className="text-xs bg-gray-100 text-gray-600 border border-gray-200">
+                                +{[...new Set(task.labels.map(l => getLabelName(l)))].length - 3}
                               </Badge>
                             )}
                           </div>
@@ -1456,16 +1479,16 @@ const Tasks = () => {
                               <p className="text-xs text-secondary-text mt-1">#{task.id}</p>
                             </div>
                           </div>
-                          {task.labels && task.labels.length > 0 && (
+                          {(task.labels && task.labels.length > 0) || task.priority === 'High' ? (
                             <div className="flex items-center gap-1 mb-2 flex-wrap">
                               {task.priority === 'High' && <IoArrowUp size={12} className="text-orange-500" />}
-                              {task.labels.slice(0, 2).map((label, idx) => (
-                                <Badge key={`${getLabelName(label)}-${idx}`} className={`text-xs ${getLabelColor(label)}`}>
-                                  {getLabelName(label)}
+                              {task.labels && [...new Set(task.labels.map(l => getLabelName(l)))].slice(0, 2).map((labelName, idx) => (
+                                <Badge key={`kanban-label-${labelName}-${idx}`} className={`text-xs ${getLabelColorClass(labelName)}`}>
+                                  {labelName}
                                 </Badge>
                               ))}
                             </div>
-                          )}
+                          ) : null}
                           <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
                             <div className="flex items-center gap-2">
                               {task.assigned_to && task.assigned_to.length > 0 ? (

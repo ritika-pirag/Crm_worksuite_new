@@ -7,7 +7,9 @@ import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
-import { FormCheckbox } from '../../../components/ui/FormRow'
+import RightSideModal from '../../../components/ui/RightSideModal'
+import UniqueIdBadge, { ID_PREFIXES } from '../../../components/ui/UniqueIdBadge'
+import { FormCheckbox, FormRow, FormSection, FormInput, FormSelect, FormActions } from '../../../components/ui/FormRow'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
 import {
   IoArrowBack,
@@ -183,10 +185,24 @@ const ClientDetail = () => {
 
   const [taskFormData, setTaskFormData] = useState({
     title: '',
-    dueDate: '',
-    priority: 'medium',
-    description: ''
+    description: '',
+    project_id: '',
+    assign_to: '',
+    collaborators: [],
+    status: 'Incomplete',
+    priority: 'Medium',
+    labels: [],
+    start_date: '',
+    deadline: ''
   })
+
+  // Task labels - same as main Tasks module
+  const [taskLabels, setTaskLabels] = useState([
+    { name: 'Bug', color: '#ef4444' },
+    { name: 'Design', color: '#3b82f6' },
+    { name: 'Enhancement', color: '#22c55e' },
+    { name: 'Feedback', color: '#f97316' }
+  ])
 
   const [expenseFormData, setExpenseFormData] = useState({
     title: '',
@@ -987,21 +1003,46 @@ const ClientDetail = () => {
   const handleAddTask = async () => {
     try {
       const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
+
+      // Validate required fields
+      if (!taskFormData.title?.trim()) {
+        alert('Title is required')
+        return
+      }
+
       const taskData = {
         company_id: companyId,
         client_id: parseInt(id),
-        title: taskFormData.title || null,
-        due_date: taskFormData.dueDate || null,
-        priority: taskFormData.priority || 'Medium',
+        title: taskFormData.title?.trim() || null,
         description: taskFormData.description || null,
-        status: 'To do'
+        project_id: taskFormData.project_id ? parseInt(taskFormData.project_id) : null,
+        assigned_to: taskFormData.assign_to ? [parseInt(taskFormData.assign_to)] : [],
+        collaborators: (taskFormData.collaborators || []).map(c => parseInt(c)),
+        status: taskFormData.status || 'Incomplete',
+        priority: taskFormData.priority || 'Medium',
+        labels: taskFormData.labels || [],
+        tags: taskFormData.labels || [],
+        start_date: taskFormData.start_date || null,
+        due_date: taskFormData.deadline || null,
+        deadline: taskFormData.deadline || null
       }
 
       const response = await tasksAPI.create(taskData)
       if (response.data.success) {
         alert('Task created successfully!')
         setIsAddTaskModalOpen(false)
-        setTaskFormData({ title: '', dueDate: '', priority: 'medium', description: '' })
+        setTaskFormData({
+          title: '',
+          description: '',
+          project_id: '',
+          assign_to: '',
+          collaborators: [],
+          status: 'Incomplete',
+          priority: 'Medium',
+          labels: [],
+          start_date: '',
+          deadline: ''
+        })
         // Wait a bit then fetch to ensure data is saved
         setTimeout(() => {
           fetchTasks()
@@ -3784,6 +3825,9 @@ const ClientDetail = () => {
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
                 <div className="flex items-center gap-2">
+                  <button className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50">
+                    <IoList size={18} />
+                  </button>
                   <div className="relative">
                     <select
                       className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-blue-500 text-sm"
@@ -3791,12 +3835,19 @@ const ClientDetail = () => {
                       onChange={(e) => setTaskFilterStatus(e.target.value)}
                     >
                       <option value="all">Status</option>
-                      <option value="incomplete">Incomplete</option>
-                      <option value="complete">Complete</option>
-                      <option value="doing">Doing</option>
+                      <option value="incomplete">To do</option>
+                      <option value="doing">In progress</option>
+                      <option value="complete">Done</option>
                     </select>
                     <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
                   </div>
+                  <button
+                    onClick={() => setIsFilterModalOpen(!isFilterModalOpen)}
+                    className={`px-3 py-2 text-sm border border-gray-300 rounded-lg flex items-center gap-2 transition-colors hover:bg-gray-800 hover:text-white hover:border-gray-800 ${isFilterModalOpen ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600'}`}
+                  >
+                    <IoFilter size={16} />
+                    Filters
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -3833,58 +3884,138 @@ const ClientDetail = () => {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
-                      <thead className="bg-white border-b border-gray-200">
+                    <table className="w-full min-w-[1000px]">
+                      <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Task</th>
-                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Priority</th>
-                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Due Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider w-12">
+                            <input type="checkbox" className="w-4 h-4 text-primary-accent rounded focus:ring-primary-accent" />
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Task ID</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Title</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Start date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Deadline</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Assigned to</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Labels</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider w-24">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {tasks
                           .filter(task => {
-                            const matchesStatus = taskFilterStatus === 'all' || (task.status && task.status.toLowerCase() === taskFilterStatus.toLowerCase());
+                            const normalizedStatus = task.status?.toLowerCase() === 'to do' || task.status?.toLowerCase() === 'incomplete' ? 'incomplete' :
+                              task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'doing' ? 'doing' :
+                              task.status?.toLowerCase() === 'done' || task.status?.toLowerCase() === 'complete' || task.status?.toLowerCase() === 'completed' ? 'complete' :
+                              task.status?.toLowerCase() || 'incomplete';
+                            const matchesStatus = taskFilterStatus === 'all' || normalizedStatus === taskFilterStatus.toLowerCase();
                             const searchLower = taskSearch.toLowerCase();
                             const matchesSearch = !taskSearch || (task.title && task.title.toLowerCase().includes(searchLower));
                             return matchesStatus && matchesSearch;
                           })
-                          .map((task) => (
-                            <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 text-sm font-medium text-blue-600 cursor-pointer hover:underline" onClick={() => handleViewTask(task)}>
-                                {task.title}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                                  task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                  {task.priority || 'Medium'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
-                                {task.due_date ? formatDate(task.due_date) : '-'}
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${task.status === 'Complete' ? 'bg-green-100 text-green-800' :
-                                  task.status === 'Doing' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                  {task.status || 'Incomplete'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-right text-sm font-medium">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button onClick={() => handleEditTask(task)} className="p-1.5 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors">
-                                    <IoCreate size={14} />
-                                  </button>
-                                  <button onClick={() => handleDeleteTask(task)} className="p-1.5 text-gray-400 hover:text-red-600 border border-gray-200 rounded-full hover:bg-red-50 transition-colors">
-                                    <IoClose size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                          .map((task) => {
+                            // Helper to get label color class
+                            const getTaskLabelColorClass = (labelName) => {
+                              const colorMap = {
+                                'Bug': 'bg-red-100 text-red-700 border border-red-200',
+                                'Design': 'bg-blue-100 text-blue-700 border border-blue-200',
+                                'Enhancement': 'bg-green-100 text-green-700 border border-green-200',
+                                'Feedback': 'bg-orange-100 text-orange-700 border border-orange-200',
+                              }
+                              return colorMap[labelName] || 'bg-gray-100 text-gray-600 border border-gray-200'
+                            }
+                            // Helper to get status display
+                            const getStatusDisplay = (status) => {
+                              const statusLower = (status || '').toLowerCase()
+                              if (statusLower === 'incomplete' || statusLower === 'to do') return { label: 'To do', class: 'bg-orange-100 text-orange-800' }
+                              if (statusLower === 'doing' || statusLower === 'in progress') return { label: 'In progress', class: 'bg-blue-100 text-blue-800' }
+                              if (statusLower === 'done' || statusLower === 'complete' || statusLower === 'completed') return { label: 'Done', class: 'bg-green-100 text-green-800' }
+                              return { label: status || 'To do', class: 'bg-gray-100 text-gray-800' }
+                            }
+                            const statusInfo = getStatusDisplay(task.status)
+                            const taskLabelsArr = task.labels || task.tags || []
+
+                            return (
+                              <tr key={task.id} className={`hover:bg-gray-50 ${task.priority === 'High' ? 'border-l-4 border-l-orange-500' : task.priority === 'Low' ? 'border-l-4 border-l-purple-500' : 'border-l-4 border-l-blue-500'}`}>
+                                <td className="px-4 py-3">
+                                  <input type="checkbox" className="w-4 h-4 text-primary-accent rounded focus:ring-primary-accent" />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <UniqueIdBadge prefix={ID_PREFIXES.TASK} id={task.id} size="sm" />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-medium text-primary-text truncate cursor-pointer hover:text-blue-600" onClick={() => handleViewTask(task)}>
+                                      {task.title}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                                  {task.start_date ? formatDate(task.start_date) : '-'}
+                                </td>
+                                <td className={`px-4 py-3 text-sm whitespace-nowrap ${task.due_date && new Date(task.due_date) < new Date() ? 'text-red-600 font-medium' : 'text-secondary-text'}`}>
+                                  {task.due_date ? formatDate(task.due_date) : (task.deadline ? formatDate(task.deadline) : '-')}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {task.assigned_to && task.assigned_to.length > 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary-accent/20 flex items-center justify-center text-xs font-semibold text-primary-accent flex-shrink-0">
+                                        {(task.assigned_to[0]?.name || task.assigned_to[0]?.email || 'U').charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="text-sm text-primary-text truncate hidden sm:inline">{task.assigned_to[0]?.name || task.assigned_to[0]?.email || '-'}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-secondary-text">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {taskLabelsArr && taskLabelsArr.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {[...new Set(taskLabelsArr.map(l => typeof l === 'string' ? l : l?.name || ''))].filter(Boolean).slice(0, 2).map((labelName, idx) => (
+                                        <Badge key={`task-label-${labelName}-${idx}`} className={`text-xs ${getTaskLabelColorClass(labelName)}`}>
+                                          {labelName}
+                                        </Badge>
+                                      ))}
+                                      {taskLabelsArr.length > 2 && (
+                                        <Badge className="text-xs bg-gray-100 text-gray-600">+{taskLabelsArr.length - 2}</Badge>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-secondary-text">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Badge className={`text-xs ${statusInfo.class}`}>
+                                    {statusInfo.label}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleViewTask(task)}
+                                      className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                      title="View"
+                                    >
+                                      <IoEye size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleEditTask(task)}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                      title="Edit"
+                                    >
+                                      <IoCreate size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTask(task)}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                      title="Delete"
+                                    >
+                                      <IoTrash size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
                       </tbody>
                     </table>
                   </div>
@@ -4130,57 +4261,187 @@ const ClientDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal */}
-      <Modal
+      {/* Add Task Modal - RightSideModal matching main Tasks module */}
+      <RightSideModal
         isOpen={isAddTaskModalOpen}
-        onClose={() => setIsAddTaskModalOpen(false)}
+        onClose={() => {
+          setIsAddTaskModalOpen(false)
+          setTaskFormData({
+            title: '',
+            description: '',
+            project_id: '',
+            assign_to: '',
+            collaborators: [],
+            status: 'Incomplete',
+            priority: 'Medium',
+            labels: [],
+            start_date: '',
+            deadline: ''
+          })
+        }}
         title="Add Task"
+        width="800px"
       >
-        <div className="space-y-4">
-          <Input
-            label="Title"
-            value={taskFormData.title}
-            onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
-            placeholder="Enter task title"
-          />
-          <Input
-            label="Due Date"
-            type="date"
-            value={taskFormData.dueDate}
-            onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
-          />
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Priority</label>
-            <select
-              value={taskFormData.priority}
-              onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+        <div className="space-y-0 pb-4">
+          <FormSection title="Task Details">
+            <FormRow label="Title" required>
+              <FormInput
+                value={taskFormData.title || ''}
+                onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+                placeholder="Enter task title"
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Description">
+              <RichTextEditor
+                value={taskFormData.description || ''}
+                onChange={(content) => setTaskFormData({ ...taskFormData, description: content })}
+                placeholder="Enter task description"
+              />
+            </FormRow>
+
+            <FormRow label="Project">
+              <FormSelect
+                value={taskFormData.project_id || ''}
+                onChange={(e) => setTaskFormData({ ...taskFormData, project_id: e.target.value })}
+              >
+                <option value="">-- Select Project --</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.project_name || p.name || p.title || `Project #${p.id}`}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Assignment & Status">
+            <FormRow label="Assign To">
+              <FormSelect
+                value={taskFormData.assign_to || ''}
+                onChange={(e) => setTaskFormData({ ...taskFormData, assign_to: e.target.value })}
+              >
+                <option value="">-- Select Employee --</option>
+                {filteredEmployees.map(emp => (
+                  <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
+                    {emp.name || emp.email}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormRow>
+
+            <FormRow label="Status">
+              <FormSelect
+                value={taskFormData.status || 'Incomplete'}
+                onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value })}
+              >
+                <option value="Incomplete">To do</option>
+                <option value="Doing">In progress</option>
+                <option value="Done">Done</option>
+              </FormSelect>
+            </FormRow>
+
+            <FormRow label="Priority">
+              <FormSelect
+                value={taskFormData.priority || 'Medium'}
+                onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </FormSelect>
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Additional Info" last>
+            <FormRow label="Labels">
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
+                  {taskFormData.labels && taskFormData.labels.length > 0 ? (
+                    taskFormData.labels.map((label, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                        {label}
+                        <button
+                          type="button"
+                          onClick={() => setTaskFormData({ ...taskFormData, labels: taskFormData.labels.filter((_, i) => i !== idx) })}
+                          className="hover:text-red-600"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 text-sm">No labels added</span>
+                  )}
+                </div>
+                <FormSelect
+                  onChange={(e) => {
+                    if (e.target.value && !(taskFormData.labels || []).includes(e.target.value)) {
+                      setTaskFormData({ ...taskFormData, labels: [...(taskFormData.labels || []), e.target.value] })
+                    }
+                    e.target.value = ''
+                  }}
+                >
+                  <option value="">+ Add Label</option>
+                  {taskLabels.filter(l => !(taskFormData.labels || []).includes(l?.name)).map(l => (
+                    <option key={l?.name} value={l?.name}>{l?.name}</option>
+                  ))}
+                </FormSelect>
+              </div>
+            </FormRow>
+
+            <FormRow label="Start Date">
+              <FormInput
+                type="date"
+                value={taskFormData.start_date || ''}
+                onChange={(e) => setTaskFormData({ ...taskFormData, start_date: e.target.value })}
+              />
+            </FormRow>
+
+            <FormRow label="Deadline" last>
+              <FormInput
+                type="date"
+                value={taskFormData.deadline || ''}
+                onChange={(e) => setTaskFormData({ ...taskFormData, deadline: e.target.value })}
+              />
+            </FormRow>
+          </FormSection>
+
+          <FormActions>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddTaskModalOpen(false)
+                setTaskFormData({
+                  title: '',
+                  description: '',
+                  project_id: '',
+                  assign_to: '',
+                  collaborators: [],
+                  status: 'Incomplete',
+                  priority: 'Medium',
+                  labels: [],
+                  start_date: '',
+                  deadline: ''
+                })
+              }}
+              className="px-6"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
-            <textarea
-              value={taskFormData.description}
-              onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              placeholder="Enter description"
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => setIsAddTaskModalOpen(false)} className="flex-1">
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddTask} className="flex-1">
+            <Button
+              variant="primary"
+              onClick={handleAddTask}
+              className="px-6 flex items-center gap-2"
+            >
+              <IoCheckmarkCircle size={18} />
               Add Task
             </Button>
-          </div>
+          </FormActions>
         </div>
-      </Modal>
+      </RightSideModal>
 
       {/* Add Event Modal */}
       <Modal
