@@ -801,31 +801,9 @@ const Clients = () => {
     navigate(`/app/admin/clients/${clientId}`)
   }
 
-  // Apply all filters and fetch filtered clients
-  const handleApplyFilters = async () => {
-    try {
-      setLoading(true)
-      const params = { company_id: companyId }
-
-      if (quickFilter) params.quick_filter = quickFilter
-      if (selectedOwner) params.owner_id = selectedOwner
-      if (selectedGroup) params.client_group = selectedGroup
-      if (selectedLabel) params.label = selectedLabel
-      if (hasDueFilter) params.has_due = true
-      if (hasOpenProjectsFilter) params.has_open_projects = true
-      if (myClientsFilter && user?.id) params.owner_id = user.id
-      if (filterSearchQuery) params.search = filterSearchQuery
-
-      const response = await clientsAPI.getAll(params)
-      if (response.data.success) {
-        setClients(response.data.data || [])
-      }
-      setIsAdvancedFilterOpen(false)
-    } catch (error) {
-      console.error('Error applying filters:', error)
-    } finally {
-      setLoading(false)
-    }
+  // Apply all filters - close the filter panel (filtering is done client-side)
+  const handleApplyFilters = () => {
+    setIsAdvancedFilterOpen(false)
   }
 
   // Reset all filters
@@ -1521,10 +1499,7 @@ const Clients = () => {
 
                   {/* Quick Filter Buttons */}
                   <button
-                    onClick={() => {
-                      setHasDueFilter(!hasDueFilter)
-                      handleApplyFilters()
-                    }}
+                    onClick={() => setHasDueFilter(!hasDueFilter)}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                       hasDueFilter
                         ? 'bg-blue-100 border-blue-500 text-blue-700'
@@ -1534,10 +1509,7 @@ const Clients = () => {
                     Has due
                   </button>
                   <button
-                    onClick={() => {
-                      setHasOpenProjectsFilter(!hasOpenProjectsFilter)
-                      handleApplyFilters()
-                    }}
+                    onClick={() => setHasOpenProjectsFilter(!hasOpenProjectsFilter)}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                       hasOpenProjectsFilter
                         ? 'bg-blue-100 border-blue-500 text-blue-700'
@@ -1547,10 +1519,7 @@ const Clients = () => {
                     Has open projects
                   </button>
                   <button
-                    onClick={() => {
-                      setMyClientsFilter(!myClientsFilter)
-                      handleApplyFilters()
-                    }}
+                    onClick={() => setMyClientsFilter(!myClientsFilter)}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                       myClientsFilter
                         ? 'bg-blue-100 border-blue-500 text-blue-700'
@@ -1685,9 +1654,11 @@ const Clients = () => {
             <DataTable
               columns={clientColumns}
               data={clients.filter(c => {
-                // Quick filter
+                // Quick filter dropdown
                 if (quickFilter === 'active' && c.status !== 'Active') return false
                 if (quickFilter === 'inactive' && c.status !== 'Inactive') return false
+                if (quickFilter === 'vip' && !c.clientGroups?.some(g => g.toLowerCase().includes('vip'))) return false
+                if (quickFilter === 'corporate' && !c.clientGroups?.some(g => g.toLowerCase().includes('corporate') || g.toLowerCase().includes('enterprise'))) return false
                 // Status filter from overview
                 if (statusFilter && c.status !== statusFilter) return false
                 // Owner filter
@@ -1697,6 +1668,12 @@ const Clients = () => {
                 if (selectedGroup && !c.clientGroups?.includes(selectedGroup)) return false
                 // Label filter
                 if (selectedLabel && !c.labels?.includes(selectedLabel)) return false
+                // Has Due filter - check if client has outstanding due amount
+                if (hasDueFilter && (!c.due || parseFloat(c.due) <= 0)) return false
+                // Has Open Projects filter - check if client has projects
+                if (hasOpenProjectsFilter && (!c.totalProjects || parseInt(c.totalProjects) <= 0)) return false
+                // My Clients filter - check if current user is the owner
+                if (myClientsFilter && user?.id && c.owner_id?.toString() !== user.id.toString()) return false
                 return true
               })}
               searchPlaceholder="Search clients..."
