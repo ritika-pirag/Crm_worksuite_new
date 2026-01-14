@@ -127,7 +127,7 @@ const AdminDashboard = () => {
         setIsClockedIn(true)
         // If already clocked in (response from API), keep the existing time
         // Otherwise start fresh at 00:00:00
-        if (response.data.data?.clock_in && !response.data.message?.includes('Already')) {
+        if (response.data.data?.check_in && !response.data.message?.includes('Already')) {
           setClockTime('00:00:00')
         }
       }
