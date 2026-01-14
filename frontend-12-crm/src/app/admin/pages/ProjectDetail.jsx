@@ -266,8 +266,36 @@ const ProjectDetail = () => {
 
   const [noteFormData, setNoteFormData] = useState({
     title: '',
-    content: ''
+    content: '',
+    category: '',
+    labels: [],
+    is_public: true,
+    color: '#3b82f6',
+    file: null
   })
+
+  // Note categories and labels
+  const noteCategories = ['General', 'Meeting', 'Research', 'Important', 'Follow-up', 'Other']
+  const noteLabels = ['Urgent', 'Important', 'Review', 'Completed', 'Pending']
+  const noteColors = ['#3b82f6', '#22c55e', '#ef4444', '#f97316', '#8b5cf6', '#ec4899', '#64748b']
+
+  // Files tab state
+  const [filesActiveTab, setFilesActiveTab] = useState('list')
+  const [fileCategories] = useState(['Documents', 'Images', 'Spreadsheets', 'Presentations', 'Others'])
+  const [fileSearchQuery, setFileSearchQuery] = useState('')
+
+  // Timesheets sub-tab state
+  const [timesheetSubTab, setTimesheetSubTab] = useState('details')
+  const [timesheetFilters, setTimesheetFilters] = useState({
+    member: '',
+    task: '',
+    startDate: '',
+    endDate: ''
+  })
+
+  // Comment input state
+  const [newComment, setNewComment] = useState('')
+  const [commentFile, setCommentFile] = useState(null)
 
   const [milestoneFormData, setMilestoneFormData] = useState({
     title: '',
@@ -1629,30 +1657,41 @@ const ProjectDetail = () => {
       alert('Please enter valid hours')
       return
     }
-    if (!timesheetFormData.date) {
-      alert('Please select a date')
+    if (!timesheetFormData.user_id) {
+      alert('Please select a member')
       return
     }
 
     try {
       const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
-      const userId = parseInt(localStorage.getItem('userId') || 1, 10)
+      const userId = timesheetFormData.user_id ? parseInt(timesheetFormData.user_id) : parseInt(localStorage.getItem('userId') || 1, 10)
+
+      // Extract date from start_time or use today
+      let dateValue = new Date().toISOString().split('T')[0]
+      if (timesheetFormData.start_time) {
+        dateValue = new Date(timesheetFormData.start_time).toISOString().split('T')[0]
+      } else if (timesheetFormData.date) {
+        dateValue = timesheetFormData.date
+      }
 
       const timesheetData = {
         company_id: companyId,
         user_id: userId,
         project_id: parseInt(id),
-        date: timesheetFormData.date || new Date().toISOString().split('T')[0],
+        task_id: timesheetFormData.task_id ? parseInt(timesheetFormData.task_id) : null,
+        date: dateValue,
         hours: parseFloat(timesheetFormData.hours),
-        description: timesheetFormData.description || ''
+        description: timesheetFormData.description || '',
+        start_time: timesheetFormData.start_time || null,
+        end_time: timesheetFormData.end_time || null
       }
 
       console.log('Sending timesheet data:', timesheetData)
       const response = await timeTrackingAPI.create(timesheetData, { company_id: companyId })
       if (response.data.success) {
-        alert('Timesheet added successfully!')
+        alert('Time logged successfully!')
         setIsAddTimesheetModalOpen(false)
-        setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '' })
+        setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '', user_id: '', task_id: '', start_time: '', end_time: '' })
         await fetchTimesheets()
       } else {
         alert(response.data.error || 'Failed to add timesheet')
@@ -1908,7 +1947,7 @@ const ProjectDetail = () => {
             scrollbarColor: '#cbd5e1 #f1f5f9',
             WebkitOverflowScrolling: 'touch'
           }}>
-            {['Overview', 'Members', 'Tasks List', 'Tasks Kanban', 'Notes', 'Files', 'Comments', 'Timesheets', 'Invoices', 'Payments', 'Expenses', 'Contracts'].map((tab) => (
+            {['Overview', 'Tasks List', 'Tasks Kanban', 'Notes', 'Files', 'Comments', 'Timesheets', 'Invoices', 'Payments', 'Expenses', 'Contracts'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2471,199 +2510,387 @@ const ProjectDetail = () => {
 
 
           {activeTab === 'notes' && (
-            <Card className="p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-primary-text">Notes</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddNoteModalOpen(true)}
-                  className="flex items-center gap-2 hover:bg-gray-800 hover:text-white hover:border-gray-800 w-full sm:w-auto justify-center"
-                >
-                  <IoAdd size={16} />
-                  <span className="text-xs sm:text-sm">Add note</span>
-                </Button>
+            <Card className="p-0 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 className="text-lg font-semibold text-primary-text">Notes</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 sm:flex-initial">
+                    <input
+                      type="text"
+                      placeholder="Search notes..."
+                      className="w-full sm:w-48 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent focus:border-primary-accent"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  </div>
+                  <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Excel</button>
+                  <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <IoPrint size={16} />
+                  </button>
+                  <Button onClick={() => { setSelectedNote(null); setNoteFormData({ title: '', content: '', category: '', labels: [], is_public: true, color: '#3b82f6', file: null }); setIsAddNoteModalOpen(true); }} className="flex items-center gap-2">
+                    <IoAdd size={16} /> Add Note
+                  </Button>
+                </div>
               </div>
               {loadingNotes ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text text-sm">Loading...</div>
+                <div className="text-center py-8 text-secondary-text">Loading...</div>
               ) : notes.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text">
-                  <IoDocumentText size={40} className="sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No notes found</p>
+                <div className="text-center py-12 text-secondary-text">
+                  <IoDocumentText size={48} className="mx-auto mb-3 text-gray-300" />
+                  <p className="text-base font-medium text-gray-900">No notes found</p>
+                  <p className="text-sm mt-1">Create your first note to get started.</p>
                 </div>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {notes.map((note, index) => (
-                    <div key={index} className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm text-primary-text whitespace-pre-wrap break-words">{note.content || note.note}</p>
-                          {note.created_at && (
-                            <p className="text-xs text-secondary-text mt-2">{new Date(note.created_at).toLocaleDateString()}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-2 flex-shrink-0">
-                          <button
-                            onClick={() => handleViewNote(note)}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-primary-accent"
-                            title="View"
-                          >
-                            <IoEye size={16} className="sm:w-[18px] sm:h-[18px]" />
-                          </button>
-                          <button
-                            onClick={() => handleEditNote(note)}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-blue-600"
-                            title="Edit"
-                          >
-                            <IoCreate size={16} className="sm:w-[18px] sm:h-[18px]" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteNote(note)}
-                            className="p-2 hover:bg-red-100 rounded-lg text-red-600"
-                            title="Delete"
-                          >
-                            <IoTrash size={16} className="sm:w-[18px] sm:h-[18px]" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px]">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Created Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Title</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Category</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Files</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase tracking-wider w-32">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {notes.filter(note => {
+                        if (!searchQuery) return true;
+                        const query = searchQuery.toLowerCase();
+                        return (note.title || '').toLowerCase().includes(query) || (note.content || '').toLowerCase().includes(query);
+                      }).map((note) => (
+                        <tr key={note.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                            {note.created_at ? new Date(note.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1 h-8 rounded-full" style={{ backgroundColor: note.color || '#3b82f6' }}></div>
+                              <div>
+                                <p className="text-sm font-medium text-primary-text">{note.title || 'Untitled'}</p>
+                                <p className="text-xs text-secondary-text truncate max-w-xs">{(note.content || '').substring(0, 50)}{(note.content || '').length > 50 ? '...' : ''}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge className="text-xs bg-gray-100 text-gray-700">{note.category || 'General'}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-secondary-text">
+                            {note.file_name ? (
+                              <div className="flex items-center gap-1 text-primary-accent">
+                                <IoDocumentText size={14} />
+                                <span className="text-xs">1 file</span>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge className={`text-xs ${note.is_public ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {note.is_public ? 'Public' : 'Private'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => handleViewNote(note)} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="View">
+                                <IoEye size={16} />
+                              </button>
+                              <button onClick={() => handleEditNote(note)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
+                                <IoCreate size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteNote(note)} className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
+                                <IoTrash size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </Card>
           )}
 
           {activeTab === 'files' && (
-            <Card className="p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-primary-text">Files</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddFileModalOpen(true)}
-                  className="flex items-center gap-2 hover:bg-gray-800 hover:text-white hover:border-gray-800 w-full sm:w-auto justify-center"
-                >
-                  <IoAdd size={16} />
-                  <span className="text-xs sm:text-sm">Add file</span>
-                </Button>
+            <Card className="p-0 overflow-hidden">
+              {/* Files Header */}
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h3 className="text-lg font-semibold text-primary-text">Files</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative flex-1 sm:flex-initial">
+                      <input
+                        type="text"
+                        placeholder="Search files..."
+                        className="w-full sm:w-48 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent focus:border-primary-accent"
+                        value={fileSearchQuery}
+                        onChange={(e) => setFileSearchQuery(e.target.value)}
+                      />
+                      <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    </div>
+                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Excel</button>
+                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                      <IoPrint size={16} />
+                    </button>
+                    <Button onClick={() => setIsAddFileModalOpen(true)} className="flex items-center gap-2">
+                      <IoAdd size={16} /> Add File
+                    </Button>
+                  </div>
+                </div>
+                {/* Sub-tabs */}
+                <div className="flex gap-1 border-b border-gray-200 -mx-4 px-4">
+                  {['Files List', 'Folders', 'Category'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setFilesActiveTab(tab.toLowerCase().replace(' ', ''))}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${filesActiveTab === tab.toLowerCase().replace(' ', '')
+                        ? 'border-primary-accent text-primary-accent'
+                        : 'border-transparent text-secondary-text hover:text-primary-text'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {/* Files Content */}
               {loadingFiles ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text text-sm">Loading...</div>
+                <div className="text-center py-8 text-secondary-text">Loading...</div>
               ) : files.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text">
-                  <IoFileTray size={40} className="sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No files found</p>
+                <div className="text-center py-12 text-secondary-text">
+                  <IoFileTray size={48} className="mx-auto mb-3 text-gray-300" />
+                  <p className="text-base font-medium text-gray-900">No files found</p>
+                  <p className="text-sm mt-1">Upload your first file to get started.</p>
+                </div>
+              ) : filesActiveTab === 'list' || filesActiveTab === 'fileslist' ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px]">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">File Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Category</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Size</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Uploaded By</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Upload Date</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase tracking-wider w-32">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {files.filter(file => {
+                        if (!fileSearchQuery) return true;
+                        const query = fileSearchQuery.toLowerCase();
+                        return (file.name || file.file_name || '').toLowerCase().includes(query);
+                      }).map((file) => (
+                        <tr key={file.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                (file.file_type || '').includes('pdf') ? 'bg-red-100 text-red-600' :
+                                (file.file_type || '').includes('doc') ? 'bg-blue-100 text-blue-600' :
+                                (file.file_type || '').includes('xls') ? 'bg-green-100 text-green-600' :
+                                (file.file_type || '').match(/jpg|jpeg|png|gif/) ? 'bg-purple-100 text-purple-600' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                <IoDocumentText size={20} />
+                              </div>
+                              <span className="text-sm font-medium text-primary-text">{file.name || file.file_name || file.title}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge className="text-xs bg-gray-100 text-gray-700">{file.category || 'Documents'}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-secondary-text">{file.size || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-secondary-text">{file.user_name || 'Admin'}</td>
+                          <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                            {file.created_at ? new Date(file.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => handleDownloadFile(file)} className="p-1.5 text-primary-accent hover:bg-primary-accent/10 rounded transition-colors" title="Download">
+                                <IoDownload size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteFile(file)} className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
+                                <IoTrash size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : filesActiveTab === 'folders' ? (
+                <div className="p-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {['Documents', 'Images', 'Spreadsheets', 'Presentations', 'Others'].map((folder) => {
+                      const folderFiles = files.filter(f => (f.category || 'Documents') === folder);
+                      return (
+                        <div key={folder} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer text-center">
+                          <IoFileTray size={40} className="mx-auto mb-2 text-yellow-500" />
+                          <p className="text-sm font-medium text-primary-text">{folder}</p>
+                          <p className="text-xs text-secondary-text">{folderFiles.length} files</p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {files.map((file) => (
-                    <div key={file.id} className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
-                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                          <IoDocumentText size={20} className="sm:w-6 sm:h-6 text-primary-accent flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm sm:text-base text-primary-text truncate">{file.name || file.file_name}</h4>
-                            <p className="text-xs sm:text-sm text-secondary-text">{file.size || '-'}</p>
-                            <p className="text-xs sm:text-sm text-secondary-text">{file.uploaded_at || '-'}</p>
+                <div className="p-4">
+                  <div className="space-y-4">
+                    {['Documents', 'Images', 'Spreadsheets', 'Presentations', 'Others'].map((category) => {
+                      const categoryFiles = files.filter(f => (f.category || 'Documents') === category);
+                      if (categoryFiles.length === 0) return null;
+                      return (
+                        <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-primary-text">{category}</h4>
+                            <Badge className="text-xs bg-primary-accent/10 text-primary-accent">{categoryFiles.length} files</Badge>
+                          </div>
+                          <div className="p-3 space-y-2">
+                            {categoryFiles.map((file) => (
+                              <div key={file.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <IoDocumentText size={16} className="text-gray-400" />
+                                  <span className="text-sm text-primary-text">{file.name || file.file_name}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleDownloadFile(file)} className="p-1 text-primary-accent hover:bg-primary-accent/10 rounded">
+                                    <IoDownload size={14} />
+                                  </button>
+                                  <button onClick={() => handleDeleteFile(file)} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                                    <IoTrash size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0">
-                          <button
-                            onClick={() => handleDownloadFile(file)}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-primary-accent"
-                            title="Download"
-                          >
-                            <IoDownload size={16} className="sm:w-[18px] sm:h-[18px]" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFile(file)}
-                            className="p-2 hover:bg-red-100 rounded-lg text-red-600"
-                            title="Delete"
-                          >
-                            <IoTrash size={16} className="sm:w-[18px] sm:h-[18px]" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </Card>
           )}
 
           {activeTab === 'comments' && (
-            <Card className="p-3 sm:p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-primary-text">Comments</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddCommentModalOpen(true)}
-                  className="flex items-center gap-2 hover:bg-gray-800 hover:text-white hover:border-gray-800 w-full sm:w-auto justify-center"
-                >
-                  <IoAdd size={16} />
-                  <span className="text-xs sm:text-sm">Add comment</span>
-                </Button>
+            <Card className="p-4 sm:p-6">
+              <h3 className="text-lg font-semibold text-primary-text mb-4">Comments</h3>
+              {/* Comment Input */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary-accent/20 flex items-center justify-center text-sm font-semibold text-primary-accent flex-shrink-0">
+                    {localStorage.getItem('userName')?.substring(0, 2).toUpperCase() || 'U'}
+                  </div>
+                  <div className="flex-1">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Write a comment..."
+                      className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent focus:border-primary-accent resize-none"
+                      rows={3}
+                    />
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => setCommentFile(e.target.files[0])}
+                          />
+                          <IoDocumentText size={16} />
+                          <span>Attach File</span>
+                        </label>
+                        {commentFile && (
+                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded flex items-center gap-1">
+                            {commentFile.name}
+                            <button onClick={() => setCommentFile(null)} className="text-red-500 hover:text-red-700">
+                              <IoClose size={14} />
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        onClick={async () => {
+                          if (!newComment.trim()) {
+                            alert('Please enter a comment');
+                            return;
+                          }
+                          try {
+                            const companyId = parseInt(localStorage.getItem('companyId') || 1, 10);
+                            const userId = parseInt(localStorage.getItem('userId') || 1, 10);
+                            await notesAPI.create({
+                              company_id: companyId,
+                              user_id: userId,
+                              project_id: parseInt(id),
+                              title: 'Comment',
+                              content: newComment
+                            });
+                            setNewComment('');
+                            setCommentFile(null);
+                            await fetchComments();
+                          } catch (error) {
+                            console.error('Error posting comment:', error);
+                            alert(error.response?.data?.error || 'Failed to post comment');
+                          }
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <IoChatbubble size={16} />
+                        Post Comment
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
+              {/* Comments List */}
               {loadingComments ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text text-sm">Loading...</div>
+                <div className="text-center py-8 text-secondary-text">Loading...</div>
               ) : comments.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-secondary-text">
-                  <IoChatbubble size={40} className="sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No comments found</p>
+                <div className="text-center py-12 text-secondary-text">
+                  <IoChatbubble size={48} className="mx-auto mb-3 text-gray-300" />
+                  <p className="text-base font-medium text-gray-900">No comments yet</p>
+                  <p className="text-sm mt-1">Be the first to comment on this project.</p>
                 </div>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
+                <div className="space-y-4">
                   {comments.map((comment) => (
-                    <div key={comment.id} className="p-3 sm:p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-accent/20 flex items-center justify-center text-xs font-semibold text-primary-accent flex-shrink-0">
-                          {comment.user_name ? comment.user_name.substring(0, 2).toUpperCase() : 'U'}
+                    <div key={comment.id} className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+                      <div className="w-10 h-10 rounded-full bg-primary-accent/20 flex items-center justify-center text-sm font-semibold text-primary-accent flex-shrink-0">
+                        {comment.user_name || comment.created_by_name ? (comment.user_name || comment.created_by_name).substring(0, 2).toUpperCase() : 'U'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-semibold text-primary-text">{comment.user_name || comment.created_by_name || 'User'}</p>
+                          <p className="text-xs text-secondary-text">{comment.created_at ? new Date(comment.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-medium text-primary-text">{comment.user_name || 'User'}</p>
-                          <p className="text-xs sm:text-sm text-secondary-text mt-1 line-clamp-3">{comment.content || comment.comment}</p>
-                          <p className="text-xs text-secondary-text mt-1">{comment.created_at ? new Date(comment.created_at).toLocaleDateString() : '-'}</p>
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => handleViewComment(comment)}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-primary-accent"
-                            title="View"
-                          >
-                            <IoEye size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCommentFormData({ content: comment.content || comment.comment || '' })
-                              setSelectedComment(comment)
-                              setIsAddCommentModalOpen(true)
-                            }}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-blue-600"
-                            title="Edit"
-                          >
-                            <IoCreate size={16} />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this comment?')) {
-                                try {
-                                  const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
-                                  await notesAPI.delete(comment.id, { company_id: companyId })
-                                  alert('Comment deleted successfully!')
-                                  await fetchComments()
-                                } catch (error) {
-                                  console.error('Error deleting comment:', error)
-                                  alert(error.response?.data?.error || 'Failed to delete comment')
-                                }
+                        <p className="text-sm text-secondary-text whitespace-pre-wrap">{comment.content || comment.comment}</p>
+                        {comment.file_name && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-primary-accent bg-primary-accent/5 px-2 py-1 rounded inline-flex">
+                            <IoDocumentText size={14} />
+                            <span>{comment.file_name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={async () => {
+                            if (window.confirm('Are you sure you want to delete this comment?')) {
+                              try {
+                                const companyId = parseInt(localStorage.getItem('companyId') || 1, 10);
+                                await notesAPI.delete(comment.id, { company_id: companyId });
+                                await fetchComments();
+                              } catch (error) {
+                                console.error('Error deleting comment:', error);
+                                alert(error.response?.data?.error || 'Failed to delete comment');
                               }
-                            }}
-                            className="p-1.5 hover:bg-red-100 rounded-lg text-red-600"
-                            title="Delete"
-                          >
-                            <IoTrash size={16} />
-                          </button>
-                        </div>
+                            }
+                          }}
+                          className="p-1.5 hover:bg-red-100 rounded-lg text-red-600"
+                          title="Delete"
+                        >
+                          <IoTrash size={16} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -2674,60 +2901,241 @@ const ProjectDetail = () => {
 
           {activeTab === 'timesheets' && (
             <Card className="p-0 overflow-hidden">
-              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-primary-text">Timesheets</h3>
-                <Button onClick={() => setIsAddTimesheetModalOpen(true)} className="flex items-center gap-2">
-                  <IoAdd size={16} /> Add Log
-                </Button>
+              {/* Timesheets Header */}
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h3 className="text-lg font-semibold text-primary-text">Timesheets</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent"
+                      value={timesheetFilters.member}
+                      onChange={(e) => setTimesheetFilters({ ...timesheetFilters, member: e.target.value })}
+                    >
+                      <option value="">All Members</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent"
+                      value={timesheetFilters.task}
+                      onChange={(e) => setTimesheetFilters({ ...timesheetFilters, task: e.target.value })}
+                    >
+                      <option value="">All Tasks</option>
+                      {tasks.map(task => (
+                        <option key={task.id} value={task.id}>{task.title}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="date"
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-accent"
+                      value={timesheetFilters.startDate}
+                      onChange={(e) => setTimesheetFilters({ ...timesheetFilters, startDate: e.target.value })}
+                    />
+                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Excel</button>
+                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                      <IoPrint size={16} />
+                    </button>
+                    <Button onClick={() => setIsAddTimesheetModalOpen(true)} className="flex items-center gap-2">
+                      <IoAdd size={16} /> Log Time
+                    </Button>
+                  </div>
+                </div>
+                {/* Sub-tabs */}
+                <div className="flex gap-1 border-b border-gray-200 -mx-4 px-4">
+                  {['Details', 'Summary', 'Chart', 'Daily Activity'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setTimesheetSubTab(tab.toLowerCase().replace(' ', ''))}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${timesheetSubTab === tab.toLowerCase().replace(' ', '')
+                        ? 'border-primary-accent text-primary-accent'
+                        : 'border-transparent text-secondary-text hover:text-primary-text'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <DataTable
-                columns={[
-                  {
-                    header: 'Employee',
-                    accessor: 'user_name',
-                    key: 'user_name',
-                    className: 'font-medium',
-                    render: (value, row) => row.user_name || 'User'
-                  },
-                  {
-                    header: 'Date',
-                    accessor: 'date',
-                    key: 'date',
-                    render: (value, row) => row.date ? new Date(row.date).toLocaleDateString() : (row.created_at ? new Date(row.created_at).toLocaleDateString() : '-')
-                  },
-                  {
-                    header: 'Hours',
-                    accessor: 'hours',
-                    key: 'hours',
-                    render: (value, row) => <span className="font-mono bg-gray-100 px-2 py-1 rounded">{parseFloat(row.hours || 0).toFixed(2)}h</span>
-                  },
-                  {
-                    header: 'Description',
-                    accessor: 'description',
-                    key: 'description',
-                    render: (value, row) => <span className="text-gray-500 truncate max-w-xs block">{row.description || '-'}</span>
-                  },
-                  {
-                    header: 'Action',
-                    accessor: 'id',
-                    key: 'id',
-                    className: 'text-right',
-                    render: (value, row) => (
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => handleViewTimesheet(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded">
-                          <IoEye size={16} />
-                        </button>
-                        <button onClick={() => handleDeleteTimesheet(row)} className="p-1 text-red-600 hover:bg-red-50 rounded">
-                          <IoTrash size={16} />
-                        </button>
+              {/* Content based on sub-tab */}
+              {loadingTimesheets ? (
+                <div className="text-center py-8 text-secondary-text">Loading...</div>
+              ) : timesheetSubTab === 'details' ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Member</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Task</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Start Time</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">End Time</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Total</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-secondary-text uppercase tracking-wider">Note</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-secondary-text uppercase tracking-wider w-24">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {timesheets.filter(ts => {
+                        if (timesheetFilters.member && ts.user_id != timesheetFilters.member) return false;
+                        if (timesheetFilters.task && ts.task_id != timesheetFilters.task) return false;
+                        return true;
+                      }).map((ts) => (
+                        <tr key={ts.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-primary-accent/20 flex items-center justify-center text-xs font-semibold text-primary-accent">
+                                {(ts.user_name || 'U').substring(0, 2).toUpperCase()}
+                              </div>
+                              <span className="text-sm font-medium text-primary-text">{ts.user_name || ts.employee_name || 'User'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-secondary-text">{ts.task_title || ts.task_name || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                            {ts.start_time ? new Date(ts.start_time).toLocaleString() : (ts.date ? new Date(ts.date).toLocaleDateString() + ' 09:00' : '-')}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-secondary-text whitespace-nowrap">
+                            {ts.end_time ? new Date(ts.end_time).toLocaleString() : (ts.date && ts.hours ? new Date(ts.date).toLocaleDateString() + ' ' + (9 + parseFloat(ts.hours)).toFixed(0) + ':00' : '-')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-sm bg-green-100 text-green-700 px-2 py-1 rounded">{parseFloat(ts.hours || 0).toFixed(2)}h</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-secondary-text truncate max-w-xs">{ts.description || ts.note || '-'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => handleViewTimesheet(ts)} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="View">
+                                <IoEye size={16} />
+                              </button>
+                              <button onClick={() => handleEditTimesheet && handleEditTimesheet(ts)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">
+                                <IoCreate size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteTimesheet(ts)} className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">
+                                <IoTrash size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Total Summary */}
+                  <div className="p-4 bg-gray-50 border-t border-gray-200">
+                    <div className="flex items-center justify-end gap-4">
+                      <span className="text-sm font-medium text-secondary-text">Total Hours:</span>
+                      <span className="text-lg font-bold text-primary-accent">{timesheets.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0).toFixed(2)}h</span>
+                    </div>
+                  </div>
+                </div>
+              ) : timesheetSubTab === 'summary' ? (
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="text-sm text-blue-600 font-medium">Total Hours</p>
+                      <p className="text-2xl font-bold text-blue-700">{timesheets.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0).toFixed(2)}h</p>
+                    </div>
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+                      <p className="text-sm text-green-600 font-medium">Total Entries</p>
+                      <p className="text-2xl font-bold text-green-700">{timesheets.length}</p>
+                    </div>
+                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                      <p className="text-sm text-purple-600 font-medium">Avg Hours/Day</p>
+                      <p className="text-2xl font-bold text-purple-700">{timesheets.length > 0 ? (timesheets.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0) / timesheets.length).toFixed(2) : '0.00'}h</p>
+                    </div>
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                      <p className="text-sm text-orange-600 font-medium">Team Members</p>
+                      <p className="text-2xl font-bold text-orange-700">{[...new Set(timesheets.map(ts => ts.user_id))].length}</p>
+                    </div>
+                  </div>
+                  {/* By Member Summary */}
+                  <h4 className="text-sm font-semibold text-primary-text mb-3">Hours by Member</h4>
+                  <div className="space-y-2">
+                    {Object.entries(timesheets.reduce((acc, ts) => {
+                      const name = ts.user_name || ts.employee_name || 'Unknown';
+                      acc[name] = (acc[name] || 0) + parseFloat(ts.hours || 0);
+                      return acc;
+                    }, {})).map(([name, hours]) => (
+                      <div key={name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="text-sm font-medium text-primary-text">{name}</span>
+                        <span className="text-sm font-mono bg-primary-accent/10 text-primary-accent px-2 py-1 rounded">{hours.toFixed(2)}h</span>
                       </div>
-                    )
-                  }
-                ]}
-                data={timesheets}
-                loading={loadingTimesheets}
-                pagination
-              />
+                    ))}
+                  </div>
+                </div>
+              ) : timesheetSubTab === 'chart' ? (
+                <div className="p-6">
+                  <div className="text-center py-12 text-secondary-text">
+                    <IoStopwatch size={48} className="mx-auto mb-3 text-gray-300" />
+                    <p className="text-base font-medium text-gray-900">Time Distribution Chart</p>
+                    <p className="text-sm mt-1">Visual representation of time logged</p>
+                    {/* Simple bar chart representation */}
+                    <div className="mt-6 max-w-md mx-auto space-y-3">
+                      {Object.entries(timesheets.reduce((acc, ts) => {
+                        const name = ts.user_name || ts.employee_name || 'Unknown';
+                        acc[name] = (acc[name] || 0) + parseFloat(ts.hours || 0);
+                        return acc;
+                      }, {})).map(([name, hours]) => {
+                        const maxHours = Math.max(...Object.values(timesheets.reduce((acc, ts) => {
+                          const n = ts.user_name || ts.employee_name || 'Unknown';
+                          acc[n] = (acc[n] || 0) + parseFloat(ts.hours || 0);
+                          return acc;
+                        }, {})));
+                        const percentage = maxHours > 0 ? (hours / maxHours) * 100 : 0;
+                        return (
+                          <div key={name} className="text-left">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-medium">{name}</span>
+                              <span>{hours.toFixed(2)}h</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                              <div className="bg-primary-accent h-3 rounded-full transition-all duration-300" style={{ width: `${percentage}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <h4 className="text-sm font-semibold text-primary-text mb-4">Daily Activity</h4>
+                  {timesheets.length === 0 ? (
+                    <div className="text-center py-8 text-secondary-text">No activity recorded</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {Object.entries(timesheets.reduce((acc, ts) => {
+                        const date = ts.date ? new Date(ts.date).toLocaleDateString() : 'Unknown Date';
+                        if (!acc[date]) acc[date] = [];
+                        acc[date].push(ts);
+                        return acc;
+                      }, {})).sort((a, b) => new Date(b[0]) - new Date(a[0])).map(([date, entries]) => (
+                        <div key={date} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                            <span className="text-sm font-semibold text-primary-text">{date}</span>
+                            <Badge className="text-xs bg-primary-accent/10 text-primary-accent">
+                              {entries.reduce((sum, e) => sum + parseFloat(e.hours || 0), 0).toFixed(2)}h total
+                            </Badge>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {entries.map((entry) => (
+                              <div key={entry.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-primary-accent/20 flex items-center justify-center text-xs font-semibold text-primary-accent">
+                                    {(entry.user_name || 'U').substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-primary-text">{entry.user_name || 'User'}</p>
+                                    <p className="text-xs text-secondary-text">{entry.task_title || entry.description || 'Task'}</p>
+                                  </div>
+                                </div>
+                                <span className="font-mono text-sm bg-green-100 text-green-700 px-2 py-1 rounded">{parseFloat(entry.hours || 0).toFixed(2)}h</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           )}
 
@@ -3096,104 +3504,254 @@ const ProjectDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Note Modal */}
-      <Modal
+      {/* Add Note Modal - Enhanced */}
+      <RightSideModal
         isOpen={isAddNoteModalOpen}
         onClose={() => {
           setIsAddNoteModalOpen(false)
-          setNoteFormData({ title: '', content: '' })
+          setSelectedNote(null)
+          setNoteFormData({ title: '', content: '', category: '', labels: [], is_public: true, color: '#3b82f6', file: null })
         }}
-        title="Add Note"
+        title={selectedNote ? 'Edit Note' : 'Add Note'}
+        width="600px"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Title (Optional)</label>
-            <Input
-              value={noteFormData.title}
-              onChange={(e) => setNoteFormData({ ...noteFormData, title: e.target.value })}
-              placeholder="Enter note title"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Note *</label>
-            <textarea
-              value={noteFormData.content}
-              onChange={(e) => setNoteFormData({ ...noteFormData, content: e.target.value })}
-              rows={6}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              placeholder="Enter note"
-              required
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
+        <div className="space-y-0 pb-4">
+          <FormSection title="Note Details">
+            <FormRow label="Title" required>
+              <FormInput
+                value={noteFormData.title || ''}
+                onChange={(e) => setNoteFormData({ ...noteFormData, title: e.target.value })}
+                placeholder="Enter note title"
+              />
+            </FormRow>
+            <FormRow label="Description">
+              <RichTextEditor
+                value={noteFormData.content || ''}
+                onChange={(content) => setNoteFormData({ ...noteFormData, content })}
+                placeholder="Enter note content"
+              />
+            </FormRow>
+            <FormRow label="Category">
+              <FormSelect
+                value={noteFormData.category || ''}
+                onChange={(e) => setNoteFormData({ ...noteFormData, category: e.target.value })}
+              >
+                <option value="">-- Select Category --</option>
+                {noteCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </FormSelect>
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Labels & Settings">
+            <FormRow label="Labels">
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
+                  {noteFormData.labels && noteFormData.labels.length > 0 ? (
+                    noteFormData.labels.map((label, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                        {label}
+                        <button
+                          type="button"
+                          onClick={() => setNoteFormData({ ...noteFormData, labels: noteFormData.labels.filter((_, i) => i !== idx) })}
+                          className="hover:text-red-600"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 text-sm">No labels added</span>
+                  )}
+                </div>
+                <FormSelect
+                  onChange={(e) => {
+                    if (e.target.value && !(noteFormData.labels || []).includes(e.target.value)) {
+                      setNoteFormData({ ...noteFormData, labels: [...(noteFormData.labels || []), e.target.value] })
+                    }
+                    e.target.value = ''
+                  }}
+                >
+                  <option value="">+ Add Label</option>
+                  {noteLabels.filter(l => !(noteFormData.labels || []).includes(l)).map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </FormSelect>
+              </div>
+            </FormRow>
+            <FormRow label="Color">
+              <div className="flex gap-2 flex-wrap">
+                {noteColors.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNoteFormData({ ...noteFormData, color })}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${noteFormData.color === color ? 'border-gray-800 scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </FormRow>
+            <FormRow label="Visibility">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    checked={noteFormData.is_public}
+                    onChange={() => setNoteFormData({ ...noteFormData, is_public: true })}
+                    className="w-4 h-4 text-primary-accent"
+                  />
+                  <span className="text-sm">Public</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    checked={!noteFormData.is_public}
+                    onChange={() => setNoteFormData({ ...noteFormData, is_public: false })}
+                    className="w-4 h-4 text-primary-accent"
+                  />
+                  <span className="text-sm">Private</span>
+                </label>
+              </div>
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Attachments" last>
+            <FormRow label="Attach File" last>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary-accent transition-colors">
+                <input
+                  type="file"
+                  onChange={(e) => setNoteFormData({ ...noteFormData, file: e.target.files[0] })}
+                  className="hidden"
+                  id="note-file-upload"
+                />
+                <label htmlFor="note-file-upload" className="cursor-pointer">
+                  <IoDocumentText size={32} className="mx-auto mb-2 text-gray-400" />
+                  {noteFormData.file ? (
+                    <p className="text-sm text-primary-accent">{noteFormData.file.name}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Click to upload or drag and drop</p>
+                  )}
+                </label>
+              </div>
+            </FormRow>
+          </FormSection>
+
+          <FormActions>
             <Button variant="outline" onClick={() => {
               setIsAddNoteModalOpen(false)
-              setNoteFormData({ title: '', content: '' })
-            }} className="flex-1">
+              setSelectedNote(null)
+              setNoteFormData({ title: '', content: '', category: '', labels: [], is_public: true, color: '#3b82f6', file: null })
+            }} className="px-6">
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddNote} className="flex-1">
-              Add Note
+            <Button onClick={handleAddNote} className="px-6 flex items-center gap-2">
+              <IoCheckmarkCircle size={18} />
+              {selectedNote ? 'Update Note' : 'Add Note'}
             </Button>
-          </div>
+          </FormActions>
         </div>
-      </Modal>
+      </RightSideModal>
 
 
 
-      {/* Add File Modal */}
-      <Modal
+      {/* Add File Modal - Enhanced with Category & Drag & Drop */}
+      <RightSideModal
         isOpen={isAddFileModalOpen}
         onClose={() => {
           setIsAddFileModalOpen(false)
-          setFileFormData({ title: '', file: null, description: '' })
+          setFileFormData({ title: '', file: null, description: '', category: '' })
         }}
-        title="Add File"
+        title="Upload File"
+        width="500px"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">File *</label>
-            <input
-              type="file"
-              onChange={(e) => setFileFormData({ ...fileFormData, file: e.target.files[0] })}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              required
-            />
-            {fileFormData.file && (
-              <p className="text-xs text-secondary-text mt-1">Selected: {fileFormData.file.name}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Title (Optional)</label>
-            <Input
-              value={fileFormData.title}
-              onChange={(e) => setFileFormData({ ...fileFormData, title: e.target.value })}
-              placeholder="Enter file title"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
-            <textarea
-              value={fileFormData.description}
-              onChange={(e) => setFileFormData({ ...fileFormData, description: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              placeholder="Enter file description"
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
+        <div className="space-y-0 pb-4">
+          <FormSection title="File Upload">
+            <FormRow label="Category">
+              <FormSelect
+                value={fileFormData.category || ''}
+                onChange={(e) => setFileFormData({ ...fileFormData, category: e.target.value })}
+              >
+                <option value="">-- Select Category --</option>
+                {fileCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </FormSelect>
+            </FormRow>
+            <FormRow label="File" required last>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${fileFormData.file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary-accent'}`}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary-accent', 'bg-primary-accent/5'); }}
+                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary-accent', 'bg-primary-accent/5'); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-primary-accent', 'bg-primary-accent/5');
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    setFileFormData({ ...fileFormData, file: e.dataTransfer.files[0] });
+                  }
+                }}
+              >
+                <input
+                  type="file"
+                  onChange={(e) => setFileFormData({ ...fileFormData, file: e.target.files[0] })}
+                  className="hidden"
+                  id="project-file-upload"
+                />
+                <label htmlFor="project-file-upload" className="cursor-pointer">
+                  {fileFormData.file ? (
+                    <>
+                      <IoCheckmarkCircle size={48} className="mx-auto mb-3 text-green-500" />
+                      <p className="text-sm font-medium text-green-700">{fileFormData.file.name}</p>
+                      <p className="text-xs text-green-600 mt-1">Click or drag to replace</p>
+                    </>
+                  ) : (
+                    <>
+                      <IoDocumentText size={48} className="mx-auto mb-3 text-gray-400" />
+                      <p className="text-sm font-medium text-gray-700">Drag & drop your file here</p>
+                      <p className="text-xs text-gray-500 mt-1">or click to browse</p>
+                    </>
+                  )}
+                </label>
+              </div>
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Optional Details" last>
+            <FormRow label="Title">
+              <FormInput
+                value={fileFormData.title || ''}
+                onChange={(e) => setFileFormData({ ...fileFormData, title: e.target.value })}
+                placeholder="Enter file title (optional)"
+              />
+            </FormRow>
+            <FormRow label="Description" last>
+              <textarea
+                value={fileFormData.description || ''}
+                onChange={(e) => setFileFormData({ ...fileFormData, description: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none text-sm"
+                placeholder="Enter file description (optional)"
+              />
+            </FormRow>
+          </FormSection>
+
+          <FormActions>
             <Button variant="outline" onClick={() => {
               setIsAddFileModalOpen(false)
-              setFileFormData({ title: '', file: null, description: '' })
-            }} className="flex-1">
+              setFileFormData({ title: '', file: null, description: '', category: '' })
+            }} className="px-6">
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddFile} className="flex-1">
+            <Button onClick={handleAddFile} className="px-6 flex items-center gap-2">
+              <IoDocumentText size={18} />
               Upload File
             </Button>
-          </div>
+          </FormActions>
         </div>
-      </Modal>
+      </RightSideModal>
 
       {/* Add Comment Modal */}
       <Modal
@@ -3230,60 +3788,103 @@ const ProjectDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Timesheet Modal */}
-      <Modal
+      {/* Add Timesheet Modal - Enhanced */}
+      <RightSideModal
         isOpen={isAddTimesheetModalOpen}
         onClose={() => {
           setIsAddTimesheetModalOpen(false)
-          setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '' })
+          setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '', user_id: '', task_id: '', start_time: '', end_time: '' })
         }}
-        title="Add Timesheet"
+        title="Log Time"
+        width="500px"
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Date *</label>
-            <Input
-              type="date"
-              value={timesheetFormData.date}
-              onChange={(e) => setTimesheetFormData({ ...timesheetFormData, date: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Hours *</label>
-            <Input
-              type="number"
-              step="0.25"
-              min="0"
-              value={timesheetFormData.hours}
-              onChange={(e) => setTimesheetFormData({ ...timesheetFormData, hours: e.target.value })}
-              placeholder="Enter hours worked"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
-            <textarea
-              value={timesheetFormData.description}
-              onChange={(e) => setTimesheetFormData({ ...timesheetFormData, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              placeholder="Enter work description"
-            />
-          </div>
-          <div className="flex gap-3 pt-4">
+        <div className="space-y-0 pb-4">
+          <FormSection title="Time Details">
+            <FormRow label="Member" required>
+              <FormSelect
+                value={timesheetFormData.user_id || ''}
+                onChange={(e) => setTimesheetFormData({ ...timesheetFormData, user_id: e.target.value })}
+              >
+                <option value="">-- Select Member --</option>
+                {employees.map(emp => (
+                  <option key={emp.id || emp.user_id} value={emp.id || emp.user_id}>{emp.name || emp.email}</option>
+                ))}
+              </FormSelect>
+            </FormRow>
+            <FormRow label="Task">
+              <FormSelect
+                value={timesheetFormData.task_id || ''}
+                onChange={(e) => setTimesheetFormData({ ...timesheetFormData, task_id: e.target.value })}
+              >
+                <option value="">-- Select Task --</option>
+                {tasks.map(task => (
+                  <option key={task.id} value={task.id}>{task.title}</option>
+                ))}
+              </FormSelect>
+            </FormRow>
+            <div className="grid grid-cols-2 gap-4">
+              <FormRow label="Start Date/Time">
+                <FormInput
+                  type="datetime-local"
+                  value={timesheetFormData.start_time || ''}
+                  onChange={(e) => setTimesheetFormData({ ...timesheetFormData, start_time: e.target.value })}
+                />
+              </FormRow>
+              <FormRow label="End Date/Time">
+                <FormInput
+                  type="datetime-local"
+                  value={timesheetFormData.end_time || ''}
+                  onChange={(e) => {
+                    const endTime = e.target.value;
+                    let hours = timesheetFormData.hours || '';
+                    if (timesheetFormData.start_time && endTime) {
+                      const start = new Date(timesheetFormData.start_time);
+                      const end = new Date(endTime);
+                      hours = ((end - start) / (1000 * 60 * 60)).toFixed(2);
+                    }
+                    setTimesheetFormData({ ...timesheetFormData, end_time: endTime, hours });
+                  }}
+                />
+              </FormRow>
+            </div>
+            <FormRow label="Total Hours" required>
+              <FormInput
+                type="number"
+                step="0.25"
+                min="0"
+                value={timesheetFormData.hours || ''}
+                onChange={(e) => setTimesheetFormData({ ...timesheetFormData, hours: e.target.value })}
+                placeholder="Enter hours worked"
+              />
+            </FormRow>
+          </FormSection>
+
+          <FormSection title="Note" last>
+            <FormRow label="Note" last>
+              <textarea
+                value={timesheetFormData.description || ''}
+                onChange={(e) => setTimesheetFormData({ ...timesheetFormData, description: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none text-sm"
+                placeholder="Enter work description or note"
+              />
+            </FormRow>
+          </FormSection>
+
+          <FormActions>
             <Button variant="outline" onClick={() => {
               setIsAddTimesheetModalOpen(false)
-              setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '' })
-            }} className="flex-1">
+              setTimesheetFormData({ date: new Date().toISOString().split('T')[0], hours: '', description: '', user_id: '', task_id: '', start_time: '', end_time: '' })
+            }} className="px-6">
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleAddTimesheet} className="flex-1">
-              Add Timesheet
+            <Button onClick={handleAddTimesheet} className="px-6 flex items-center gap-2">
+              <IoTime size={18} />
+              Log Time
             </Button>
-          </div>
+          </FormActions>
         </div>
-      </Modal>
+      </RightSideModal>
 
       {/* Add Expense Modal */}
       <Modal
