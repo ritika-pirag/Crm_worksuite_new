@@ -1,788 +1,660 @@
 import { useCallback, useEffect, useState } from 'react'
-import { reportsAPI, clientsAPI, employeesAPI } from '../../../api'
+import { reportsAPI, clientsAPI, employeesAPI, projectsAPI } from '../../../api'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
-import { IoDownload, IoRefresh, IoPieChart, IoBarChart, IoPeople, IoFolder, IoTrendingUp, IoBusiness, IoPerson, IoFilter, IoCheckmarkCircle, IoTime, IoHourglass, IoDocumentText } from 'react-icons/io5'
+import DataTable from '../../../components/ui/DataTable'
 import {
-  BarChart as ReBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart as RePieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  AreaChart,
-  Area
+  IoDownload, IoRefresh, IoPieChart, IoBarChart, IoPeople, IoFolder, IoTrendingUp,
+  IoBusiness, IoPerson, IoFilter, IoCheckmarkCircle, IoTime, IoHourglass, IoDocumentText,
+  IoCash, IoReceipt, IoCalendar, IoSearch, IoPrint, IoChevronDown
+} from 'react-icons/io5'
+import {
+  BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts'
 
 const Reports = () => {
-  const [clients, setClients] = useState([])
-  const [employees, setEmployees] = useState([])
+  const companyId = localStorage.getItem('companyId') || '1'
+  const currentYear = new Date().getFullYear()
+
+  // Main tab state
+  const [activeTab, setActiveTab] = useState('expenses')
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Filter states
-  const [filterType, setFilterType] = useState('all') // 'all', 'client', 'employee'
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedView, setSelectedView] = useState('yearly')
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const [selectedClient, setSelectedClient] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [selectedCurrency, setSelectedCurrency] = useState('')
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('')
 
-  const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: ''
-  })
-  const [loading, setLoading] = useState(false)
-  const [salesData, setSalesData] = useState([])
-  const [salesTotal, setSalesTotal] = useState({ revenue: 0, paid: 0, unpaid: 0, count: 0 })
-  const [revenueData, setRevenueData] = useState([])
-  const [revenueTotal, setRevenueTotal] = useState({ revenue: 0, paid: 0, unpaid: 0, invoices: 0 })
-  const [projectStatusData, setProjectStatusData] = useState([])
-  const [projectsList, setProjectsList] = useState([])
-  const [projectTotal, setProjectTotal] = useState({ projects: 0, budget: 0 })
-  const [employeePerformanceData, setEmployeePerformanceData] = useState([])
-  const [employeeSummary, setEmployeeSummary] = useState({
-    total_employees: 0, excellent: 0, good: 0, fair: 0, average: 0,
-    total_tasks: 0, total_completed: 0, total_projects: 0, total_hours: 0
-  })
+  // Data states
+  const [clients, setClients] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [projects, setProjects] = useState([])
 
-  // Get company ID from localStorage
-  const companyId = localStorage.getItem('companyId') || '1'
+  // Report data states
+  const [expensesData, setExpensesData] = useState({ data: [], chartData: {}, totals: {} })
+  const [invoicesSummaryData, setInvoicesSummaryData] = useState({ data: [], totals: {} })
+  const [invoiceDetailsData, setInvoiceDetailsData] = useState({ data: [], totals: {} })
+  const [incomeExpenseData, setIncomeExpenseData] = useState({ data: [], summary: {} })
+  const [paymentsSummaryData, setPaymentsSummaryData] = useState({ data: [], totals: {} })
+  const [timesheetsData, setTimesheetsData] = useState({ data: [], totals: {} })
+  const [projectsReportData, setProjectsReportData] = useState({ data: [], totals: {} })
+
+  // Sub-view states
+  const [expensesView, setExpensesView] = useState('yearly')
+  const [invoicesView, setInvoicesView] = useState('yearly')
+  const [paymentsView, setPaymentsView] = useState('monthly')
+  const [timesheetsView, setTimesheetsView] = useState('details')
+  const [projectsView, setProjectsView] = useState('team')
+
+  const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16']
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i)
 
   useEffect(() => {
-    fetchClients()
-    fetchEmployees()
+    fetchDropdownData()
   }, [])
 
   useEffect(() => {
-    fetchAllReports()
-  }, [filterType, selectedClient, selectedEmployee, dateRange])
+    fetchReportData()
+  }, [activeTab, selectedYear, selectedView, dateRange, selectedClient, selectedEmployee, selectedProject, selectedCurrency, selectedPaymentMethod, expensesView, invoicesView, paymentsView, timesheetsView, projectsView])
 
-  const fetchClients = async () => {
+  const fetchDropdownData = async () => {
     try {
-      const response = await clientsAPI.getAll({ company_id: companyId })
-      const clientData = response.data?.data || response.data || []
-      setClients(Array.isArray(clientData) ? clientData : [])
-    } catch (error) {
-      console.error('Error fetching clients:', error)
-      setClients([])
-    }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await employeesAPI.getAll({ company_id: companyId })
-      const employeeData = response.data?.data || response.data || []
-      setEmployees(Array.isArray(employeeData) ? employeeData : [])
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-      setEmployees([])
-    }
-  }
-
-  const fetchAllReports = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = {
-        company_id: companyId,
-        ...(dateRange.startDate && { start_date: dateRange.startDate }),
-        ...(dateRange.endDate && { end_date: dateRange.endDate })
-      }
-
-      // Add client or employee filter based on selection
-      if (filterType === 'client' && selectedClient) {
-        params.client_id = selectedClient
-      } else if (filterType === 'employee' && selectedEmployee) {
-        params.employee_id = selectedEmployee
-        params.user_id = selectedEmployee
-      }
-
-      console.log('Fetching reports with params:', params)
-
-      // Fetch all reports in parallel
-      const [salesRes, revenueRes, projectsRes, employeesRes] = await Promise.all([
-        reportsAPI.getSalesReport(params).catch(err => {
-          console.error('Sales API error:', err)
-          return { data: { success: true, data: [], total: {} } }
-        }),
-        reportsAPI.getRevenueReport({ ...params, period: 'monthly' }).catch(err => {
-          console.error('Revenue API error:', err)
-          return { data: { success: true, data: [], total: {} } }
-        }),
-        reportsAPI.getProjectStatusReport(params).catch(err => {
-          console.error('Projects API error:', err)
-          return { data: { success: true, data: [], projects: [], total: {} } }
-        }),
-        reportsAPI.getEmployeePerformanceReport(params).catch(err => {
-          console.error('Employees API error:', err)
-          return { data: { success: true, data: [], summary: {} } }
-        })
+      const [clientsRes, employeesRes, projectsRes] = await Promise.all([
+        clientsAPI.getAll({ company_id: companyId }).catch(() => ({ data: { data: [] } })),
+        employeesAPI.getAll({ company_id: companyId }).catch(() => ({ data: { data: [] } })),
+        projectsAPI.getAll({ company_id: companyId }).catch(() => ({ data: { data: [] } }))
       ])
+      setClients(clientsRes.data?.data || clientsRes.data || [])
+      setEmployees(employeesRes.data?.data || employeesRes.data || [])
+      setProjects(projectsRes.data?.data || projectsRes.data || [])
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error)
+    }
+  }
 
-      console.log('API Responses:', { salesRes, revenueRes, projectsRes, employeesRes })
-      console.log('Employee Response Detail:', JSON.stringify(employeesRes?.data, null, 2))
+  const fetchReportData = useCallback(async () => {
+    setLoading(true)
+    const baseParams = {
+      company_id: companyId,
+      year: selectedYear,
+      ...(dateRange.start && { start_date: dateRange.start }),
+      ...(dateRange.end && { end_date: dateRange.end }),
+      ...(selectedClient && { client_id: selectedClient }),
+      ...(selectedCurrency && { currency: selectedCurrency })
+    }
 
-      // Process Sales Data
-      if (salesRes.data?.success) {
-        const formatted = (salesRes.data.data || []).map(item => ({
-          name: item.month_name || item.month || 'N/A',
-          revenue: parseFloat(item.revenue || 0),
-          count: parseInt(item.count || 0),
-          paid: parseFloat(item.paid || 0),
-          unpaid: parseFloat(item.unpaid || 0)
-        }))
-        setSalesData(formatted)
-        setSalesTotal(salesRes.data.total || {
-          revenue: formatted.reduce((s, d) => s + d.revenue, 0),
-          paid: formatted.reduce((s, d) => s + d.paid, 0),
-          unpaid: formatted.reduce((s, d) => s + d.unpaid, 0),
-          count: formatted.reduce((s, d) => s + d.count, 0)
-        })
-      }
-
-      // Process Revenue Data
-      if (revenueRes.data?.success) {
-        const formatted = (revenueRes.data.data || []).map(item => ({
-          name: item.period || 'N/A',
-          revenue: parseFloat(item.total_revenue || 0),
-          paid: parseFloat(item.total_paid || 0),
-          unpaid: parseFloat(item.total_unpaid || 0),
-          count: parseInt(item.invoice_count || 0)
-        }))
-        setRevenueData(formatted)
-        setRevenueTotal(revenueRes.data.total || {
-          revenue: formatted.reduce((s, d) => s + d.revenue, 0),
-          paid: formatted.reduce((s, d) => s + d.paid, 0),
-          unpaid: formatted.reduce((s, d) => s + d.unpaid, 0),
-          invoices: formatted.reduce((s, d) => s + d.count, 0)
-        })
-      }
-
-      // Process Project Status Data
-      if (projectsRes.data?.success) {
-        const formatted = (projectsRes.data.data || []).map(item => ({
-          name: item.status || 'Unknown',
-          value: parseInt(item.count || 0),
-          budget: parseFloat(item.total_budget || 0)
-        }))
-        setProjectStatusData(formatted)
-        setProjectsList(projectsRes.data.projects || [])
-        setProjectTotal(projectsRes.data.total || {
-          projects: formatted.reduce((s, d) => s + d.value, 0),
-          budget: formatted.reduce((s, d) => s + d.budget, 0)
-        })
-      }
-
-      // Process Employee Performance Data
-      if (employeesRes.data?.success) {
-        setEmployeePerformanceData(employeesRes.data.data || [])
-        setEmployeeSummary(employeesRes.data.summary || {
-          total_employees: 0, excellent: 0, good: 0, fair: 0, average: 0,
-          total_tasks: 0, total_completed: 0, total_projects: 0, total_hours: 0
-        })
+    try {
+      switch (activeTab) {
+        case 'expenses':
+          const expRes = await reportsAPI.getExpensesSummary({ ...baseParams, view: expensesView })
+          if (expRes.data?.success) setExpensesData(expRes.data)
+          break
+        case 'invoices-summary':
+          const invSumRes = await reportsAPI.getInvoicesSummary({ ...baseParams, view: invoicesView })
+          if (invSumRes.data?.success) setInvoicesSummaryData(invSumRes.data)
+          break
+        case 'invoice-details':
+          const invDetRes = await reportsAPI.getInvoiceDetails(baseParams)
+          if (invDetRes.data?.success) setInvoiceDetailsData(invDetRes.data)
+          break
+        case 'income-expense':
+          const incExpRes = await reportsAPI.getIncomeVsExpenses({ ...baseParams, project_id: selectedProject })
+          if (incExpRes.data?.success) setIncomeExpenseData(incExpRes.data)
+          break
+        case 'payments':
+          const payRes = await reportsAPI.getPaymentsSummary({ ...baseParams, view: paymentsView, payment_method: selectedPaymentMethod })
+          if (payRes.data?.success) setPaymentsSummaryData(payRes.data)
+          break
+        case 'timesheets':
+          const timeRes = await reportsAPI.getTimesheetsReport({ ...baseParams, view: timesheetsView, user_id: selectedEmployee, project_id: selectedProject })
+          if (timeRes.data?.success) setTimesheetsData(timeRes.data)
+          break
+        case 'projects':
+          const projRes = await reportsAPI.getProjectsReport({ ...baseParams, view: projectsView })
+          if (projRes.data?.success) setProjectsReportData(projRes.data)
+          break
       }
     } catch (error) {
-      console.error('Error fetching reports:', error)
+      console.error('Error fetching report:', error)
     } finally {
       setLoading(false)
     }
-  }, [companyId, filterType, selectedClient, selectedEmployee, dateRange])
+  }, [companyId, activeTab, selectedYear, dateRange, selectedClient, selectedEmployee, selectedProject, selectedCurrency, selectedPaymentMethod, expensesView, invoicesView, paymentsView, timesheetsView, projectsView])
 
-  const handleExportCSV = () => {
-    // Generate CSV for Sales Data
-    let csvContent = "data:text/csv;charset=utf-8,"
-    csvContent += "Category,Month/Period,Revenue,Paid,Unpaid,Count\n"
+  const handleExport = (type = 'excel') => {
+    let data = []
+    let filename = `report_${activeTab}_${new Date().toISOString().split('T')[0]}`
 
-    // Add Sales Data
-    salesData.forEach(row => {
-      csvContent += `Sales,${row.name},${row.revenue},${row.paid},${row.unpaid},${row.count}\n`
-    })
-
-    // Add Revenue Data
-    revenueData.forEach(row => {
-      csvContent += `Revenue,${row.name},${row.revenue},${row.paid},${row.unpaid},${row.count}\n`
-    })
-
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `business_report_${new Date().toISOString().split('T')[0]}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const handleExportPDF = () => {
-    const escapeHtml = (value) => {
-      return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
+    switch (activeTab) {
+      case 'expenses': data = expensesData.data; break
+      case 'invoices-summary': data = invoicesSummaryData.data; break
+      case 'invoice-details': data = invoiceDetailsData.data; break
+      case 'payments': data = paymentsSummaryData.data; break
+      case 'timesheets': data = timesheetsData.data; break
+      case 'projects': data = projectsReportData.data; break
+      default: data = []
     }
 
-    const today = new Date().toISOString().split('T')[0]
-
-    const salesRows = (salesData || [])
-      .map((row) => {
-        return `
-          <tr>
-            <td>${escapeHtml(row.name)}</td>
-            <td style="text-align:right">$${Number(row.revenue || 0).toLocaleString()}</td>
-            <td style="text-align:right">$${Number(row.paid || 0).toLocaleString()}</td>
-            <td style="text-align:right">$${Number(row.unpaid || 0).toLocaleString()}</td>
-            <td style="text-align:right">${Number(row.count || 0).toLocaleString()}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const revenueRows = (revenueData || [])
-      .map((row) => {
-        return `
-          <tr>
-            <td>${escapeHtml(row.name)}</td>
-            <td style="text-align:right">$${Number(row.revenue || 0).toLocaleString()}</td>
-            <td style="text-align:right">$${Number(row.paid || 0).toLocaleString()}</td>
-            <td style="text-align:right">$${Number(row.unpaid || 0).toLocaleString()}</td>
-            <td style="text-align:right">${Number(row.count || 0).toLocaleString()}</td>
-          </tr>
-        `
-      })
-      .join('')
-
-    const html = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Business Report ${escapeHtml(today)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
-            h1 { font-size: 20px; margin: 0 0 4px 0; }
-            .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
-            h2 { font-size: 14px; margin: 18px 0 8px 0; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; }
-            th { background: #f9fafb; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>Business Report</h1>
-          <div class="meta">Generated: ${escapeHtml(today)}</div>
-
-          <h2>Sales</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Revenue</th>
-                <th>Paid</th>
-                <th>Unpaid</th>
-                <th>Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${salesRows || '<tr><td colspan="5">No data</td></tr>'}
-            </tbody>
-          </table>
-
-          <h2>Revenue</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Period</th>
-                <th>Revenue</th>
-                <th>Paid</th>
-                <th>Unpaid</th>
-                <th>Invoices</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${revenueRows || '<tr><td colspan="5">No data</td></tr>'}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `
-
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer')
-    if (!printWindow) return
-
-    printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.focus()
-
-    setTimeout(() => {
-      printWindow.print()
-    }, 250)
+    if (type === 'excel') {
+      const headers = data.length > 0 ? Object.keys(data[0]).join(',') : ''
+      const rows = data.map(row => Object.values(row).join(',')).join('\n')
+      const csv = `${headers}\n${rows}`
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${filename}.csv`
+      a.click()
+    } else {
+      window.print()
+    }
   }
 
-  // Chart Color Palette
-  const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+  const formatCurrency = (value) => `$${parseFloat(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  // Custom Chart Components using Recharts
-  const PremiumBarChart = ({ data, dataKey, color = '#3B82F6' }) => (
-    <ResponsiveContainer width="100%" height="100%">
-      <ReBarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis
-          dataKey="name"
-          axisLine={false}
-          tickLine={false}
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
-        />
-        <YAxis
-          axisLine={false}
-          tickLine={false}
-          tick={{ fontSize: 11, fill: '#94a3b8' }}
-          tickFormatter={(value) => `$${value >= 1000 ? (value / 1000) + 'k' : value}`}
-        />
-        <Tooltip
-          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-          formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']}
-        />
-        <Bar
-          dataKey={dataKey}
-          fill={color}
-          radius={[4, 4, 0, 0]}
-          barSize={40}
-        />
-      </ReBarChart>
-    </ResponsiveContainer>
-  )
-
-  const PremiumPieChart = ({ data }) => (
-    <ResponsiveContainer width="100%" height="100%">
-      <RePieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={80}
-          paddingAngle={5}
-          dataKey="value"
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip
-          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-        />
-        <Legend verticalAlign="bottom" height={36} iconType="circle" />
-      </RePieChart>
-    </ResponsiveContainer>
-  )
-
-  // Rating Badge Component
-  const RatingBadge = ({ rating }) => {
-    const colors = {
-      'Excellent': 'bg-green-100 text-green-700',
-      'Good': 'bg-blue-100 text-blue-700',
-      'Fair': 'bg-yellow-100 text-yellow-700',
-      'Average': 'bg-gray-100 text-gray-700'
-    }
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[rating] || colors['Average']}`}>
-        {rating}
-      </span>
+  // Filter data by search term
+  const filterData = (data) => {
+    if (!searchTerm) return data
+    return data.filter(item =>
+      Object.values(item).some(val =>
+        String(val).toLowerCase().includes(searchTerm.toLowerCase())
+      )
     )
   }
+
+  const tabs = [
+    { id: 'expenses', label: 'Expenses Summary', icon: IoCash },
+    { id: 'invoices-summary', label: 'Invoices Summary', icon: IoReceipt },
+    { id: 'invoice-details', label: 'Invoice Details', icon: IoDocumentText },
+    { id: 'income-expense', label: 'Income vs Expenses', icon: IoTrendingUp },
+    { id: 'payments', label: 'Payments Summary', icon: IoCash },
+    { id: 'timesheets', label: 'Timesheets', icon: IoTime },
+    { id: 'projects', label: 'Projects Report', icon: IoFolder }
+  ]
+
+  // Render functions for each report type
+  const renderExpensesSummary = () => (
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {['yearly', 'monthly', 'custom', 'yearly-chart', 'category-chart'].map(view => (
+          <button
+            key={view}
+            onClick={() => setExpensesView(view)}
+            className={`px-3 py-1.5 text-sm rounded-lg ${expensesView === view ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {view.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          </button>
+        ))}
+      </div>
+
+      {expensesView.includes('chart') ? (
+        <Card className="p-6">
+          <h3 className="font-semibold mb-4">{expensesView === 'yearly-chart' ? 'Yearly Expenses Chart' : 'Expenses by Category'}</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              {expensesView === 'yearly-chart' ? (
+                <ReBarChart data={expensesData.chartData?.monthly || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis tickFormatter={(v) => `$${v}`} />
+                  <Tooltip formatter={(v) => formatCurrency(v)} />
+                  <Bar dataKey="total" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                </ReBarChart>
+              ) : (
+                <RePieChart>
+                  <Pie data={expensesData.chartData?.category || []} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label>
+                    {(expensesData.chartData?.category || []).map((_, idx) => (
+                      <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => formatCurrency(v)} />
+                  <Legend />
+                </RePieChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-4">
+          <DataTable
+            columns={[
+              { key: 'category', header: 'Category' },
+              { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) },
+              { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
+              { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row.second_tax) },
+              { key: 'total', header: 'Total', render: (row) => formatCurrency(row.total) }
+            ]}
+            data={filterData(expensesData.data || [])}
+            searchable={false}
+          />
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-8 font-semibold">
+            <span>Total: {formatCurrency(expensesData.totals?.total)}</span>
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+
+  const renderInvoicesSummary = () => (
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {['yearly', 'monthly', 'custom'].map(view => (
+          <button
+            key={view}
+            onClick={() => setInvoicesView(view)}
+            className={`px-3 py-1.5 text-sm rounded-lg ${invoicesView === view ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {view.charAt(0).toUpperCase() + view.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <Card className="p-4">
+        <DataTable
+          columns={[
+            { key: 'client_name', header: 'Client Name' },
+            { key: 'count', header: 'Count' },
+            { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row.invoice_total) },
+            { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row.discount) },
+            { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
+            { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row.second_tax) },
+            { key: 'tds', header: 'TDS', render: (row) => formatCurrency(row.tds) },
+            { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row.payment_received) },
+            { key: 'due', header: 'Due', render: (row) => formatCurrency(row.due) }
+          ]}
+          data={filterData(invoicesSummaryData.data || [])}
+          searchable={false}
+        />
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-6 text-sm font-semibold">
+          <span>Total: {formatCurrency(invoicesSummaryData.totals?.invoice_total)}</span>
+          <span>Received: {formatCurrency(invoicesSummaryData.totals?.payment_received)}</span>
+          <span>Due: {formatCurrency(invoicesSummaryData.totals?.due)}</span>
+        </div>
+      </Card>
+    </div>
+  )
+
+  const renderInvoiceDetails = () => (
+    <Card className="p-4">
+      <DataTable
+        columns={[
+          { key: 'invoice_number', header: 'Invoice ID' },
+          { key: 'client_name', header: 'Client' },
+          { key: 'vat_gst', header: 'VAT/GST' },
+          { key: 'bill_date', header: 'Bill Date' },
+          { key: 'due_date', header: 'Due Date' },
+          { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row.invoice_total) },
+          { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row.discount) },
+          { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
+          { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row.payment_received) },
+          { key: 'due', header: 'Due', render: (row) => formatCurrency(row.due) },
+          {
+            key: 'status', header: 'Status', render: (row) => (
+              <span className={`px-2 py-1 rounded text-xs font-medium ${row.status === 'Paid' ? 'bg-green-100 text-green-700' :
+                row.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-700' :
+                  row.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                }`}>
+                {row.status}
+              </span>
+            )
+          }
+        ]}
+        data={filterData(invoiceDetailsData.data || [])}
+        searchable={false}
+      />
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-6 text-sm font-semibold">
+        <span>Total: {formatCurrency(invoiceDetailsData.totals?.invoice_total)}</span>
+        <span>Due: {formatCurrency(invoiceDetailsData.totals?.due)}</span>
+      </div>
+    </Card>
+  )
+
+  const renderIncomeVsExpenses = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+        <Card className="p-4 bg-green-50">
+          <p className="text-sm text-gray-600">Total Income</p>
+          <p className="text-2xl font-bold text-green-600">{formatCurrency(incomeExpenseData.summary?.total_income)}</p>
+        </Card>
+        <Card className="p-4 bg-red-50">
+          <p className="text-sm text-gray-600">Total Expenses</p>
+          <p className="text-2xl font-bold text-red-600">{formatCurrency(incomeExpenseData.summary?.total_expense)}</p>
+        </Card>
+        <Card className="p-4 bg-blue-50">
+          <p className="text-sm text-gray-600">Profit</p>
+          <p className="text-2xl font-bold text-blue-600">{formatCurrency(incomeExpenseData.summary?.profit)}</p>
+        </Card>
+        <Card className="p-4 bg-purple-50">
+          <p className="text-sm text-gray-600">Profit %</p>
+          <p className="text-2xl font-bold text-purple-600">{incomeExpenseData.summary?.profit_percentage || 0}%</p>
+        </Card>
+      </div>
+
+      <Card className="p-6">
+        <h3 className="font-semibold mb-4">Income vs Expenses Chart</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={incomeExpenseData.data || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis tickFormatter={(v) => `$${v}`} />
+              <Tooltip formatter={(v) => formatCurrency(v)} />
+              <Legend />
+              <Area type="monotone" dataKey="income" name="Income" stroke="#10B981" fill="#10B98133" />
+              <Area type="monotone" dataKey="expense" name="Expense" stroke="#EF4444" fill="#EF444433" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+    </div>
+  )
+
+  const renderPaymentsSummary = () => (
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {['monthly', 'clients'].map(view => (
+          <button
+            key={view}
+            onClick={() => setPaymentsView(view)}
+            className={`px-3 py-1.5 text-sm rounded-lg ${paymentsView === view ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {view === 'monthly' ? 'Monthly Summary' : 'Clients Summary'}
+          </button>
+        ))}
+      </div>
+
+      <Card className="p-4">
+        <DataTable
+          columns={paymentsView === 'monthly' ? [
+            { key: 'period', header: 'Month' },
+            { key: 'count', header: 'Count' },
+            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) }
+          ] : [
+            { key: 'client_name', header: 'Client' },
+            { key: 'count', header: 'Count' },
+            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) }
+          ]}
+          data={filterData(paymentsSummaryData.data || [])}
+          searchable={false}
+        />
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-6 text-sm font-semibold">
+          <span>Total Count: {paymentsSummaryData.totals?.count || 0}</span>
+          <span>Total Amount: {formatCurrency(paymentsSummaryData.totals?.amount)}</span>
+        </div>
+      </Card>
+    </div>
+  )
+
+  const renderTimesheets = () => (
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {['details', 'summary', 'chart', 'daily'].map(view => (
+          <button
+            key={view}
+            onClick={() => setTimesheetsView(view)}
+            className={`px-3 py-1.5 text-sm rounded-lg ${timesheetsView === view ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {view === 'daily' ? 'Daily Activity' : view.charAt(0).toUpperCase() + view.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {timesheetsView === 'chart' ? (
+        <Card className="p-6">
+          <h3 className="font-semibold mb-4">Time Logged by Project</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie data={timesheetsData.data || []} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label>
+                  {(timesheetsData.data || []).map((_, idx) => (
+                    <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => `${v} hours`} />
+                <Legend />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-4">
+          <DataTable
+            columns={timesheetsView === 'details' ? [
+              { key: 'member', header: 'Member' },
+              { key: 'project', header: 'Project' },
+              { key: 'client', header: 'Client' },
+              { key: 'task', header: 'Task' },
+              { key: 'start_time', header: 'Start Time' },
+              { key: 'end_time', header: 'End Time' },
+              { key: 'total', header: 'Total', render: (row) => `${row.total || 0}h` },
+              { key: 'note', header: 'Note' }
+            ] : timesheetsView === 'summary' ? [
+              { key: 'member', header: 'Member' },
+              { key: 'entries', header: 'Entries' },
+              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row.total_hours || 0}h` }
+            ] : [
+              { key: 'date', header: 'Date' },
+              { key: 'member', header: 'Member' },
+              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row.total_hours || 0}h` },
+              { key: 'entries', header: 'Entries' }
+            ]}
+            data={filterData(timesheetsData.data || [])}
+            searchable={false}
+          />
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-6 text-sm font-semibold">
+            <span>Total Hours: {timesheetsData.totals?.total_hours || 0}h</span>
+            <span>Total Entries: {timesheetsData.totals?.total_entries || 0}</span>
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+
+  const renderProjectsReport = () => (
+    <div className="space-y-4">
+      <div className="flex gap-2 mb-4">
+        {['team', 'clients'].map(view => (
+          <button
+            key={view}
+            onClick={() => setProjectsView(view)}
+            className={`px-3 py-1.5 text-sm rounded-lg ${projectsView === view ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {view === 'team' ? 'Team Members Summary' : 'Clients Summary'}
+          </button>
+        ))}
+      </div>
+
+      <Card className="p-4">
+        <DataTable
+          columns={projectsView === 'team' ? [
+            { key: 'team_member', header: 'Team Member' },
+            { key: 'open_projects', header: 'Open Projects' },
+            { key: 'completed_projects', header: 'Completed Projects' },
+            { key: 'hold_projects', header: 'Hold Projects' },
+            { key: 'open_tasks', header: 'Open Tasks' },
+            { key: 'completed_tasks', header: 'Completed Tasks' },
+            { key: 'total_time_logged', header: 'Total Time Logged', render: (row) => `${row.total_time_logged || 0}h` }
+          ] : [
+            { key: 'client_name', header: 'Client' },
+            { key: 'open_projects', header: 'Open Projects' },
+            { key: 'completed_projects', header: 'Completed Projects' },
+            { key: 'hold_projects', header: 'Hold Projects' },
+            { key: 'total_budget', header: 'Total Budget', render: (row) => formatCurrency(row.total_budget) }
+          ]}
+          data={filterData(projectsReportData.data || [])}
+          searchable={false}
+        />
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg flex justify-end gap-6 text-sm font-semibold">
+          <span>Open: {projectsReportData.totals?.open_projects || 0}</span>
+          <span>Completed: {projectsReportData.totals?.completed_projects || 0}</span>
+          <span>Hold: {projectsReportData.totals?.hold_projects || 0}</span>
+        </div>
+      </Card>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500 mt-1">View and export business reports</p>
+          <h1 className="text-2xl font-bold text-gray-900">Reports & Finance</h1>
+          <p className="text-gray-500">View and export business reports</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={fetchAllReports}
-          >
-            <IoRefresh size={18} />
-            <span className="hidden sm:inline">Refresh</span>
+          <Button variant="outline" onClick={fetchReportData} className="flex items-center gap-2">
+            <IoRefresh size={18} /> Refresh
           </Button>
-          <Button
-            variant="outline"
-            className="flex items-center gap-2 border-green-200 text-green-700 hover:bg-green-50"
-            onClick={handleExportCSV}
-          >
-            <IoDocumentText size={18} />
-            <span className="hidden sm:inline">Export Excel</span>
+          <Button variant="outline" onClick={() => handleExport('excel')} className="flex items-center gap-2 border-green-200 text-green-700 hover:bg-green-50">
+            <IoDocumentText size={18} /> Excel
           </Button>
-          <Button
-            variant="primary"
-            className="flex items-center gap-2 shadow-lg shadow-blue-500/20"
-            onClick={handleExportPDF}
-          >
-            <IoDownload size={18} />
-            <span className="hidden sm:inline">Export PDF</span>
+          <Button variant="primary" onClick={() => handleExport('print')} className="flex items-center gap-2">
+            <IoPrint size={18} /> Print
           </Button>
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 border-b pb-2">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            <tab.icon size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
-      <Card className="p-4 sm:p-6">
+      <Card className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <IoFilter size={20} className="text-blue-600" />
-          <span className="font-medium text-gray-900">Filter Reports</span>
+          <span className="font-medium">Filters</span>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Report Type Filter */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Year Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Report For
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
             <select
-              value={filterType}
-              onChange={(e) => {
-                setFilterType(e.target.value)
-                setSelectedClient('')
-                setSelectedEmployee('')
-              }}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="all">All (Company Wide)</option>
-              <option value="client">Client Specific</option>
-              <option value="employee">Employee Specific</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
 
+          {/* Date Range */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
           {/* Client Filter */}
-          {filterType === 'client' && (
+          {['invoices-summary', 'invoice-details', 'timesheets'].includes(activeTab) && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="flex items-center gap-1">
-                  <IoBusiness className="text-blue-500" size={16} />
-                  Select Client
-                </span>
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
               <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">All Clients</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.id}>
-                    {client.name || client.client_name || client.company_name || `Client #${client.id}`}
-                  </option>
-                ))}
+                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name || `Client #${c.id}`}</option>)}
               </select>
             </div>
           )}
 
-          {/* Employee Filter */}
-          {filterType === 'employee' && (
+          {/* Member Filter */}
+          {activeTab === 'timesheets' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="flex items-center gap-1">
-                  <IoPerson className="text-green-500" size={16} />
-                  Select Employee
-                </span>
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
               <select
                 value={selectedEmployee}
                 onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">All Employees</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name || emp.email || `Employee #${emp.id}`}
-                  </option>
-                ))}
+                <option value="">All Members</option>
+                {employees.map(e => <option key={e.id} value={e.user_id || e.id}>{e.name || e.email || `Employee #${e.id}`}</option>)}
               </select>
             </div>
           )}
 
-          {/* Date Filters */}
+          {/* Project Filter */}
+          {['income-expense', 'timesheets'].includes(activeTab) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+              <select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Projects</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.project_name || `Project #${p.id}`}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Search */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <div className="relative">
+              <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
           </div>
         </div>
-
-        {/* Active Filter Badge */}
-        {(filterType !== 'all' || dateRange.startDate) && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {filterType === 'client' && selectedClient && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                <IoBusiness size={14} />
-                {clients.find(c => c.id == selectedClient)?.name || clients.find(c => c.id == selectedClient)?.client_name || 'Client'}
-                <button onClick={() => setSelectedClient('')} className="ml-1 hover:text-blue-900">×</button>
-              </span>
-            )}
-            {filterType === 'employee' && selectedEmployee && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                <IoPerson size={14} />
-                {employees.find(e => e.id == selectedEmployee)?.name || employees.find(e => e.id == selectedEmployee)?.email || 'Employee'}
-                <button onClick={() => setSelectedEmployee('')} className="ml-1 hover:text-green-900">×</button>
-              </span>
-            )}
-            {dateRange.startDate && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                {dateRange.startDate} - {dateRange.endDate || 'Today'}
-                <button onClick={() => setDateRange({ startDate: '', endDate: '' })} className="ml-1 hover:text-gray-900">×</button>
-              </span>
-            )}
-          </div>
-        )}
       </Card>
 
+      {/* Report Content */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-500">Loading reports...</span>
+          <span className="ml-3 text-gray-500">Loading report...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Sales Report */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <IoTrendingUp className="text-blue-600" size={24} />
-              <h3 className="text-lg font-semibold text-gray-900">Sales Report</h3>
-            </div>
-            <div className="h-64 mt-2">
-              {salesData.length > 0 ? (
-                <PremiumBarChart data={salesData} dataKey="revenue" color="#3B82F6" />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50/50 rounded-xl border border-dashed">
-                  <IoBarChart size={48} className="mb-2 opacity-50" />
-                  <p className="font-medium">No sales data available</p>
-                  <p className="text-sm">Create invoices to see sales data</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-4 pt-4 border-t">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">${(salesTotal.revenue || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">Total Revenue</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">${(salesTotal.paid || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">Total Paid</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">${(salesTotal.unpaid || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">Total Unpaid</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Revenue Report */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <IoBarChart className="text-green-600" size={24} />
-              <h3 className="text-lg font-semibold text-gray-900">Revenue Report</h3>
-            </div>
-            <div className="h-64 mt-2">
-              {revenueData.length > 0 ? (
-                <PremiumBarChart data={revenueData} dataKey="revenue" color="#10B981" />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50/50 rounded-xl border border-dashed">
-                  <IoBarChart size={48} className="mb-2 opacity-50" />
-                  <p className="font-medium">No revenue data available</p>
-                  <p className="text-sm">Create invoices to see revenue data</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 pt-4 border-t">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{revenueTotal.invoices || 0}</p>
-                <p className="text-xs text-gray-500">Total Invoices</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">${(revenueTotal.revenue || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">Total Revenue</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Project Status */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <IoFolder className="text-purple-600" size={24} />
-              <h3 className="text-lg font-semibold text-gray-900">Project Status</h3>
-            </div>
-            <div className="h-64 mt-2">
-              {projectStatusData.length > 0 && projectStatusData.some(d => d.value > 0) ? (
-                <PremiumPieChart data={projectStatusData} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50/50 rounded-xl border border-dashed">
-                  <IoPieChart size={48} className="mb-2 opacity-50" />
-                  <p className="font-medium">No project data available</p>
-                  <p className="text-sm">Create projects to see status data</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 pt-4 border-t">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">{projectTotal.projects || 0}</p>
-                <p className="text-xs text-gray-500">Total Projects</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">${(projectTotal.budget || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-500">Total Budget</p>
-              </div>
-            </div>
-
-            {/* Projects List */}
-            {projectsList.length > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Recent Projects</h4>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {projectsList.slice(0, 5).map((project, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-                      <div>
-                        <span className="font-medium text-gray-900">{project.project_name || 'Project'}</span>
-                        <span className="text-gray-500 ml-2">({project.client_name || project.client_company_name || 'No client'})</span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-xs ${project.status?.toLowerCase().includes('completed') ? 'bg-green-100 text-green-700' :
-                        project.status?.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-700' :
-                          project.status?.toLowerCase().includes('hold') ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-700'
-                        }`}>
-                        {project.status || 'Unknown'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* Employee Performance */}
-          <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <IoPeople className="text-orange-600" size={24} />
-              <h3 className="text-lg font-semibold text-gray-900">Employee Performance</h3>
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              <div className="bg-blue-50 p-3 rounded-lg text-center">
-                <p className="text-xl font-bold text-blue-600">{employeeSummary.total_employees || 0}</p>
-                <p className="text-xs text-gray-500">Employees</p>
-              </div>
-              <div className="bg-green-50 p-3 rounded-lg text-center">
-                <p className="text-xl font-bold text-green-600">{employeeSummary.total_completed || 0}</p>
-                <p className="text-xs text-gray-500">Tasks Done</p>
-              </div>
-              <div className="bg-purple-50 p-3 rounded-lg text-center">
-                <p className="text-xl font-bold text-purple-600">{employeeSummary.total_projects || 0}</p>
-                <p className="text-xs text-gray-500">Projects</p>
-              </div>
-              <div className="bg-orange-50 p-3 rounded-lg text-center">
-                <p className="text-xl font-bold text-orange-600">{employeeSummary.total_hours || 0}h</p>
-                <p className="text-xs text-gray-500">Hours</p>
-              </div>
-            </div>
-
-            <div className="h-64 overflow-y-auto">
-              {employeePerformanceData.length > 0 ? (
-                <div className="space-y-3">
-                  {employeePerformanceData.map((emp, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                          {(emp.name || 'E').charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{emp.name || 'Employee'}</p>
-                          <p className="text-xs text-gray-500">{emp.designation || emp.email || ''}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <div className="flex items-center gap-1">
-                            <IoCheckmarkCircle className="text-green-500" size={14} />
-                            <span className="font-semibold text-green-600">{emp.tasks_completed || 0}</span>
-                          </div>
-                          <p className="text-xs text-gray-400">Done</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center gap-1">
-                            <IoTime className="text-blue-500" size={14} />
-                            <span className="font-semibold text-blue-600">{emp.tasks_in_progress || 0}</span>
-                          </div>
-                          <p className="text-xs text-gray-400">Progress</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center gap-1">
-                            <IoHourglass className="text-orange-500" size={14} />
-                            <span className="font-semibold text-orange-600">{emp.tasks_pending || 0}</span>
-                          </div>
-                          <p className="text-xs text-gray-400">Pending</p>
-                        </div>
-                        <RatingBadge rating={emp.rating} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                  <IoPeople size={48} className="mb-2 opacity-50" />
-                  <p>No employee data available</p>
-                  <p className="text-sm">Add employees to see performance data</p>
-                </div>
-              )}
-            </div>
-
-            {/* Rating Summary */}
-            {employeePerformanceData.length > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-center gap-4">
-                  <span className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    Excellent: {employeeSummary.excellent || 0}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    Good: {employeeSummary.good || 0}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                    Fair: {employeeSummary.fair || 0}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm">
-                    <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-                    Average: {employeeSummary.average || 0}
-                  </span>
-                </div>
-              </div>
-            )}
-          </Card>
-        </div>
+        <>
+          {activeTab === 'expenses' && renderExpensesSummary()}
+          {activeTab === 'invoices-summary' && renderInvoicesSummary()}
+          {activeTab === 'invoice-details' && renderInvoiceDetails()}
+          {activeTab === 'income-expense' && renderIncomeVsExpenses()}
+          {activeTab === 'payments' && renderPaymentsSummary()}
+          {activeTab === 'timesheets' && renderTimesheets()}
+          {activeTab === 'projects' && renderProjectsReport()}
+        </>
       )}
     </div>
   )
