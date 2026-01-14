@@ -1768,6 +1768,100 @@ const ProjectDetail = () => {
     setIsAddInvoiceModalOpen(true);
   }
 
+  const handleAddInvoice = async () => {
+    if (!invoiceFormData.client_id) {
+      alert('Please select a client')
+      return
+    }
+    if (!invoiceFormData.due_date) {
+      alert('Please enter due date')
+      return
+    }
+    try {
+      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
+      const userId = parseInt(localStorage.getItem('userId') || 1, 10)
+      const invoiceData = {
+        company_id: companyId,
+        user_id: userId,
+        created_by: userId,
+        project_id: parseInt(id),
+        client_id: parseInt(invoiceFormData.client_id),
+        invoice_number: invoiceFormData.invoice_number || `INV-${Date.now()}`,
+        bill_date: invoiceFormData.issue_date,
+        invoice_date: invoiceFormData.issue_date,
+        due_date: invoiceFormData.due_date,
+        total: parseFloat(invoiceFormData.amount) || 0,
+        status: invoiceFormData.status || 'unpaid',
+        note: invoiceFormData.note || null
+      }
+      const response = await invoicesAPI.create(invoiceData)
+      if (response.data.success) {
+        alert('Invoice created successfully!')
+        setIsAddInvoiceModalOpen(false)
+        setInvoiceFormData({
+          invoice_number: '',
+          issue_date: new Date().toISOString().split('T')[0],
+          due_date: '',
+          client_id: '',
+          amount: '',
+          status: 'unpaid',
+          note: ''
+        })
+        fetchInvoices()
+      }
+    } catch (error) {
+      console.error('Error creating invoice:', error)
+      alert(error.response?.data?.error || 'Failed to create invoice')
+    }
+  }
+
+  const handleAddPayment = async () => {
+    if (!paymentFormData.invoice_id) {
+      alert('Please select an invoice')
+      return
+    }
+    if (!paymentFormData.amount || parseFloat(paymentFormData.amount) <= 0) {
+      alert('Please enter a valid amount')
+      return
+    }
+    if (!paymentFormData.payment_method) {
+      alert('Please select a payment method')
+      return
+    }
+    try {
+      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
+      const userId = parseInt(localStorage.getItem('userId') || 1, 10)
+      const paymentData = {
+        company_id: companyId,
+        user_id: userId,
+        invoice_id: parseInt(paymentFormData.invoice_id),
+        amount: parseFloat(paymentFormData.amount),
+        payment_date: paymentFormData.payment_date,
+        payment_method: paymentFormData.payment_method,
+        transaction_id: paymentFormData.transaction_id || null,
+        note: paymentFormData.remarks || null
+      }
+      const response = await paymentsAPI.create(paymentData)
+      if (response.data.success) {
+        alert('Payment added successfully!')
+        setIsAddPaymentModalOpen(false)
+        setPaymentFormData({
+          invoice_id: '',
+          amount: '',
+          payment_date: new Date().toISOString().split('T')[0],
+          payment_method: 'bank_transfer',
+          transaction_id: '',
+          remarks: ''
+        })
+        fetchPayments()
+        fetchInvoices() // Refresh invoices to update paid amounts
+      }
+    } catch (error) {
+      console.error('Error adding payment:', error)
+      alert(error.response?.data?.error || 'Failed to add payment')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -3885,6 +3979,247 @@ const ProjectDetail = () => {
           </FormActions>
         </div>
       </RightSideModal>
+
+      {/* Add Invoice Modal */}
+      <Modal
+        isOpen={isAddInvoiceModalOpen}
+        onClose={() => {
+          setIsAddInvoiceModalOpen(false)
+          setInvoiceFormData({
+            invoice_number: '',
+            issue_date: new Date().toISOString().split('T')[0],
+            due_date: '',
+            client_id: '',
+            amount: '',
+            status: 'unpaid',
+            note: ''
+          })
+        }}
+        title="Add Invoice"
+      >
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Bill Date</label>
+            <Input
+              type="date"
+              value={invoiceFormData.issue_date}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, issue_date: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Due Date *</label>
+            <Input
+              type="date"
+              value={invoiceFormData.due_date}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, due_date: e.target.value })}
+              className="flex-1"
+              required
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Client *</label>
+            <select
+              value={invoiceFormData.client_id}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, client_id: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.client_name || client.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Amount</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={invoiceFormData.amount}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, amount: e.target.value })}
+              placeholder="Enter amount"
+              className="flex-1"
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-32 text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={invoiceFormData.status}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, status: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent"
+            >
+              <option value="unpaid">Unpaid</option>
+              <option value="partial">Partial</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div className="flex items-start">
+            <label className="w-32 text-sm font-medium text-gray-700 pt-2">Note</label>
+            <textarea
+              value={invoiceFormData.note}
+              onChange={(e) => setInvoiceFormData({ ...invoiceFormData, note: e.target.value })}
+              placeholder="Add a note..."
+              rows={3}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-primary-accent"
+            />
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddInvoiceModalOpen(false)
+                setInvoiceFormData({
+                  invoice_number: '',
+                  issue_date: new Date().toISOString().split('T')[0],
+                  due_date: '',
+                  client_id: '',
+                  amount: '',
+                  status: 'unpaid',
+                  note: ''
+                })
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddInvoice} className="flex-1">
+              <IoCheckmark size={18} className="mr-1" /> Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Payment Modal */}
+      <Modal
+        isOpen={isAddPaymentModalOpen}
+        onClose={() => {
+          setIsAddPaymentModalOpen(false)
+          setPaymentFormData({
+            invoice_id: '',
+            amount: '',
+            payment_date: new Date().toISOString().split('T')[0],
+            payment_method: 'bank_transfer',
+            transaction_id: '',
+            remarks: ''
+          })
+        }}
+        title="Add Payment"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center">
+            <label className="w-36 text-sm font-medium text-gray-700">Invoice *</label>
+            <select
+              value={paymentFormData.invoice_id}
+              onChange={(e) => {
+                const invoiceId = e.target.value
+                setPaymentFormData(prev => ({ ...prev, invoice_id: invoiceId }))
+                if (invoiceId) {
+                  const selectedInvoice = invoices.find(inv => inv.id === parseInt(invoiceId))
+                  if (selectedInvoice) {
+                    const dueAmount = parseFloat(selectedInvoice.total || 0) - parseFloat(selectedInvoice.paid_amount || 0)
+                    setPaymentFormData(prev => ({ ...prev, invoice_id: invoiceId, amount: dueAmount > 0 ? dueAmount.toFixed(2) : '' }))
+                  }
+                }
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent"
+              required
+            >
+              <option value="">Select Invoice</option>
+              {invoices.filter(inv => inv.status !== 'paid').map((invoice) => (
+                <option key={invoice.id} value={invoice.id}>
+                  {invoice.invoice_number || `INV-${invoice.id}`} (Due: ${(parseFloat(invoice.total || 0) - parseFloat(invoice.paid_amount || 0)).toFixed(2)})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center">
+            <label className="w-36 text-sm font-medium text-gray-700">Payment Method *</label>
+            <select
+              value={paymentFormData.payment_method}
+              onChange={(e) => setPaymentFormData({ ...paymentFormData, payment_method: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent"
+              required
+            >
+              <option value="">Select Payment Method</option>
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="paypal">PayPal</option>
+              <option value="stripe">Stripe</option>
+              <option value="credit_card">Credit Card</option>
+              <option value="debit_card">Debit Card</option>
+              <option value="upi">UPI</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+          <div className="flex items-center">
+            <label className="w-36 text-sm font-medium text-gray-700">Payment Date</label>
+            <Input
+              type="date"
+              value={paymentFormData.payment_date}
+              onChange={(e) => setPaymentFormData({ ...paymentFormData, payment_date: e.target.value })}
+              className="flex-1"
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-36 text-sm font-medium text-gray-700">Amount *</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={paymentFormData.amount}
+              onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value })}
+              placeholder="Enter amount"
+              className="flex-1"
+              required
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-36 text-sm font-medium text-gray-700">Transaction ID</label>
+            <Input
+              value={paymentFormData.transaction_id}
+              onChange={(e) => setPaymentFormData({ ...paymentFormData, transaction_id: e.target.value })}
+              placeholder="Optional"
+              className="flex-1"
+            />
+          </div>
+          <div className="flex items-start">
+            <label className="w-36 text-sm font-medium text-gray-700 pt-2">Note</label>
+            <textarea
+              value={paymentFormData.remarks}
+              onChange={(e) => setPaymentFormData({ ...paymentFormData, remarks: e.target.value })}
+              placeholder="Add a note..."
+              rows={3}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-primary-accent"
+            />
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddPaymentModalOpen(false)
+                setPaymentFormData({
+                  invoice_id: '',
+                  amount: '',
+                  payment_date: new Date().toISOString().split('T')[0],
+                  payment_method: 'bank_transfer',
+                  transaction_id: '',
+                  remarks: ''
+                })
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddPayment} className="flex-1">
+              <IoCheckmark size={18} className="mr-1" /> Add Payment
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add Expense Modal */}
       <Modal
