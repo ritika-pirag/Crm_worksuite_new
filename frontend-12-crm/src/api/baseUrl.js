@@ -7,7 +7,8 @@
 // const BaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 // Production URLs (uncomment when deploying):
-const BaseUrl = 'https://crm-developo-production.up.railway.app'
+const BaseUrl = 'https://crm-worksuite-production.up.railway.app'
+
 // const BaseUrl = 'https://ws.kiaantechnology.com'
 
 export default BaseUrl
