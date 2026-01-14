@@ -1653,18 +1653,34 @@ const ProjectDetail = () => {
   }
 
   const handleAddTimesheet = async () => {
-    if (!timesheetFormData.hours || parseFloat(timesheetFormData.hours) <= 0) {
-      alert('Please enter valid hours')
+    // Validate hours
+    const hoursValue = parseFloat(timesheetFormData.hours)
+    if (!timesheetFormData.hours || isNaN(hoursValue) || hoursValue <= 0) {
+      alert('Please enter valid hours (must be greater than 0)')
       return
     }
-    if (!timesheetFormData.user_id) {
+
+    // Validate member selection
+    if (!timesheetFormData.user_id || timesheetFormData.user_id === '') {
       alert('Please select a member')
       return
     }
 
+    // Validate project ID
+    if (!id || isNaN(parseInt(id))) {
+      alert('Invalid project ID')
+      return
+    }
+
     try {
-      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
-      const userId = timesheetFormData.user_id ? parseInt(timesheetFormData.user_id) : parseInt(localStorage.getItem('userId') || 1, 10)
+      const companyId = parseInt(localStorage.getItem('companyId') || '1', 10)
+      const userId = parseInt(timesheetFormData.user_id, 10)
+
+      // Validate userId is a valid number
+      if (isNaN(userId) || userId <= 0) {
+        alert('Please select a valid member')
+        return
+      }
 
       // Extract date from start_time or use today
       let dateValue = new Date().toISOString().split('T')[0]
@@ -1677,13 +1693,11 @@ const ProjectDetail = () => {
       const timesheetData = {
         company_id: companyId,
         user_id: userId,
-        project_id: parseInt(id),
-        task_id: timesheetFormData.task_id ? parseInt(timesheetFormData.task_id) : null,
+        project_id: parseInt(id, 10),
+        task_id: timesheetFormData.task_id ? parseInt(timesheetFormData.task_id, 10) : null,
         date: dateValue,
-        hours: parseFloat(timesheetFormData.hours),
-        description: timesheetFormData.description || '',
-        start_time: timesheetFormData.start_time || null,
-        end_time: timesheetFormData.end_time || null
+        hours: hoursValue,
+        description: timesheetFormData.description || ''
       }
 
       console.log('Sending timesheet data:', timesheetData)

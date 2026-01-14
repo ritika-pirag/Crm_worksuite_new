@@ -209,7 +209,7 @@ const DataTable = ({
                         className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <span className="text-sm text-gray-700">{col.label}</span>
+                      <span className="text-sm text-gray-700">{col.label || col.header}</span>
                     </label>
                   ))}
                 </div>
@@ -364,7 +364,7 @@ const DataTable = ({
                   className={`px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap ${col.className || 'text-left'}`}
                   style={col.width ? { width: col.width, minWidth: col.width } : {}}
                 >
-                  {col.label}
+                  {col.label || col.header}
                 </th>
               ))}
               {actions && (
@@ -477,7 +477,7 @@ const DataTable = ({
                   <div className="grid grid-cols-2 gap-3">
                     {secondaryColumns.map((col, idx) => (
                       <div key={col.key || idx} className="min-w-0">
-                        <div className="text-[10px] uppercase text-gray-400 tracking-wide font-medium">{col.label}</div>
+                        <div className="text-[10px] uppercase text-gray-400 tracking-wide font-medium">{col.label || col.header}</div>
                         <div className="text-xs text-gray-600 mt-0.5">
                           {col.render ? col.render(row[col.key], row) : row[col.key]}
                         </div>
