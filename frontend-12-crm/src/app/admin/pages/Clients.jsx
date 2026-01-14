@@ -503,7 +503,7 @@ const Clients = () => {
         </a>
       ),
     },
-    { key: 'jobTitle', label: 'Job Title' },
+    { key: 'jobTitle', label: 'Job Title', render: (value, row) => row.jobTitle || row.job_title || value || '-' },
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
     {
@@ -1853,7 +1853,7 @@ const Clients = () => {
                           </button>
                         ),
                       },
-                      { key: 'jobTitle', label: 'Job Title', render: (value, row) => value || row.job_title || '-' },
+                      { key: 'jobTitle', label: 'Job Title', render: (value, row) => row.jobTitle || row.job_title || value || '-' },
                       { key: 'email', label: 'Email' },
                       { key: 'phone', label: 'Phone', render: (value) => value || '-' },
                       {
