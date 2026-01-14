@@ -131,12 +131,15 @@ const getCompleteDashboard = async (req, res) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // ===== 1. SUMMARY DATA =====
+    // Try to get clock data using employee_id first (joined from users), then fallback to user_id
     const [clockInData] = await safeQuery(
-      `SELECT check_in, check_out, TIMEDIFF(COALESCE(check_out, NOW()), check_in) as duration 
-       FROM attendance 
-       WHERE user_id = ? AND DATE(check_in) = ? AND is_deleted = 0 
-       ORDER BY check_in DESC LIMIT 1`,
-      [userId, today],
+      `SELECT a.clock_in, a.clock_out,
+              TIMEDIFF(COALESCE(a.clock_out, CURTIME()), a.clock_in) as duration
+       FROM attendance a
+       LEFT JOIN employees e ON a.employee_id = e.id
+       WHERE (e.user_id = ? OR a.user_id = ?) AND a.date = ? AND a.is_deleted = 0
+       ORDER BY a.clock_in DESC LIMIT 1`,
+      [userId, userId, today],
       []
     );
 
@@ -424,15 +427,18 @@ const getCompleteDashboard = async (req, res) => {
     // Format clock time
     let clockTime = '00:00:00';
     let isClockedIn = false;
-    if (clockInData) {
-      isClockedIn = !clockInData.check_out;
+    let clockInTime = null;
+    if (clockInData && clockInData.clock_in) {
+      isClockedIn = !clockInData.clock_out;
       clockTime = clockInData.duration || '00:00:00';
+      clockInTime = clockInData.clock_in;
     }
 
     // Build final response
     const dashboardData = {
       summary: {
         clockIn: clockTime,
+        clockInTime: clockInTime,
         isClockedIn: isClockedIn,
         openTasks: openTasksCount?.total || 0,
         eventsToday: eventsTodayCount?.total || 0,

@@ -77,8 +77,19 @@ const AdminDashboard = () => {
       if (response.data.success) {
         const data = response.data.data
         setDashboardData(data)
-        setIsClockedIn(data.summary?.isClockedIn || false)
-        setClockTime(data.summary?.clockIn || '00:00:00')
+
+        // Set clock status from API
+        const isCurrentlyClockedIn = data.summary?.isClockedIn || false
+        setIsClockedIn(isCurrentlyClockedIn)
+
+        // If clocked in, use the elapsed time (duration) from API
+        // clockIn contains the elapsed duration (HH:MM:SS format)
+        if (isCurrentlyClockedIn && data.summary?.clockIn) {
+          setClockTime(data.summary.clockIn)
+        } else {
+          setClockTime('00:00:00')
+        }
+
         setStickyNote(data.stickyNote || 'My quick notes here...')
       }
     } catch (error) {
@@ -111,9 +122,15 @@ const AdminDashboard = () => {
 
   const handleClockIn = async () => {
     try {
-      await attendanceAPI.checkIn({ company_id: companyId })
-      setIsClockedIn(true)
-      setClockTime('00:00:00')
+      const response = await attendanceAPI.checkIn({ company_id: companyId, user_id: userId })
+      if (response.data.success) {
+        setIsClockedIn(true)
+        // If already clocked in (response from API), keep the existing time
+        // Otherwise start fresh at 00:00:00
+        if (response.data.data?.clock_in && !response.data.message?.includes('Already')) {
+          setClockTime('00:00:00')
+        }
+      }
     } catch (error) {
       console.error('Error clocking in:', error)
     }
@@ -125,11 +142,14 @@ const AdminDashboard = () => {
 
   const confirmClockOut = async () => {
     try {
-      await attendanceAPI.checkOut({ company_id: companyId, note: clockOutNote })
-      setIsClockedIn(false)
-      clearInterval(clockIntervalRef.current)
-      setShowClockOutModal(false)
-      setClockOutNote('')
+      const response = await attendanceAPI.checkOut({ company_id: companyId, user_id: userId, note: clockOutNote })
+      if (response.data.success) {
+        setIsClockedIn(false)
+        clearInterval(clockIntervalRef.current)
+        setShowClockOutModal(false)
+        setClockOutNote('')
+        // Keep the final time displayed
+      }
     } catch (error) {
       console.error('Error clocking out:', error)
     }
@@ -198,6 +218,18 @@ const AdminDashboard = () => {
     const total = data.reduce((sum, item) => sum + item.value, 0)
     let currentAngle = 0
 
+    // Handle zero total - show empty circle
+    if (total === 0) {
+      return (
+        <svg width={size} height={size} viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="32.5" fill="none" stroke="#E5E7EB" strokeWidth="15" />
+          <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="#9CA3AF">
+            No data
+          </text>
+        </svg>
+      )
+    }
+
     const createArcPath = (startAngle, endAngle, radius, innerRadius) => {
       const startX = 50 + radius * Math.cos((startAngle - 90) * Math.PI / 180)
       const startY = 50 + radius * Math.sin((startAngle - 90) * Math.PI / 180)
@@ -263,10 +295,10 @@ const AdminDashboard = () => {
     { label: 'Expired', value: tasksOverview.expired ?? 0, color: '#6B7280' },
   ]
 
-  // Income Expense chart data - use fallback values if API returns 0
+  // Income Expense chart data - use API values only
   const incomeExpenseData = [
-    { label: 'Income', value: incomeVsExpenses.thisYear?.income || 5207, color: '#10B981' },
-    { label: 'Expenses', value: incomeVsExpenses.thisYear?.expenses || 215, color: '#EF4444' },
+    { label: 'Income', value: incomeVsExpenses.thisYear?.income || 0, color: '#10B981' },
+    { label: 'Expenses', value: incomeVsExpenses.thisYear?.expenses || 0, color: '#EF4444' },
   ]
 
   // Generate ticket bar chart data
@@ -383,7 +415,7 @@ const AdminDashboard = () => {
                 <IoNotifications className="text-red-400 mt-0.5 flex-shrink-0" size={16} />
                 <div>
                   <p className="text-xs text-gray-500">Next reminder</p>
-                  <p className="text-sm text-gray-700">{summary.nextReminder ?? '16-01-2026 - Renew my...'}</p>
+                  <p className="text-sm text-gray-700">{summary.nextReminder || 'No upcoming reminders'}</p>
                 </div>
               </div>
             </div>
@@ -411,12 +443,12 @@ const AdminDashboard = () => {
             {/* Not paid */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-[100px]">
-                <span className="text-orange-500 font-bold">{invoiceOverview.notPaid ?? 3}</span>
+                <span className="text-orange-500 font-bold">{invoiceOverview.notPaid ?? 0}</span>
                 <span className="text-sm text-gray-600">Not paid</span>
               </div>
               <div className="flex items-center gap-2 flex-1 justify-end">
                 <div className="w-20 h-2 bg-orange-400 rounded-full"></div>
-                <span className="text-sm font-medium min-w-[80px] text-right">{formatCurrency(parseFloat(invoiceOverview.notPaidAmount) || 5970)}</span>
+                <span className="text-sm font-medium min-w-[80px] text-right">{formatCurrency(parseFloat(invoiceOverview.notPaidAmount) || 0)}</span>
               </div>
             </div>
             {/* Partially paid */}
@@ -433,12 +465,12 @@ const AdminDashboard = () => {
             {/* Fully paid */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-[100px]">
-                <span className="text-blue-600 font-bold">{invoiceOverview.fullyPaid ?? 1}</span>
+                <span className="text-blue-600 font-bold">{invoiceOverview.fullyPaid ?? 0}</span>
                 <span className="text-sm text-gray-600">Fully paid</span>
               </div>
               <div className="flex items-center gap-2 flex-1 justify-end">
                 <div className="w-32 h-2 bg-blue-600 rounded-full"></div>
-                <span className="text-sm font-medium min-w-[80px] text-right">{formatCurrency(parseFloat(invoiceOverview.fullyPaidAmount) || 20)}</span>
+                <span className="text-sm font-medium min-w-[80px] text-right">{formatCurrency(parseFloat(invoiceOverview.fullyPaidAmount) || 0)}</span>
               </div>
             </div>
             {/* Draft */}
@@ -458,7 +490,7 @@ const AdminDashboard = () => {
             <div className="flex items-start gap-4">
               <div>
                 <p className="text-sm text-gray-500">Total invoiced</p>
-                <p className="text-xl font-bold text-gray-800">{formatCurrency(parseFloat(invoiceOverview.totalInvoiced) || 5990)}</p>
+                <p className="text-xl font-bold text-gray-800">{formatCurrency(parseFloat(invoiceOverview.totalInvoiced) || 0)}</p>
               </div>
               <div className="flex-1">
                 <p className="text-xs text-gray-400 mb-1">Last 12 months</p>
@@ -478,7 +510,7 @@ const AdminDashboard = () => {
             </div>
             <div className="mt-3">
               <p className="text-sm text-gray-500">Due</p>
-              <p className="text-xl font-bold text-gray-800">{formatCurrency(parseFloat(invoiceOverview.totalDue) || 5980)}</p>
+              <p className="text-xl font-bold text-gray-800">{formatCurrency(parseFloat(invoiceOverview.totalDue) || 0)}</p>
             </div>
           </div>
         </div>
@@ -493,29 +525,51 @@ const AdminDashboard = () => {
             {/* Donut Chart */}
             <div className="flex-shrink-0">
               <svg width="120" height="120" viewBox="0 0 100 100">
-                {/* Green arc (Income - larger portion) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#10B981"
-                  strokeWidth="10"
-                  strokeDasharray={`${(incomeExpenseData[0].value / (incomeExpenseData[0].value + incomeExpenseData[1].value)) * 238.76} 238.76`}
-                  transform="rotate(-90 50 50)"
-                />
-                {/* Red arc (Expenses - smaller portion) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="none"
-                  stroke="#EF4444"
-                  strokeWidth="10"
-                  strokeDasharray={`${(incomeExpenseData[1].value / (incomeExpenseData[0].value + incomeExpenseData[1].value)) * 238.76} 238.76`}
-                  strokeDashoffset={`${-(incomeExpenseData[0].value / (incomeExpenseData[0].value + incomeExpenseData[1].value)) * 238.76}`}
-                  transform="rotate(-90 50 50)"
-                />
+                {(() => {
+                  const total = incomeExpenseData[0].value + incomeExpenseData[1].value;
+                  if (total === 0) {
+                    // Show empty circle when no data
+                    return (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#E5E7EB"
+                        strokeWidth="10"
+                      />
+                    );
+                  }
+                  const incomeRatio = incomeExpenseData[0].value / total;
+                  const expenseRatio = incomeExpenseData[1].value / total;
+                  return (
+                    <>
+                      {/* Green arc (Income) */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="10"
+                        strokeDasharray={`${incomeRatio * 238.76} 238.76`}
+                        transform="rotate(-90 50 50)"
+                      />
+                      {/* Red arc (Expenses) */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#EF4444"
+                        strokeWidth="10"
+                        strokeDasharray={`${expenseRatio * 238.76} 238.76`}
+                        strokeDashoffset={`${-incomeRatio * 238.76}`}
+                        transform="rotate(-90 50 50)"
+                      />
+                    </>
+                  );
+                })()}
               </svg>
             </div>
             {/* Legend */}
@@ -524,22 +578,22 @@ const AdminDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">This Year</p>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="font-semibold text-gray-800">{formatCurrency(incomeVsExpenses.thisYear?.income ?? 5207)}</span>
+                  <span className="font-semibold text-gray-800">{formatCurrency(incomeVsExpenses.thisYear?.income ?? 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="font-semibold text-gray-800">{formatCurrency(incomeVsExpenses.thisYear?.expenses ?? 215)}</span>
+                  <span className="font-semibold text-gray-800">{formatCurrency(incomeVsExpenses.thisYear?.expenses ?? 0)}</span>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Last Year</p>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                  <span className="text-gray-600">{formatCurrency(incomeVsExpenses.lastYear?.income ?? 12623)}</span>
+                  <span className="text-gray-600">{formatCurrency(incomeVsExpenses.lastYear?.income ?? 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                  <span className="text-gray-600">{formatCurrency(incomeVsExpenses.lastYear?.expenses ?? 8905)}</span>
+                  <span className="text-gray-600">{formatCurrency(incomeVsExpenses.lastYear?.expenses ?? 0)}</span>
                 </div>
               </div>
             </div>
@@ -631,7 +685,7 @@ const AdminDashboard = () => {
           </div>
           <div className="flex items-center justify-between mb-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">{teamOverview.total || 4}</p>
+              <p className="text-3xl font-bold text-blue-600">{teamOverview.total || 0}</p>
               <p className="text-sm text-gray-500">Team members</p>
             </div>
             <div className="text-center">
@@ -670,7 +724,7 @@ const AdminDashboard = () => {
               <IoNotifications size={14} />
               <span>Last announcement</span>
             </div>
-            <p className="text-sm font-medium text-cyan-500 mt-1">{teamOverview.lastAnnouncement || 'Tomorrow is holiday!'}</p>
+            <p className="text-sm font-medium text-cyan-500 mt-1">{teamOverview.lastAnnouncement || 'No announcements'}</p>
           </div>
         </div>
 

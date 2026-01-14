@@ -538,6 +538,283 @@ const getEmployeeAttendance = async (req, res) => {
   }
 };
 
+/**
+ * Check In - Clock in for the current user
+ * POST /api/v1/attendance/check-in
+ */
+const checkIn = async (req, res) => {
+  try {
+    const companyId = req.body.company_id || req.query.company_id || req.companyId;
+    const userId = req.body.user_id || req.userId;
+
+    if (!companyId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'company_id and user_id are required'
+      });
+    }
+
+    // Get employee record for the user
+    const [empCheck] = await pool.execute(
+      `SELECT id FROM employees WHERE user_id = ? AND company_id = ? AND is_deleted = 0`,
+      [userId, companyId]
+    );
+
+    // If no employee record exists, create one or use user directly
+    let employeeId = null;
+    if (empCheck.length > 0) {
+      employeeId = empCheck[0].id;
+    } else {
+      // Create a basic employee record for this user
+      const [userInfo] = await pool.execute(
+        `SELECT name, email FROM users WHERE id = ?`,
+        [userId]
+      );
+
+      if (userInfo.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+
+      // Try to create employee record
+      try {
+        const [empResult] = await pool.execute(
+          `INSERT INTO employees (company_id, user_id, employee_number, joining_date)
+           VALUES (?, ?, ?, CURDATE())`,
+          [companyId, userId, `EMP-${userId}`]
+        );
+        employeeId = empResult.insertId;
+      } catch (empErr) {
+        console.error('Could not create employee record:', empErr);
+        // Continue without employee record if we can't create one
+      }
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const currentTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS format
+
+    // Check if already checked in today
+    let existingQuery = employeeId
+      ? `SELECT id, clock_in, clock_out FROM attendance WHERE employee_id = ? AND date = ? AND is_deleted = 0`
+      : `SELECT id, clock_in, clock_out FROM attendance WHERE user_id = ? AND date = ? AND is_deleted = 0`;
+
+    const [existing] = await pool.execute(existingQuery, [employeeId || userId, today]);
+
+    if (existing.length > 0 && existing[0].clock_in) {
+      return res.json({
+        success: true,
+        message: 'Already clocked in today',
+        data: {
+          id: existing[0].id,
+          clock_in: existing[0].clock_in,
+          clock_out: existing[0].clock_out,
+          isClockedIn: !existing[0].clock_out
+        }
+      });
+    }
+
+    let attendanceId;
+
+    if (existing.length > 0) {
+      // Update existing record with clock_in
+      await pool.execute(
+        `UPDATE attendance SET clock_in = ?, status = 'present', updated_at = NOW() WHERE id = ?`,
+        [currentTime, existing[0].id]
+      );
+      attendanceId = existing[0].id;
+    } else {
+      // Create new attendance record
+      if (employeeId) {
+        const [result] = await pool.execute(
+          `INSERT INTO attendance (company_id, employee_id, user_id, date, status, clock_in, work_from, marked_by)
+           VALUES (?, ?, ?, ?, 'present', ?, 'office', ?)`,
+          [companyId, employeeId, userId, today, currentTime, userId]
+        );
+        attendanceId = result.insertId;
+      } else {
+        // If no employee_id available, try inserting with just user_id
+        const [result] = await pool.execute(
+          `INSERT INTO attendance (company_id, user_id, date, status, clock_in, work_from, marked_by)
+           VALUES (?, ?, ?, 'present', ?, 'office', ?)`,
+          [companyId, userId, today, currentTime, userId]
+        );
+        attendanceId = result.insertId;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Clocked in successfully',
+      data: {
+        id: attendanceId,
+        clock_in: currentTime,
+        clock_out: null,
+        isClockedIn: true
+      }
+    });
+  } catch (error) {
+    console.error('Check in error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clock in',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Check Out - Clock out for the current user
+ * POST /api/v1/attendance/check-out
+ */
+const checkOut = async (req, res) => {
+  try {
+    const companyId = req.body.company_id || req.query.company_id || req.companyId;
+    const userId = req.body.user_id || req.userId;
+
+    if (!companyId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'company_id and user_id are required'
+      });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const currentTime = new Date().toTimeString().split(' ')[0]; // HH:MM:SS format
+
+    // Get employee_id for the user
+    const [empCheck] = await pool.execute(
+      `SELECT id FROM employees WHERE user_id = ? AND company_id = ? AND is_deleted = 0`,
+      [userId, companyId]
+    );
+
+    const employeeId = empCheck.length > 0 ? empCheck[0].id : null;
+
+    // Find today's attendance record
+    let existingQuery = employeeId
+      ? `SELECT id, clock_in, clock_out FROM attendance WHERE employee_id = ? AND date = ? AND is_deleted = 0`
+      : `SELECT id, clock_in, clock_out FROM attendance WHERE user_id = ? AND date = ? AND is_deleted = 0`;
+
+    const [existing] = await pool.execute(existingQuery, [employeeId || userId, today]);
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No clock in record found for today. Please clock in first.'
+      });
+    }
+
+    if (!existing[0].clock_in) {
+      return res.status(400).json({
+        success: false,
+        error: 'You must clock in before clocking out'
+      });
+    }
+
+    if (existing[0].clock_out) {
+      return res.json({
+        success: true,
+        message: 'Already clocked out today',
+        data: {
+          id: existing[0].id,
+          clock_in: existing[0].clock_in,
+          clock_out: existing[0].clock_out,
+          isClockedIn: false
+        }
+      });
+    }
+
+    // Update with clock_out time
+    await pool.execute(
+      `UPDATE attendance SET clock_out = ?, updated_at = NOW() WHERE id = ?`,
+      [currentTime, existing[0].id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Clocked out successfully',
+      data: {
+        id: existing[0].id,
+        clock_in: existing[0].clock_in,
+        clock_out: currentTime,
+        isClockedIn: false
+      }
+    });
+  } catch (error) {
+    console.error('Check out error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clock out',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Get today's clock status for the current user
+ * GET /api/v1/attendance/today-status
+ */
+const getTodayStatus = async (req, res) => {
+  try {
+    const companyId = req.query.company_id || req.companyId;
+    const userId = req.query.user_id || req.userId;
+
+    if (!companyId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'company_id and user_id are required'
+      });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Get employee_id for the user
+    const [empCheck] = await pool.execute(
+      `SELECT id FROM employees WHERE user_id = ? AND company_id = ? AND is_deleted = 0`,
+      [userId, companyId]
+    );
+
+    const employeeId = empCheck.length > 0 ? empCheck[0].id : null;
+
+    // Find today's attendance record
+    let query = employeeId
+      ? `SELECT id, clock_in, clock_out, status FROM attendance WHERE employee_id = ? AND date = ? AND is_deleted = 0`
+      : `SELECT id, clock_in, clock_out, status FROM attendance WHERE user_id = ? AND date = ? AND is_deleted = 0`;
+
+    const [records] = await pool.execute(query, [employeeId || userId, today]);
+
+    if (records.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          isClockedIn: false,
+          clock_in: null,
+          clock_out: null
+        }
+      });
+    }
+
+    const record = records[0];
+    res.json({
+      success: true,
+      data: {
+        id: record.id,
+        isClockedIn: record.clock_in && !record.clock_out,
+        clock_in: record.clock_in,
+        clock_out: record.clock_out,
+        status: record.status
+      }
+    });
+  } catch (error) {
+    console.error('Get today status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch today status'
+    });
+  }
+};
+
 module.exports = {
   getAll,
   getSummary,
@@ -545,5 +822,8 @@ module.exports = {
   bulkMarkAttendance,
   getById,
   deleteAttendance,
-  getEmployeeAttendance
+  getEmployeeAttendance,
+  checkIn,
+  checkOut,
+  getTodayStatus
 };
