@@ -555,15 +555,16 @@ const Clients = () => {
       render: (value, row) => {
         const contacts = row.contacts || [];
         const primary = contacts.find(c => c.is_primary) || contacts[0];
+        const contactName = primary?.name || '';
 
-        if (!primary) return <span className="text-gray-400">-</span>;
+        if (!contactName) return <span className="text-gray-400">-</span>;
 
         return (
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
               <IoPerson size={12} className="text-blue-600" />
             </div>
-            <span className="text-sm text-gray-700 truncate" title={primary.name}>{primary.name}</span>
+            <span className="text-sm text-gray-700 truncate" title={contactName}>{contactName}</span>
           </div>
         )
       }
