@@ -4,6 +4,33 @@
 
 const pool = require('../config/db');
 
+// Helper function to format date for MySQL (handles ISO format like 2026-01-30T00:00:00.000Z)
+const formatDateForMySQL = (dateValue) => {
+  if (!dateValue || dateValue === '') return null;
+
+  // If it's already in YYYY-MM-DD format, return as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue;
+  }
+
+  // Handle ISO format (2026-01-30T00:00:00.000Z)
+  if (typeof dateValue === 'string' && dateValue.includes('T')) {
+    return dateValue.split('T')[0];
+  }
+
+  // Try to parse as Date object
+  try {
+    const date = new Date(dateValue);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  } catch (e) {
+    // Fall through
+  }
+
+  return null;
+};
+
 const generateProposalNumber = async (companyId) => {
   try {
     // Find the highest existing proposal number for this company
@@ -181,11 +208,6 @@ const getAll = async (req, res) => {
       params.push(created_by);
     }
 
-    if (lead_id) {
-      whereClause += ' AND e.lead_id = ?';
-      params.push(parseInt(lead_id));
-    }
-
     // Search filter
     if (search) {
       whereClause += ` AND (
@@ -306,8 +328,8 @@ const create = async (req, res) => {
     await connection.beginTransaction();
 
     const {
-      proposal_date, valid_till, client_id, tax, second_tax, note,
-      currency, status, items, description, terms, discount, discount_type
+      proposal_date, valid_till, client_id, lead_id, project_id, tax, second_tax, note,
+      currency, status, items, description, terms, discount, discount_type, title
     } = req.body;
 
     const companyId = req.body.company_id || req.query.company_id || req.companyId || 1;
@@ -326,24 +348,29 @@ const create = async (req, res) => {
       totals = calculateTotals(items, discount, discount_type);
     }
 
-    // Insert proposal
+    // Use title in description if no description provided
+    const finalDescription = description || title || null;
+
+    // Insert proposal with lead_id and project_id
     const [result] = await connection.execute(
       `INSERT INTO estimates (
         company_id, estimate_number, proposal_date, valid_till, currency, client_id,
-        tax, second_tax, note, description, terms, discount, discount_type,
+        lead_id, project_id, tax, second_tax, note, description, terms, discount, discount_type,
         sub_total, discount_amount, tax_amount, total, status, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         companyId || null,
         proposal_number || null,
-        (proposal_date && proposal_date !== '') ? proposal_date : null,
-        (valid_till && valid_till !== '') ? valid_till : null,
+        formatDateForMySQL(proposal_date),
+        formatDateForMySQL(valid_till),
         (currency && currency !== '') ? currency : 'USD',
-        (client_id && client_id !== '') ? client_id : null,
+        (client_id && client_id !== '') ? parseInt(client_id) : null,
+        (lead_id && lead_id !== '') ? parseInt(lead_id) : null,
+        (project_id && project_id !== '') ? parseInt(project_id) : null,
         (tax && tax !== '') ? tax : null,
         (second_tax && second_tax !== '') ? second_tax : null,
         (note && note !== '') ? note : null,
-        (description && description !== '') ? description : null,
+        finalDescription,
         (terms && terms !== '') ? terms : 'Thank you for your business.',
         discount || 0,
         discount_type || '%',
@@ -451,8 +478,8 @@ const update = async (req, res) => {
       const updateFields = [];
       const updateValues = [];
 
-      if (proposal_date !== undefined) updateFields.push('proposal_date = ?'), updateValues.push(proposal_date);
-      if (valid_till !== undefined) updateFields.push('valid_till = ?'), updateValues.push(valid_till);
+      if (proposal_date !== undefined) updateFields.push('proposal_date = ?'), updateValues.push(formatDateForMySQL(proposal_date));
+      if (valid_till !== undefined) updateFields.push('valid_till = ?'), updateValues.push(formatDateForMySQL(valid_till));
       if (currency !== undefined) updateFields.push('currency = ?'), updateValues.push(currency);
       if (client_id !== undefined) updateFields.push('client_id = ?'), updateValues.push(client_id);
       if (tax !== undefined) updateFields.push('tax = ?'), updateValues.push(tax);
