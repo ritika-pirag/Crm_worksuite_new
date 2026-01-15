@@ -225,6 +225,8 @@ const ProjectDetail = () => {
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false)
   const [selectedNote, setSelectedNote] = useState(null)
+  const [isViewNoteModalOpen, setIsViewNoteModalOpen] = useState(false)
+  const [viewingNote, setViewingNote] = useState(null)
   const [selectedExpense, setSelectedExpense] = useState(null)
   const [isViewExpenseModalOpen, setIsViewExpenseModalOpen] = useState(false)
   const [isEditExpenseModalOpen, setIsEditExpenseModalOpen] = useState(false)
@@ -1376,7 +1378,19 @@ const ProjectDetail = () => {
   }
 
   const handleViewNote = (note) => {
-    alert(`Note:\n${note.content || note.note || '-'}\n\nCreated: ${note.created_at ? new Date(note.created_at).toLocaleDateString() : '-'}`)
+    setViewingNote(note)
+    setIsViewNoteModalOpen(true)
+  }
+
+  // Helper function to render HTML content safely (strip tags for preview, render for full view)
+  const renderHTMLContent = (htmlContent) => {
+    if (!htmlContent) return '-'
+    return <div dangerouslySetInnerHTML={{ __html: htmlContent }} className="prose prose-sm max-w-none" />
+  }
+
+  const stripHTMLTags = (html) => {
+    if (!html) return ''
+    return html.replace(/<[^>]*>/g, '').trim()
   }
 
   const handleDownloadFile = (file) => {
@@ -1485,6 +1499,85 @@ const ProjectDetail = () => {
       console.error('Error deleting timesheet:', error)
       alert(error.response?.data?.error || 'Failed to delete timesheet')
     }
+  }
+
+  // Export to Excel (CSV format)
+  const handleExportTimesheets = () => {
+    const filteredData = timesheets.filter(ts => {
+      if (timesheetFilters.member && ts.user_id != timesheetFilters.member) return false
+      if (timesheetFilters.task && ts.task_id != timesheetFilters.task) return false
+      return true
+    })
+
+    if (filteredData.length === 0) {
+      alert('No data to export')
+      return
+    }
+
+    const headers = ['Member', 'Task', 'Start Time', 'End Time', 'Hours', 'Note']
+    const rows = filteredData.map(ts => [
+      ts.user_name || ts.employee_name || 'User',
+      ts.task_title || ts.task_name || '-',
+      ts.start_time ? new Date(ts.start_time).toLocaleString() : '-',
+      ts.end_time ? new Date(ts.end_time).toLocaleString() : '-',
+      parseFloat(ts.hours || 0).toFixed(2),
+      ts.description || ts.note || '-'
+    ])
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `timesheets_${project?.name || 'project'}_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+  }
+
+  // Print timesheets
+  const handlePrintTimesheets = () => {
+    const filteredData = timesheets.filter(ts => {
+      if (timesheetFilters.member && ts.user_id != timesheetFilters.member) return false
+      if (timesheetFilters.task && ts.task_id != timesheetFilters.task) return false
+      return true
+    })
+
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Timesheets - ${project?.name || 'Project'}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background-color: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Timesheets - ${project?.name || 'Project'}</h1>
+          <p>Total Entries: ${filteredData.length} | Total Hours: ${filteredData.reduce((sum, ts) => sum + parseFloat(ts.hours || 0), 0).toFixed(2)}h</p>
+          <table>
+            <thead>
+              <tr><th>Member</th><th>Task</th><th>Start</th><th>End</th><th>Hours</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              ${filteredData.map(ts => `
+                <tr>
+                  <td>${ts.user_name || ts.employee_name || 'User'}</td>
+                  <td>${ts.task_title || ts.task_name || '-'}</td>
+                  <td>${ts.start_time ? new Date(ts.start_time).toLocaleString() : '-'}</td>
+                  <td>${ts.end_time ? new Date(ts.end_time).toLocaleString() : '-'}</td>
+                  <td>${parseFloat(ts.hours || 0).toFixed(2)}h</td>
+                  <td>${ts.description || ts.note || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
   }
 
   const handleDeleteMilestone = async (milestone) => {
@@ -1753,9 +1846,12 @@ const ProjectDetail = () => {
 
       const expenseData = {
         company_id: companyId,
+        project_id: parseInt(id),
         lead_id: null,
         description: expenseFormData.title,
         note: expenseFormData.description || '',
+        category: expenseFormData.category || 'General',
+        expense_date: expenseFormData.date || new Date().toISOString().split('T')[0],
         currency: 'USD',
         discount: 0,
         discount_type: '%',
@@ -2686,7 +2782,7 @@ const ProjectDetail = () => {
                               <div className="w-1 h-8 rounded-full" style={{ backgroundColor: note.color || '#3b82f6' }}></div>
                               <div>
                                 <p className="text-sm font-medium text-primary-text">{note.title || 'Untitled'}</p>
-                                <p className="text-xs text-secondary-text truncate max-w-xs">{(note.content || '').substring(0, 50)}{(note.content || '').length > 50 ? '...' : ''}</p>
+                                <p className="text-xs text-secondary-text truncate max-w-xs">{stripHTMLTags(note.content || '').substring(0, 50)}{stripHTMLTags(note.content || '').length > 50 ? '...' : ''}</p>
                               </div>
                             </div>
                           </td>
@@ -2982,10 +3078,30 @@ const ProjectDetail = () => {
                           <p className="text-xs text-secondary-text">{comment.created_at ? new Date(comment.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</p>
                         </div>
                         <p className="text-sm text-secondary-text whitespace-pre-wrap">{comment.content || comment.comment}</p>
-                        {comment.file_name && (
-                          <div className="mt-2 flex items-center gap-2 text-xs text-primary-accent bg-primary-accent/5 px-2 py-1 rounded inline-flex">
-                            <IoDocumentText size={14} />
-                            <span>{comment.file_name}</span>
+                        {(comment.file_name || comment.file_path) && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <IoDocumentText className="text-blue-600" size={20} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-primary-text truncate">{comment.file_name || 'Attachment'}</p>
+                                <p className="text-xs text-secondary-text">Attached file</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (comment.file_path) {
+                                    window.open(comment.file_path, '_blank')
+                                  } else {
+                                    alert('File path not available')
+                                  }
+                                }}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                              >
+                                <IoDownload size={14} />
+                                Download
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -3049,8 +3165,18 @@ const ProjectDetail = () => {
                       value={timesheetFilters.startDate}
                       onChange={(e) => setTimesheetFilters({ ...timesheetFilters, startDate: e.target.value })}
                     />
-                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Excel</button>
-                    <button className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <button
+                      onClick={handleExportTimesheets}
+                      className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1"
+                    >
+                      <IoDownload size={14} />
+                      Excel
+                    </button>
+                    <button
+                      onClick={handlePrintTimesheets}
+                      className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      title="Print"
+                    >
                       <IoPrint size={16} />
                     </button>
                     <Button onClick={() => setIsAddTimesheetModalOpen(true)} className="flex items-center gap-2">
@@ -3773,7 +3899,77 @@ const ProjectDetail = () => {
         </div>
       </RightSideModal>
 
-
+      {/* View Note Modal */}
+      <Modal
+        isOpen={isViewNoteModalOpen}
+        onClose={() => {
+          setIsViewNoteModalOpen(false)
+          setViewingNote(null)
+        }}
+        title="Note Details"
+        maxWidth="2xl"
+      >
+        {viewingNote && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
+              <div className="w-2 h-12 rounded-full" style={{ backgroundColor: viewingNote.color || '#3b82f6' }}></div>
+              <div>
+                <h3 className="text-lg font-semibold text-primary-text">{viewingNote.title || 'Untitled'}</h3>
+                <p className="text-sm text-secondary-text">
+                  Created: {viewingNote.created_at ? new Date(viewingNote.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-secondary-text uppercase">Category</p>
+                <p className="text-sm font-medium">{viewingNote.category || 'General'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-secondary-text uppercase">Status</p>
+                <Badge className={`text-xs ${viewingNote.is_public ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                  {viewingNote.is_public ? 'Public' : 'Private'}
+                </Badge>
+              </div>
+            </div>
+            <div className="pt-2">
+              <p className="text-xs text-secondary-text uppercase mb-2">Content</p>
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 max-h-64 overflow-y-auto">
+                {renderHTMLContent(viewingNote.content || viewingNote.note)}
+              </div>
+            </div>
+            {viewingNote.file_name && (
+              <div className="pt-2">
+                <p className="text-xs text-secondary-text uppercase mb-2">Attachment</p>
+                <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                  <IoDocumentText className="text-blue-600" size={24} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary-text">{viewingNote.file_name}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadFile(viewingNote)}
+                    className="flex items-center gap-1"
+                  >
+                    <IoDownload size={14} />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <Button variant="outline" onClick={() => { setIsViewNoteModalOpen(false); setViewingNote(null); }} className="flex-1">
+                Close
+              </Button>
+              <Button onClick={() => { setIsViewNoteModalOpen(false); handleEditNote(viewingNote); }} className="flex-1 flex items-center justify-center gap-2">
+                <IoCreate size={16} />
+                Edit Note
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Add File Modal - Enhanced with Category & Drag & Drop */}
       <RightSideModal
@@ -4649,10 +4845,50 @@ const ProjectDetail = () => {
               <Button
                 variant="outline"
                 onClick={() => {
+                  const printWindow = window.open('', '_blank')
+                  printWindow.document.write(`
+                    <html>
+                      <head>
+                        <title>Expense - ${selectedExpense.expense_number || `EXP#${selectedExpense.id}`}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+                          .header { text-align: center; margin-bottom: 30px; }
+                          .title { font-size: 24px; font-weight: bold; }
+                          .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+                          .label { color: #666; }
+                          .value { font-weight: 500; }
+                          .amount { font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; }
+                          .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="header">
+                          <div class="title">EXPENSE REPORT</div>
+                          <div>${selectedExpense.expense_number || `EXP#${selectedExpense.id}`}</div>
+                        </div>
+                        <div class="amount">$${parseFloat(selectedExpense.total || selectedExpense.amount || 0).toFixed(2)}</div>
+                        <div class="row"><span class="label">Status</span><span class="value">${selectedExpense.status || 'Pending'}</span></div>
+                        <div class="row"><span class="label">Category</span><span class="value">${selectedExpense.category || '-'}</span></div>
+                        <div class="row"><span class="label">Date</span><span class="value">${selectedExpense.expense_date ? new Date(selectedExpense.expense_date).toLocaleDateString() : '-'}</span></div>
+                        <div class="row"><span class="label">Project</span><span class="value">${project?.name || '-'}</span></div>
+                        <div class="row"><span class="label">Description</span><span class="value">${selectedExpense.description || '-'}</span></div>
+                      </body>
+                    </html>
+                  `)
+                  printWindow.document.close()
+                  printWindow.print()
+                }}
+                className="flex items-center gap-2"
+              >
+                <IoPrint size={16} />
+                Print
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
                   setIsViewExpenseModalOpen(false)
                   setSelectedExpense(null)
                 }}
-                className="flex-1"
               >
                 Close
               </Button>
@@ -4662,7 +4898,6 @@ const ProjectDetail = () => {
                   setIsViewExpenseModalOpen(false)
                   handleEditExpense(selectedExpense)
                 }}
-                className="flex-1"
               >
                 Edit
               </Button>
@@ -4830,7 +5065,107 @@ const ProjectDetail = () => {
                 <p className="text-primary-text bg-gray-50 p-3 rounded-lg">{selectedInvoice.note}</p>
               </div>
             )}
-            <div className="pt-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="pt-6 border-t border-gray-200 flex justify-between gap-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank')
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Invoice - ${selectedInvoice.invoice_number || `INV-${selectedInvoice.id}`}</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+                            .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
+                            .invoice-title { font-size: 32px; font-weight: bold; color: #333; }
+                            .invoice-number { font-size: 14px; color: #666; }
+                            .info-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
+                            .info-block { }
+                            .info-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+                            .info-value { font-size: 14px; color: #333; }
+                            .amount-section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px 0; }
+                            .amount-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                            .total-row { font-size: 18px; font-weight: bold; border-top: 2px solid #ddd; padding-top: 8px; margin-top: 8px; }
+                            .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+                            .status-paid { background: #d1fae5; color: #065f46; }
+                            .status-unpaid { background: #fef3c7; color: #92400e; }
+                            .footer { margin-top: 40px; text-align: center; color: #888; font-size: 12px; }
+                          </style>
+                        </head>
+                        <body>
+                          <div class="header">
+                            <div>
+                              <div class="invoice-title">INVOICE</div>
+                              <div class="invoice-number">${selectedInvoice.invoice_number || `INV-${selectedInvoice.id}`}</div>
+                            </div>
+                            <div>
+                              <span class="status ${selectedInvoice.status === 'paid' ? 'status-paid' : 'status-unpaid'}">${selectedInvoice.status || 'Unpaid'}</span>
+                            </div>
+                          </div>
+                          <div class="info-section">
+                            <div class="info-block">
+                              <div class="info-label">Bill To:</div>
+                              <div class="info-value"><strong>${selectedInvoice.client_name || 'Client'}</strong></div>
+                            </div>
+                            <div class="info-block">
+                              <div class="info-label">Project:</div>
+                              <div class="info-value">${project?.name || 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div class="info-section">
+                            <div class="info-block">
+                              <div class="info-label">Issue Date:</div>
+                              <div class="info-value">${selectedInvoice.issue_date ? new Date(selectedInvoice.issue_date).toLocaleDateString() : '-'}</div>
+                            </div>
+                            <div class="info-block">
+                              <div class="info-label">Due Date:</div>
+                              <div class="info-value">${selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : '-'}</div>
+                            </div>
+                          </div>
+                          <div class="amount-section">
+                            <div class="amount-row">
+                              <span>Subtotal</span>
+                              <span>$${parseFloat(selectedInvoice.sub_total || selectedInvoice.total || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="amount-row">
+                              <span>Tax</span>
+                              <span>$${parseFloat(selectedInvoice.tax_amount || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="amount-row total-row">
+                              <span>Total</span>
+                              <span>$${parseFloat(selectedInvoice.total || selectedInvoice.amount || 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                          ${selectedInvoice.note ? `<div><strong>Note:</strong> ${selectedInvoice.note}</div>` : ''}
+                          <div class="footer">Thank you for your business!</div>
+                        </body>
+                      </html>
+                    `)
+                    printWindow.document.close()
+                    printWindow.print()
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <IoPrint size={16} />
+                  Print
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const csvContent = `Invoice Number,Client,Amount,Status,Issue Date,Due Date\n"${selectedInvoice.invoice_number || `INV-${selectedInvoice.id}`}","${selectedInvoice.client_name || ''}","${parseFloat(selectedInvoice.total || 0).toFixed(2)}","${selectedInvoice.status || 'Unpaid'}","${selectedInvoice.issue_date ? new Date(selectedInvoice.issue_date).toLocaleDateString() : ''}","${selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : ''}"`
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    link.href = URL.createObjectURL(blob)
+                    link.download = `invoice_${selectedInvoice.invoice_number || selectedInvoice.id}.csv`
+                    link.click()
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <IoDownload size={16} />
+                  Download
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => setIsViewInvoiceModalOpen(false)}>Close</Button>
             </div>
           </div>
@@ -4895,7 +5230,60 @@ const ProjectDetail = () => {
                 <p className="text-primary-text bg-gray-50 p-3 rounded-lg">{selectedPayment.remarks}</p>
               </div>
             )}
-            <div className="pt-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="pt-6 border-t border-gray-200 flex justify-between gap-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank')
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Payment Receipt - PAY-${selectedPayment.id}</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+                            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+                            .receipt-title { font-size: 24px; font-weight: bold; color: #333; }
+                            .receipt-number { font-size: 14px; color: #666; margin-top: 5px; }
+                            .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+                            .label { color: #666; }
+                            .value { font-weight: 500; color: #333; }
+                            .amount-row { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
+                            .amount { font-size: 24px; font-weight: bold; text-align: center; }
+                            .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+                            .status-completed { background: #d1fae5; color: #065f46; }
+                            .status-pending { background: #fef3c7; color: #92400e; }
+                            .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+                          </style>
+                        </head>
+                        <body>
+                          <div class="header">
+                            <div class="receipt-title">PAYMENT RECEIPT</div>
+                            <div class="receipt-number">PAY-${selectedPayment.id}</div>
+                          </div>
+                          <div class="amount-row">
+                            <div class="amount">$${parseFloat(selectedPayment.amount || 0).toFixed(2)}</div>
+                            <div style="text-align: center; margin-top: 5px;">
+                              <span class="status ${selectedPayment.status === 'completed' ? 'status-completed' : 'status-pending'}">${selectedPayment.status || 'Pending'}</span>
+                            </div>
+                          </div>
+                          <div class="row"><span class="label">Invoice</span><span class="value">${selectedPayment.invoice_number || (selectedPayment.invoice_id ? `INV-${selectedPayment.invoice_id}` : '-')}</span></div>
+                          <div class="row"><span class="label">Payment Date</span><span class="value">${selectedPayment.payment_date ? new Date(selectedPayment.payment_date).toLocaleDateString() : '-'}</span></div>
+                          <div class="row"><span class="label">Payment Method</span><span class="value">${selectedPayment.payment_method ? selectedPayment.payment_method.replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase()) : '-'}</span></div>
+                          ${selectedPayment.transaction_id ? `<div class="row"><span class="label">Transaction ID</span><span class="value">${selectedPayment.transaction_id}</span></div>` : ''}
+                          <div class="footer">Thank you for your payment!</div>
+                        </body>
+                      </html>
+                    `)
+                    printWindow.document.close()
+                    printWindow.print()
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <IoPrint size={16} />
+                  Print
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => setIsViewPaymentModalOpen(false)}>Close</Button>
             </div>
           </div>
