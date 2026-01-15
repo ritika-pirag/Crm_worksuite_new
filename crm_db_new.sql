@@ -2739,6 +2739,24 @@ ALTER TABLE `user_sticky_notes`
 ALTER TABLE `user_todos`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
+-- --------------------------------------------------------
+-- Default Data Inserts
+-- --------------------------------------------------------
+
+--
+-- Default Company
+--
+INSERT INTO `companies` (`id`, `name`, `email`, `currency`, `timezone`, `created_at`, `updated_at`, `is_deleted`) VALUES
+(1, 'Default Company', 'admin@company.com', 'USD', 'UTC', NOW(), NOW(), 0);
+
+--
+-- Default Super Admin User
+-- Email: superadmin@gmail.com
+-- Password: 123456
+--
+INSERT INTO `users` (`id`, `company_id`, `name`, `email`, `password`, `role`, `status`, `created_at`, `updated_at`, `is_deleted`) VALUES
+(1, 1, 'Super Admin', 'superadmin@gmail.com', '$2a$10$QR8/Bnb5q6nbyDb3Valf1eH40ErrQfztJUpIyq940BdGs6foL2zea', 'SUPERADMIN', 'Active', NOW(), NOW(), 0);
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
