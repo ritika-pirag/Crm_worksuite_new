@@ -899,12 +899,17 @@ const updateStatus = async (req, res) => {
       [status, id, companyId]
     );
 
-    // Log status change (notes column in table, changed_by must not be null)
-    await pool.execute(
-      `INSERT INTO lead_status_history (company_id, lead_id, old_status, new_status, changed_by, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [companyId, id, oldStatus, status, userId || 1, change_reason || null]
-    );
+    // Log status change (optional - don't fail if history table has issues)
+    try {
+      await pool.execute(
+        `INSERT INTO lead_status_history (company_id, lead_id, old_status, new_status, changed_by, notes)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [companyId, id, oldStatus, status, userId || 1, change_reason || null]
+      );
+    } catch (historyError) {
+      console.error('Failed to log status history:', historyError.message);
+      // Continue even if history logging fails
+    }
 
     // Get updated lead
     const [updatedLeads] = await pool.execute(
