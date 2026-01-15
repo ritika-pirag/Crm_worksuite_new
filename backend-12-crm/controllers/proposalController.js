@@ -4,6 +4,33 @@
 
 const pool = require('../config/db');
 
+// Helper function to format date for MySQL (handles ISO format like 2026-01-30T00:00:00.000Z)
+const formatDateForMySQL = (dateValue) => {
+  if (!dateValue || dateValue === '') return null;
+
+  // If it's already in YYYY-MM-DD format, return as is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue;
+  }
+
+  // Handle ISO format (2026-01-30T00:00:00.000Z)
+  if (typeof dateValue === 'string' && dateValue.includes('T')) {
+    return dateValue.split('T')[0];
+  }
+
+  // Try to parse as Date object
+  try {
+    const date = new Date(dateValue);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  } catch (e) {
+    // Fall through
+  }
+
+  return null;
+};
+
 const generateProposalNumber = async (companyId) => {
   try {
     // Find the highest existing proposal number for this company
@@ -334,8 +361,8 @@ const create = async (req, res) => {
       [
         companyId || null,
         proposal_number || null,
-        (proposal_date && proposal_date !== '') ? proposal_date : null,
-        (valid_till && valid_till !== '') ? valid_till : null,
+        formatDateForMySQL(proposal_date),
+        formatDateForMySQL(valid_till),
         (currency && currency !== '') ? currency : 'USD',
         (client_id && client_id !== '') ? parseInt(client_id) : null,
         (lead_id && lead_id !== '') ? parseInt(lead_id) : null,
@@ -451,8 +478,8 @@ const update = async (req, res) => {
       const updateFields = [];
       const updateValues = [];
 
-      if (proposal_date !== undefined) updateFields.push('proposal_date = ?'), updateValues.push(proposal_date);
-      if (valid_till !== undefined) updateFields.push('valid_till = ?'), updateValues.push(valid_till);
+      if (proposal_date !== undefined) updateFields.push('proposal_date = ?'), updateValues.push(formatDateForMySQL(proposal_date));
+      if (valid_till !== undefined) updateFields.push('valid_till = ?'), updateValues.push(formatDateForMySQL(valid_till));
       if (currency !== undefined) updateFields.push('currency = ?'), updateValues.push(currency);
       if (client_id !== undefined) updateFields.push('client_id = ?'), updateValues.push(client_id);
       if (tax !== undefined) updateFields.push('tax = ?'), updateValues.push(tax);
