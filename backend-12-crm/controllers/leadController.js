@@ -1403,21 +1403,22 @@ const getAllLabels = async (req, res) => {
       });
     }
 
-    // Fallback: Get all unique labels from leads in this company
+    // Fallback: Get all unique labels from leads in this company (lead_labels table has no color column)
     const [labels] = await pool.execute(
-      `SELECT DISTINCT ll.label, ll.id, ll.color, ll.created_at
+      `SELECT DISTINCT ll.label, MIN(ll.id) as id, MIN(ll.created_at) as created_at
        FROM lead_labels ll
        INNER JOIN leads l ON ll.lead_id = l.id
        WHERE l.company_id = ? AND l.is_deleted = 0
+       GROUP BY ll.label
        ORDER BY ll.label ASC`,
       [companyId]
     );
 
-    // Return with name field for consistency
+    // Return with name field and default color for consistency
     const labelsWithName = labels.map(l => ({
       ...l,
       name: l.label,
-      color: l.color || '#22c55e'
+      color: '#22c55e'
     }));
 
     res.json({
