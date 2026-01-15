@@ -899,11 +899,11 @@ const updateStatus = async (req, res) => {
       [status, id, companyId]
     );
 
-    // Log status change
+    // Log status change (notes column in table, changed_by must not be null)
     await pool.execute(
-      `INSERT INTO lead_status_history (company_id, lead_id, old_status, new_status, changed_by, change_reason)
+      `INSERT INTO lead_status_history (company_id, lead_id, old_status, new_status, changed_by, notes)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [companyId, id, oldStatus, status, userId, change_reason || null]
+      [companyId, id, oldStatus, status, userId || 1, change_reason || null]
     );
 
     // Get updated lead
