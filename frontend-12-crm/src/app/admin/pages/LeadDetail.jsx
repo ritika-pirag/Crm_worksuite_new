@@ -1917,27 +1917,43 @@ const LeadDetail = () => {
                 </Card>
 
                 {/* Tasks */}
-                <Card className="p-4">
+                <Card className="p-5 bg-gradient-to-br from-blue-50 to-white border border-blue-100">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-primary-text">Tasks</h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
+                        <IoCheckmarkCircle className="text-white" size={20} />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-800">Tasks</h3>
+                    </div>
                     <Button
-                      variant="outline"
+                      variant="primary"
                       size="sm"
                       onClick={handleAddTask}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md"
                     >
                       <IoAdd size={16} />
                       Add Task
                     </Button>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {tasks.length === 0 ? (
-                      <p className="text-sm text-secondary-text py-4 text-center">No tasks</p>
+                      <div className="py-8 text-center bg-white/50 rounded-xl border border-blue-100">
+                        <IoCheckmarkCircle className="mx-auto text-blue-300 mb-2" size={32} />
+                        <p className="text-sm text-gray-500 font-medium">No tasks yet</p>
+                        <p className="text-xs text-gray-400">Click "Add Task" to create one</p>
+                      </div>
                     ) : (
                       tasks.map((task, index) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg text-sm border border-gray-100 flex justify-between items-center group hover:bg-white hover:shadow-sm transition-all">
-                          <span>{task.title}</span>
-                          <span className="text-xs text-gray-400 group-hover:text-gray-600">{task.status || 'Pending'}</span>
+                        <div key={index} className="p-4 bg-white rounded-xl text-sm border border-blue-100 flex justify-between items-center group hover:shadow-lg hover:border-blue-300 transition-all duration-200">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-3 h-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' : task.status === 'Doing' ? 'bg-yellow-500' : 'bg-blue-400'}`}></div>
+                            <span className="font-medium text-gray-700">{task.title}</span>
+                          </div>
+                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                            task.status === 'Done' ? 'bg-green-100 text-green-700' :
+                            task.status === 'Doing' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>{task.status || 'Pending'}</span>
                         </div>
                       ))
                     )}
@@ -1945,27 +1961,39 @@ const LeadDetail = () => {
                 </Card>
 
                 {/* Notes */}
-                <Card className="p-4">
+                <Card className="p-5 bg-gradient-to-br from-amber-50 to-white border border-amber-100">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-primary-text">Notes</h3>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
+                        <IoDocumentText className="text-white" size={20} />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-800">Notes</h3>
+                    </div>
                     <Button
-                      variant="outline"
+                      variant="primary"
                       size="sm"
                       onClick={handleAddNote}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white shadow-md"
                     >
                       <IoAdd size={16} />
                       Add Note
                     </Button>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {notes.length === 0 ? (
-                      <p className="text-sm text-secondary-text py-4 text-center">No notes</p>
+                      <div className="py-8 text-center bg-white/50 rounded-xl border border-amber-100">
+                        <IoDocumentText className="mx-auto text-amber-300 mb-2" size={32} />
+                        <p className="text-sm text-gray-500 font-medium">No notes yet</p>
+                        <p className="text-xs text-gray-400">Click "Add Note" to create one</p>
+                      </div>
                     ) : (
                       notes.map((note, index) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg text-sm border border-gray-100">
-                          <p className="whitespace-pre-wrap">{note._description || note.content || ''}</p>
-                          <p className="text-xs text-secondary-text mt-2">{note.created_at ? new Date(note.created_at).toLocaleDateString() : 'Just now'}</p>
+                        <div key={index} className="p-4 bg-white rounded-xl text-sm border border-amber-100 hover:shadow-lg hover:border-amber-300 transition-all duration-200">
+                          <p className="whitespace-pre-wrap text-gray-700 font-medium leading-relaxed">{note._description || note.content || ''}</p>
+                          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-amber-50">
+                            <IoTime className="text-amber-400" size={14} />
+                            <p className="text-xs text-amber-600 font-medium">{note.created_at ? new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Just now'}</p>
+                          </div>
                         </div>
                       ))
                     )}
