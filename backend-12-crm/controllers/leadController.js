@@ -922,6 +922,7 @@ const updateStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update lead status',
+      details: error.sqlMessage || error.message
     });
   }
 };
