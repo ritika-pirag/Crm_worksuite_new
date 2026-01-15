@@ -1720,7 +1720,7 @@ const LeadDetail = () => {
                 {/* Events */}
                 <Card className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                    <h3 className="text-lg font-semibold text-primary-text">Follow-ups</h3>
+                    <h3 className="text-lg font-semibold text-primary-text">Events</h3>
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
                         {['month', 'week', 'day', 'list'].map((view) => (
@@ -1743,7 +1743,7 @@ const LeadDetail = () => {
                         className="flex items-center gap-2"
                       >
                         <IoAdd size={16} />
-                        Add Follow-up
+                        Add Event
                       </Button>
                     </div>
                   </div>
