@@ -4,10 +4,10 @@
  */
 
 // Use environment variable if available, otherwise use localhost:5000
-// const BaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const BaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 // Production URLs (uncomment when deploying):
-const BaseUrl = 'https://crm-worksuite-production.up.railway.app'
+// const BaseUrl = 'https://crm-worksuite-production.up.railway.app'
 
 // const BaseUrl = 'https://ws.kiaantechnology.com'
 
