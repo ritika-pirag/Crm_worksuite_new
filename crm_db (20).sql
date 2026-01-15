@@ -1092,7 +1092,10 @@ CREATE TABLE `notifications` (
   `link` varchar(500) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT 0,
   `read_at` datetime DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_by` int(10) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -2155,7 +2158,9 @@ ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_notification_user` (`user_id`),
   ADD KEY `idx_notification_read` (`is_read`),
-  ADD KEY `idx_notification_company` (`company_id`);
+  ADD KEY `idx_notification_company` (`company_id`),
+  ADD KEY `idx_notification_deleted` (`is_deleted`),
+  ADD KEY `idx_notification_created_by` (`created_by`);
 
 --
 -- Indexes for table `offline_requests`
