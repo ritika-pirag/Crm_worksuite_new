@@ -59,7 +59,7 @@ const LoginPage = () => {
 
     const credentials = {
       SUPERADMIN: {
-        email: 'superadmin@crmapp',
+        email: 'superadmin@crmapp.com',
         password: '123456'
       },
       ADMIN: {
