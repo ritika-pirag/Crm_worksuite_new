@@ -35,6 +35,7 @@ CREATE TABLE `attendance` (
   `date` date NOT NULL,
   `check_in` time DEFAULT NULL,
   `check_out` time DEFAULT NULL,
+  `total_hours` decimal(5,2) DEFAULT NULL,
   `clock_in` time DEFAULT NULL,
   `clock_out` time DEFAULT NULL,
   `status` enum('Present','Absent','Late','Half Day') DEFAULT 'Absent',
@@ -51,8 +52,8 @@ CREATE TABLE `attendance` (
 -- Dumping data for table `attendance`
 --
 
-INSERT INTO `attendance` (`id`, `company_id`, `user_id`, `employee_id`, `date`, `check_in`, `check_out`, `clock_in`, `clock_out`, `status`, `late_reason`, `work_from`, `notes`, `marked_by`, `created_at`, `updated_at`, `is_deleted`) VALUES
-(1, 2, 2, NULL, '2026-01-15', '05:56:58', NULL, NULL, NULL, 'Present', NULL, 'office', NULL, NULL, '2026-01-15 05:56:58', '2026-01-15 05:56:58', 0);
+INSERT INTO `attendance` (`id`, `company_id`, `user_id`, `employee_id`, `date`, `check_in`, `check_out`, `total_hours`, `clock_in`, `clock_out`, `status`, `late_reason`, `work_from`, `notes`, `marked_by`, `created_at`, `updated_at`, `is_deleted`) VALUES
+(1, 2, 2, NULL, '2026-01-15', '05:56:58', NULL, NULL, NULL, NULL, 'Present', NULL, 'office', NULL, NULL, '2026-01-15 05:56:58', '2026-01-15 05:56:58', 0);
 
 -- --------------------------------------------------------
 
@@ -1186,6 +1187,7 @@ CREATE TABLE `payments` (
   `transaction_id` varchar(255) DEFAULT NULL,
   `payment_gateway` varchar(100) DEFAULT NULL,
   `offline_payment_method` enum('Cash','Cheque','Bank Transfer') DEFAULT NULL,
+  `payment_method` varchar(100) DEFAULT NULL,
   `bank_account` varchar(255) DEFAULT NULL,
   `receipt_path` varchar(500) DEFAULT NULL,
   `remark` text DEFAULT NULL,
@@ -1268,6 +1270,7 @@ CREATE TABLE `projects` (
   `budget` decimal(15,2) DEFAULT NULL,
   `price` decimal(15,2) DEFAULT NULL,
   `project_type` varchar(100) DEFAULT NULL,
+  `visibility` varchar(50) DEFAULT 'private',
   `created_by` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -1278,8 +1281,8 @@ CREATE TABLE `projects` (
 -- Dumping data for table `projects`
 --
 
-INSERT INTO `projects` (`id`, `company_id`, `short_code`, `project_name`, `start_date`, `deadline`, `no_deadline`, `project_category`, `project_sub_category`, `department_id`, `project_manager_id`, `client_id`, `project_summary`, `description`, `notes`, `public_gantt_chart`, `public_task_board`, `task_approval`, `label`, `create_public_project`, `status`, `progress`, `budget`, `price`, `project_type`, `created_by`, `created_at`, `updated_at`, `is_deleted`) VALUES
-(1, 2, 'WMS', 'WMS', '2026-01-01', '2026-02-25', 0, NULL, NULL, 1, 4, 1, '<p>WMS is a complete digital solution designed to manage day-to-day workshop operations efficiently. It provides separate dashboards for <strong>Admin, Technician, and Storekeeper</strong>, each with role-based access and responsibilities. The system manages job cards, vehicle and service details, spare parts inventory, technician assignments, work progress tracking, billing, and reports from a single platform.</p>', NULL, NULL, 'enable', 'enable', 'disable', 'On track', 0, 'on hold', 0, 450000.00, 450000.00, NULL, 4, '2026-01-15 06:21:07', '2026-01-15 06:31:44', 0);
+INSERT INTO `projects` (`id`, `company_id`, `short_code`, `project_name`, `start_date`, `deadline`, `no_deadline`, `project_category`, `project_sub_category`, `department_id`, `project_manager_id`, `client_id`, `project_summary`, `description`, `notes`, `public_gantt_chart`, `public_task_board`, `task_approval`, `label`, `create_public_project`, `status`, `progress`, `budget`, `price`, `project_type`, `visibility`, `created_by`, `created_at`, `updated_at`, `is_deleted`) VALUES
+(1, 2, 'WMS', 'WMS', '2026-01-01', '2026-02-25', 0, NULL, NULL, 1, 4, 1, '<p>WMS is a complete digital solution designed to manage day-to-day workshop operations efficiently. It provides separate dashboards for <strong>Admin, Technician, and Storekeeper</strong>, each with role-based access and responsibilities. The system manages job cards, vehicle and service details, spare parts inventory, technician assignments, work progress tracking, billing, and reports from a single platform.</p>', NULL, NULL, 'enable', 'enable', 'disable', 'On track', 0, 'on hold', 0, 450000.00, 450000.00, NULL, 'private', 4, '2026-01-15 06:21:07', '2026-01-15 06:31:44', 0);
 
 -- --------------------------------------------------------
 
@@ -1462,10 +1465,14 @@ CREATE TABLE `subscriptions` (
   `company_id` int(10) UNSIGNED NOT NULL,
   `client_id` int(10) UNSIGNED NOT NULL,
   `plan` varchar(100) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
   `amount` decimal(15,2) NOT NULL,
   `billing_cycle` enum('Monthly','Quarterly','Yearly') DEFAULT 'Monthly',
   `status` enum('Active','Cancelled','Suspended') DEFAULT 'Active',
   `next_billing_date` date NOT NULL,
+  `first_billing_date` date DEFAULT NULL,
+  `completed_cycles` int(11) DEFAULT 0,
+  `total_cycles` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `is_deleted` tinyint(1) DEFAULT 0
@@ -1508,6 +1515,7 @@ CREATE TABLE `tasks` (
   `due_date` date DEFAULT NULL,
   `status` enum('Incomplete','Doing','Done') DEFAULT 'Incomplete',
   `priority` enum('High','Medium','Low') DEFAULT NULL,
+  `points` int(11) DEFAULT NULL,
   `estimated_time` varchar(50) DEFAULT NULL,
   `description` text DEFAULT NULL,
   `is_recurring` tinyint(1) DEFAULT 0,
@@ -1595,10 +1603,12 @@ CREATE TABLE `tickets` (
   `company_id` int(10) UNSIGNED NOT NULL,
   `ticket_id` varchar(50) NOT NULL,
   `subject` varchar(255) NOT NULL,
+  `ticket_type` varchar(100) DEFAULT NULL,
   `client_id` int(11) DEFAULT NULL,
   `priority` enum('High','Medium','Low') DEFAULT 'Medium',
   `description` text DEFAULT NULL,
-  `status` enum('Open','Pending','Closed') DEFAULT 'Open',
+  `file_path` varchar(500) DEFAULT NULL,
+  `status` enum('Open','New','Pending','In Progress','Closed','Resolved') DEFAULT 'Open',
   `assigned_to_id` int(10) UNSIGNED DEFAULT NULL,
   `created_by` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
