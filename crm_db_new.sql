@@ -1473,10 +1473,12 @@ CREATE TABLE `notes` (
 
 CREATE TABLE `project_labels` (
   `id` int(10) UNSIGNED NOT NULL,
-  `project_id` int(10) UNSIGNED NOT NULL,
-  `label` varchar(100) NOT NULL,
+  `company_id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
   `color` varchar(20) DEFAULT '#3B82F6',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_deleted` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
