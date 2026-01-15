@@ -63,15 +63,15 @@ const LoginPage = () => {
         password: '123456'
       },
       ADMIN: {
-        email: 'techmahindraadmin@gmail.com',
-        password: '123456'
-      },
-      EMPLOYEE: {
-        email: 'raja@gmail.com',
+        email: 'kavya@gmail.com',
         password: '123456'
       },
       CLIENT: {
-        email: 'virat@gmail.com',
+        email: 'raja@gmail.com',
+        password: '123456'
+      },
+      EMPLOYEE: {
+        email: 'devesh@gmail.com',
         password: '123456'
       }
     }
