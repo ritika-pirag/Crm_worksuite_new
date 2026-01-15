@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { clientsAPI, invoicesAPI, paymentsAPI, projectsAPI, subscriptionsAPI, estimatesAPI, proposalsAPI, contractsAPI, documentsAPI, expensesAPI, tasksAPI, notesAPI, ordersAPI, employeesAPI, departmentsAPI, contactsAPI } from '../../../api'
+import { clientsAPI, invoicesAPI, paymentsAPI, projectsAPI, subscriptionsAPI, estimatesAPI, proposalsAPI, contractsAPI, documentsAPI, expensesAPI, tasksAPI, notesAPI, ordersAPI, employeesAPI, departmentsAPI, contactsAPI, eventsAPI } from '../../../api'
 import { useSettings } from '../../../context/SettingsContext'
 import Card from '../../../components/ui/Card'
 import Button from '../../../components/ui/Button'
@@ -108,6 +108,7 @@ const ClientDetail = () => {
   const [expenses, setExpenses] = useState([])
   const [notes, setNotes] = useState([])
   const [tasks, setTasks] = useState([])
+  const [events, setEvents] = useState([])
 
   // Loading states
   const [loadingProjects, setLoadingProjects] = useState(false)
@@ -122,6 +123,7 @@ const ClientDetail = () => {
   const [loadingExpenses, setLoadingExpenses] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(false)
+  const [loadingEvents, setLoadingEvents] = useState(false)
 
   // Modals
   // const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false)
@@ -428,6 +430,7 @@ const ClientDetail = () => {
         fetchExpenses()
         fetchNotes()
         fetchTasks()
+        fetchEvents()
       }
     }
   }, [client, activeTab])
@@ -856,6 +859,33 @@ const ClientDetail = () => {
     }
   }
 
+  const fetchEvents = async () => {
+    try {
+      setLoadingEvents(true)
+      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
+      if (!companyId || isNaN(companyId) || companyId <= 0) {
+        console.error('Invalid companyId for fetchEvents:', companyId)
+        setEvents([])
+        setLoadingEvents(false)
+        return
+      }
+      const response = await eventsAPI.getAll({ client_id: id, company_id: companyId, for_client: true })
+      if (response.data.success) {
+        const fetchedEvents = response.data.data || []
+        console.log('Fetched events:', fetchedEvents)
+        setEvents(fetchedEvents)
+      } else {
+        console.error('Failed to fetch events:', response.data.error)
+        setEvents([])
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error)
+      setEvents([])
+    } finally {
+      setLoadingEvents(false)
+    }
+  }
+
   const filteredClients = clients.filter(c => {
     if (activeFilter === 'all') return true
     if (activeFilter === 'my') return true
@@ -1053,6 +1083,70 @@ const ClientDetail = () => {
     } catch (error) {
       console.error('Error creating task:', error)
       alert(error.response?.data?.error || 'Failed to create task')
+    }
+  }
+
+  // Add Event handler
+  const handleAddEvent = async () => {
+    try {
+      if (!eventFormData.title) {
+        alert('Please enter event title')
+        return
+      }
+      if (!eventFormData.date) {
+        alert('Please select event date')
+        return
+      }
+
+      const companyId = parseInt(localStorage.getItem('companyId') || 1, 10)
+      const userId = parseInt(localStorage.getItem('userId') || 1, 10)
+
+      // Backend expects these specific field names
+      const eventData = {
+        company_id: companyId,
+        user_id: userId,
+        event_name: eventFormData.title,
+        where: eventFormData.type === 'call' ? 'Phone Call' :
+               eventFormData.type === 'meeting' ? 'Office' :
+               eventFormData.type === 'deadline' ? 'N/A' : 'Online',
+        description: eventFormData.description || '',
+        starts_on_date: eventFormData.date,
+        starts_on_time: eventFormData.time || '09:00',
+        ends_on_date: eventFormData.date,
+        ends_on_time: eventFormData.time ?
+          `${String(parseInt(eventFormData.time.split(':')[0]) + 1).padStart(2, '0')}:${eventFormData.time.split(':')[1]}` :
+          '10:00',
+        label_color: eventFormData.type === 'meeting' ? '#3B82F6' :
+                     eventFormData.type === 'call' ? '#22C55E' :
+                     eventFormData.type === 'deadline' ? '#EF4444' :
+                     eventFormData.type === 'reminder' ? '#F59E0B' : '#A855F7',
+        status: 'Pending',
+        client_ids: [parseInt(id)]
+      }
+
+      console.log('Creating event:', eventData)
+      const response = await eventsAPI.create(eventData)
+
+      if (response.data.success) {
+        alert('Event added successfully!')
+        setIsAddEventModalOpen(false)
+        setEventFormData({
+          title: '',
+          date: new Date().toISOString().split('T')[0],
+          time: '',
+          description: '',
+          type: 'meeting'
+        })
+        // Refresh events
+        setTimeout(() => {
+          fetchEvents()
+        }, 500)
+      } else {
+        alert(response.data.error || 'Failed to add event')
+      }
+    } catch (error) {
+      console.error('Error adding event:', error)
+      alert(error.response?.data?.error || 'Failed to add event')
     }
   }
 
@@ -2209,6 +2303,7 @@ const ClientDetail = () => {
                     <div className="flex items-center gap-3">
                       <IoCalendar className="text-primary-accent" size={20} />
                       <h3 className="text-lg font-semibold text-primary-text">Events</h3>
+                      <Badge className="bg-blue-100 text-blue-700 text-xs">{events.length}</Badge>
                     </div>
                     <button
                       onClick={() => setIsAddEventModalOpen(true)}
@@ -2224,7 +2319,9 @@ const ClientDetail = () => {
                     <button className="p-1 hover:bg-gray-100 rounded">
                       <IoChevronDown className="rotate-90 text-gray-600" size={16} />
                     </button>
-                    <h4 className="text-sm font-semibold text-gray-900">January 2026</h4>
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h4>
                     <button className="p-1 hover:bg-gray-100 rounded">
                       <IoChevronDown className="-rotate-90 text-gray-600" size={16} />
                     </button>
@@ -2237,29 +2334,116 @@ const ClientDetail = () => {
                       <div key={day} className="py-2 text-gray-500 font-medium">{day}</div>
                     ))}
                     {/* Previous month days */}
-                    {[28, 29, 30, 31].map(day => (
-                      <button key={`prev-${day}`} className="py-2 text-gray-300 hover:bg-gray-50 rounded">
-                        {day}
-                      </button>
-                    ))}
-                    {/* Current month days */}
-                    {[...Array(31)].map((_, i) => {
-                      const day = i + 1;
-                      const isToday = day === 13;
-                      return (
-                        <button
-                          key={day}
-                          className={`py-2 rounded transition-colors ${
-                            isToday
-                              ? 'bg-blue-600 text-white font-medium'
-                              : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
+                    {(() => {
+                      const now = new Date();
+                      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+                      const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+                      const prevDays = [];
+                      for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+                        prevDays.push(prevMonthDays - i);
+                      }
+                      return prevDays.map(day => (
+                        <button key={`prev-${day}`} className="py-2 text-gray-300 hover:bg-gray-50 rounded">
                           {day}
                         </button>
-                      );
-                    })}
+                      ));
+                    })()}
+                    {/* Current month days */}
+                    {(() => {
+                      const now = new Date();
+                      const today = now.getDate();
+                      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                      const currentMonth = now.getMonth();
+                      const currentYear = now.getFullYear();
+
+                      // Get event dates for current month
+                      const eventDates = events
+                        .filter(e => {
+                          const eventDate = new Date(e.starts_on_date || e.event_date || e.date);
+                          return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+                        })
+                        .map(e => new Date(e.starts_on_date || e.event_date || e.date).getDate());
+
+                      return [...Array(daysInMonth)].map((_, i) => {
+                        const day = i + 1;
+                        const isToday = day === today;
+                        const hasEvent = eventDates.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            className={`py-2 rounded transition-colors relative ${
+                              isToday
+                                ? 'bg-blue-600 text-white font-medium'
+                                : hasEvent
+                                  ? 'bg-green-100 text-green-800 font-medium'
+                                  : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            {day}
+                            {hasEvent && !isToday && (
+                              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"></span>
+                            )}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
+
+                  {/* Events List */}
+                  {events.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Upcoming Events</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {events.slice(0, 5).map((event, idx) => {
+                          // Use label_color to determine event type styling
+                          const labelColor = event.label_color || '#3B82F6';
+                          const isBlue = labelColor.includes('3B82F6') || labelColor.includes('2563EB');
+                          const isGreen = labelColor.includes('22C55E') || labelColor.includes('16A34A');
+                          const isRed = labelColor.includes('EF4444') || labelColor.includes('DC2626');
+                          const isYellow = labelColor.includes('F59E0B') || labelColor.includes('D97706');
+                          return (
+                            <div key={event.id || idx} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
+                              <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: `${labelColor}20` }}
+                              >
+                                <IoCalendar style={{ color: labelColor }} size={14} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{event.event_name || event.title}</p>
+                                <p className="text-xs text-gray-500">
+                                  {formatDate(event.starts_on_date || event.event_date || event.date)}
+                                  {(event.starts_on_time || event.event_time) && ` at ${event.starts_on_time || event.event_time}`}
+                                </p>
+                              </div>
+                              <Badge
+                                className="text-xs"
+                                style={{ backgroundColor: `${labelColor}20`, color: labelColor }}
+                              >
+                                {event.status || 'Pending'}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {events.length > 5 && (
+                        <p className="text-xs text-gray-500 mt-2 text-center">+{events.length - 5} more events</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {events.length === 0 && !loadingEvents && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                      <p className="text-sm text-gray-500">No events scheduled</p>
+                      <button
+                        onClick={() => setIsAddEventModalOpen(true)}
+                        className="text-sm text-blue-600 hover:text-blue-700 mt-1"
+                      >
+                        Add your first event
+                      </button>
+                    </div>
+                  )}
                 </Card>
 
               </div>
@@ -4502,11 +4686,7 @@ const ClientDetail = () => {
             </Button>
             <Button
               variant="primary"
-              onClick={() => {
-                alert('Event added successfully!')
-                setIsAddEventModalOpen(false)
-                setEventFormData({ title: '', date: new Date().toISOString().split('T')[0], time: '', description: '', type: 'meeting' })
-              }}
+              onClick={handleAddEvent}
               className="flex-1"
             >
               Add Event
