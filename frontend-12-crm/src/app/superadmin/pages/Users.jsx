@@ -495,7 +495,7 @@ const Users = () => {
               required
             >
               <option value="ADMIN">Admin</option>
-              <option value="SUPERADMIN">Super Admin</option>
+              {/* <option value="SUPERADMIN">Super Admin</option> */}
             </select>
           </div>
 

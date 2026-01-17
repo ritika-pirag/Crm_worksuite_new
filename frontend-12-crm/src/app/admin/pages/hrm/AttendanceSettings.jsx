@@ -236,11 +236,11 @@ const AttendanceSettings = () => {
                 <div className="space-y-5">
                     <Input label="Shift Name" placeholder="e.g. Morning Shift" value={shiftForm.shift_name} onChange={(e) => setShiftForm({ ...shiftForm, shift_name: e.target.value })} />
                     <Input label="Short Code" placeholder="e.g. MS" value={shiftForm.shift_short_code} onChange={(e) => setShiftForm({ ...shiftForm, shift_short_code: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input type="time" label="Start Time" value={shiftForm.start_time} onChange={(e) => setShiftForm({ ...shiftForm, start_time: e.target.value })} />
                         <Input type="time" label="End Time" value={shiftForm.end_time} onChange={(e) => setShiftForm({ ...shiftForm, end_time: e.target.value })} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input type="number" label="Late Mark (mins)" value={shiftForm.late_mark_duration} onChange={(e) => setShiftForm({ ...shiftForm, late_mark_duration: e.target.value })} />
                         <Input type="color" label="Shift Color" value={shiftForm.option_color} onChange={(e) => setShiftForm({ ...shiftForm, option_color: e.target.value })} className="h-[42px] p-1" />
                     </div>

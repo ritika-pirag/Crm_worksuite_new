@@ -10,6 +10,7 @@ import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
 import RightSideModal from '../../../components/ui/RightSideModal'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import {
   FormRow,
   FormSection,
@@ -2798,7 +2799,7 @@ const LeadDetail = () => {
             onChange={(e) => setContactFormData({ ...contactFormData, phone: e.target.value })}
             placeholder="Enter phone number"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-1">Contact Type</label>
               <select
@@ -2920,7 +2921,7 @@ const LeadDetail = () => {
               placeholder="Enter description"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Start Date *"
               type="date"
@@ -2943,7 +2944,7 @@ const LeadDetail = () => {
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="End Date *"
               type="date"
@@ -3004,208 +3005,16 @@ const LeadDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal (Tasks menu style) */}
-      <RightSideModal
+      {/* Add Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddTaskModalOpen}
         onClose={() => setIsAddTaskModalOpen(false)}
-        title="Add Task"
-        width="800px"
-      >
-        <div className="space-y-0 pb-4">
-          <FormSection title="Task Details">
-            <FormRow label="Title" required>
-              <FormInput
-                value={taskFormData.title || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
-                placeholder="Enter task title"
-                required
-              />
-            </FormRow>
-
-            <FormRow label="Description">
-              <RichTextEditor
-                value={taskFormData.description || ''}
-                onChange={(content) => setTaskFormData({ ...taskFormData, description: content })}
-                placeholder="Enter task description"
-              />
-            </FormRow>
-
-            <FormRow label="Points">
-              <FormInput
-                type="number"
-                value={taskFormData.points || '1'}
-                onChange={(e) => setTaskFormData({ ...taskFormData, points: e.target.value })}
-                placeholder="Task points"
-                min="1"
-              />
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Assignment & Status">
-            <FormRow label="Assign To" required>
-              <FormSelect
-                value={taskFormData.assign_to || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, assign_to: e.target.value })}
-                required
-              >
-                <option value="">-- Select Employee --</option>
-                {employees.map(emp => (
-                  <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
-                    {emp.name || emp.email}
-                  </option>
-                ))}
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Collaborators">
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
-                  {(taskFormData.collaborators || []).length > 0 ? (
-                    (taskFormData.collaborators || []).map((collabId) => {
-                      const collab = employees.find(e => parseInt(e.user_id || e.id) === parseInt(collabId))
-                      return collab ? (
-                        <span key={collabId} className="inline-flex items-center gap-1 px-3 py-1 bg-primary-accent/10 text-primary-accent rounded-full text-sm">
-                          {collab.name || collab.email}
-                          <button
-                            type="button"
-                            onClick={() => setTaskFormData({ ...taskFormData, collaborators: (taskFormData.collaborators || []).filter(v => parseInt(v) !== parseInt(collabId)) })}
-                            className="hover:text-red-600"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ) : null
-                    })
-                  ) : (
-                    <span className="text-gray-400 text-sm">No collaborators added</span>
-                  )}
-                </div>
-                <FormSelect
-                  onChange={(e) => {
-                    const empId = parseInt(e.target.value)
-                    if (empId && !(taskFormData.collaborators || []).map(c => parseInt(c)).includes(empId)) {
-                      setTaskFormData({ ...taskFormData, collaborators: [...(taskFormData.collaborators || []), empId] })
-                    }
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">+ Add Collaborator</option>
-                  {employees
-                    .filter(emp => {
-                      const empId = parseInt(emp.user_id || emp.id)
-                      return empId !== parseInt(taskFormData.assign_to) && !(taskFormData.collaborators || []).map(c => parseInt(c)).includes(empId)
-                    })
-                    .map(emp => (
-                      <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
-                        {emp.name || emp.email}
-                      </option>
-                    ))}
-                </FormSelect>
-              </div>
-            </FormRow>
-
-            <FormRow label="Status">
-              <FormSelect
-                value={taskFormData.status || 'Incomplete'}
-                onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value })}
-              >
-                <option value="Incomplete">To do</option>
-                <option value="Doing">In progress</option>
-                <option value="Done">Done</option>
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Priority">
-              <FormSelect
-                value={taskFormData.priority || 'Medium'}
-                onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
-              </FormSelect>
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Additional Info" last>
-            <FormRow label="Labels">
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
-                  {(taskFormData.labels || []).length > 0 ? (
-                    (taskFormData.labels || []).map((labelName, idx) => {
-                      const labelObj = getLabelByName(labelName)
-                      const style = getLabelChipStyle(labelObj?.color)
-                      return (
-                        <span key={`${labelName}-${idx}`} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm" style={style}>
-                          {labelName}
-                          <button
-                            type="button"
-                            onClick={() => setTaskFormData({ ...taskFormData, labels: (taskFormData.labels || []).filter((_, i) => i !== idx) })}
-                            className="hover:text-red-600"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      )
-                    })
-                  ) : (
-                    <span className="text-gray-400 text-sm">No labels added</span>
-                  )}
-                </div>
-                <FormSelect
-                  onChange={(e) => {
-                    if (e.target.value && !(taskFormData.labels || []).includes(e.target.value)) {
-                      setTaskFormData({ ...taskFormData, labels: [...(taskFormData.labels || []), e.target.value] })
-                    }
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">+ Add Label</option>
-                  {availableLabels
-                    .filter(l => !(taskFormData.labels || []).includes(l.name))
-                    .map(l => (
-                      <option key={l.name} value={l.name}>{l.name}</option>
-                    ))}
-                </FormSelect>
-              </div>
-            </FormRow>
-
-            <FormRow label="Start Date">
-              <FormInput
-                type="date"
-                value={taskFormData.start_date || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, start_date: e.target.value })}
-              />
-            </FormRow>
-
-            <FormRow label="Deadline">
-              <FormInput
-                type="date"
-                value={taskFormData.deadline || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, deadline: e.target.value })}
-              />
-            </FormRow>
-
-            <FormRow label="Attachment" last>
-              <input
-                type="file"
-                onChange={(e) => setTaskFormData({ ...taskFormData, uploaded_file: e.target.files?.[0] || null })}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm"
-              />
-            </FormRow>
-          </FormSection>
-
-          <FormActions>
-            <Button variant="outline" onClick={() => setIsAddTaskModalOpen(false)} className="px-6">
-              Close
-            </Button>
-            <Button variant="primary" onClick={handleSaveTask} className="px-6">
-              Save Task
-            </Button>
-          </FormActions>
-        </div>
-      </RightSideModal>
+        onSave={() => fetchTasks()}
+        relatedToType="lead"
+        relatedToId={lead?.id}
+        companyId={companyId}
+        labels={availableLabels}
+      />
 
       {/* Add Note Modal (screenshot-like) */}
       <Modal
@@ -3523,7 +3332,7 @@ const LeadDetail = () => {
             onChange={(e) => setEstimateFormData({ ...estimateFormData, estimate_number: e.target.value })}
             placeholder="Auto-generated if empty"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Estimate Date"
               type="date"
@@ -3537,7 +3346,7 @@ const LeadDetail = () => {
               onChange={(e) => setEstimateFormData({ ...estimateFormData, valid_till: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">Currency</label>
               <select
@@ -3570,7 +3379,7 @@ const LeadDetail = () => {
             onChange={(e) => setEstimateFormData({ ...estimateFormData, amount: e.target.value })}
             placeholder="Enter total amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -3675,7 +3484,7 @@ const LeadDetail = () => {
             onChange={(e) => setProposalFormData({ ...proposalFormData, title: e.target.value })}
             placeholder="Enter proposal title"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Valid Till"
               type="date"
@@ -3703,7 +3512,7 @@ const LeadDetail = () => {
             onChange={(e) => setProposalFormData({ ...proposalFormData, amount: e.target.value })}
             placeholder="Enter total amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -3807,7 +3616,7 @@ const LeadDetail = () => {
             onChange={(e) => setContractFormData({ ...contractFormData, title: e.target.value })}
             placeholder="Enter contract title"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Contract Date"
               type="date"
@@ -3828,7 +3637,7 @@ const LeadDetail = () => {
             onChange={(e) => setContractFormData({ ...contractFormData, amount: e.target.value })}
             placeholder="Enter contract amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">TAX</label>
               <select
@@ -3914,7 +3723,7 @@ const LeadDetail = () => {
       >
         {selectedContract && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-secondary-text">Contract Number</p>
                 <p className="text-primary-text font-medium">{selectedContract.contract_number || `#${selectedContract.id}`}</p>
@@ -4041,7 +3850,7 @@ const LeadDetail = () => {
                 onChange={(e) => setConvertFormData({ ...convertFormData, address: e.target.value })}
                 placeholder="Enter address"
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="City"
                   value={convertFormData.city}
@@ -4055,7 +3864,7 @@ const LeadDetail = () => {
                   placeholder="Enter state"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Zip Code"
                   value={convertFormData.zip}
@@ -4109,7 +3918,7 @@ const LeadDetail = () => {
           <div className="border-b border-gray-200 pb-4">
             <h3 className="text-lg font-semibold text-primary-text mb-3">Billing Points</h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="VAT Number"
                   value={convertFormData.vatNumber}
@@ -4246,7 +4055,7 @@ const LeadDetail = () => {
               {/* Lead/Client Info */}
               <div className="section mb-6">
                 <h3 className="section-title text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Proposal For</h3>
-                <div className="info-grid grid grid-cols-2 gap-4">
+                <div className="info-grid grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="info-item bg-gray-50 p-4 rounded-lg">
                     <p className="info-label text-xs text-gray-500">Lead Name</p>
                     <p className="info-value text-base font-semibold text-gray-800">{lead?.personName || 'N/A'}</p>
@@ -4391,7 +4200,7 @@ const LeadDetail = () => {
             onChange={(e) => setProposalFormData({ ...proposalFormData, title: e.target.value })}
             placeholder="Enter proposal title"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Valid Till"
               type="date"
@@ -4422,7 +4231,7 @@ const LeadDetail = () => {
               placeholder="Enter proposal description..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Amount"
               type="number"

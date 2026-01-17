@@ -11,6 +11,7 @@ import RightSideModal from '../../../components/ui/RightSideModal'
 import UniqueIdBadge, { ID_PREFIXES } from '../../../components/ui/UniqueIdBadge'
 import { FormCheckbox, FormRow, FormSection, FormInput, FormSelect, FormActions } from '../../../components/ui/FormRow'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import {
   IoArrowBack,
   IoPerson,
@@ -4445,187 +4446,16 @@ const ClientDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal - RightSideModal matching main Tasks module */}
-      <RightSideModal
+      {/* Add Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddTaskModalOpen}
-        onClose={() => {
-          setIsAddTaskModalOpen(false)
-          setTaskFormData({
-            title: '',
-            description: '',
-            project_id: '',
-            assign_to: '',
-            collaborators: [],
-            status: 'Incomplete',
-            priority: 'Medium',
-            labels: [],
-            start_date: '',
-            deadline: ''
-          })
-        }}
-        title="Add Task"
-        width="800px"
-      >
-        <div className="space-y-0 pb-4">
-          <FormSection title="Task Details">
-            <FormRow label="Title" required>
-              <FormInput
-                value={taskFormData.title || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
-                placeholder="Enter task title"
-                required
-              />
-            </FormRow>
-
-            <FormRow label="Description">
-              <RichTextEditor
-                value={taskFormData.description || ''}
-                onChange={(content) => setTaskFormData({ ...taskFormData, description: content })}
-                placeholder="Enter task description"
-              />
-            </FormRow>
-
-            <FormRow label="Project">
-              <FormSelect
-                value={taskFormData.project_id || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, project_id: e.target.value })}
-              >
-                <option value="">-- Select Project --</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.project_name || p.name || p.title || `Project #${p.id}`}
-                  </option>
-                ))}
-              </FormSelect>
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Assignment & Status">
-            <FormRow label="Assign To">
-              <FormSelect
-                value={taskFormData.assign_to || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, assign_to: e.target.value })}
-              >
-                <option value="">-- Select Employee --</option>
-                {filteredEmployees.map(emp => (
-                  <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
-                    {emp.name || emp.email}
-                  </option>
-                ))}
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Status">
-              <FormSelect
-                value={taskFormData.status || 'Incomplete'}
-                onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value })}
-              >
-                <option value="Incomplete">To do</option>
-                <option value="Doing">In progress</option>
-                <option value="Done">Done</option>
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Priority">
-              <FormSelect
-                value={taskFormData.priority || 'Medium'}
-                onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
-              </FormSelect>
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Additional Info" last>
-            <FormRow label="Labels">
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
-                  {taskFormData.labels && taskFormData.labels.length > 0 ? (
-                    taskFormData.labels.map((label, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                        {label}
-                        <button
-                          type="button"
-                          onClick={() => setTaskFormData({ ...taskFormData, labels: taskFormData.labels.filter((_, i) => i !== idx) })}
-                          className="hover:text-red-600"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400 text-sm">No labels added</span>
-                  )}
-                </div>
-                <FormSelect
-                  onChange={(e) => {
-                    if (e.target.value && !(taskFormData.labels || []).includes(e.target.value)) {
-                      setTaskFormData({ ...taskFormData, labels: [...(taskFormData.labels || []), e.target.value] })
-                    }
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">+ Add Label</option>
-                  {taskLabels.filter(l => !(taskFormData.labels || []).includes(l?.name)).map(l => (
-                    <option key={l?.name} value={l?.name}>{l?.name}</option>
-                  ))}
-                </FormSelect>
-              </div>
-            </FormRow>
-
-            <FormRow label="Start Date">
-              <FormInput
-                type="date"
-                value={taskFormData.start_date || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, start_date: e.target.value })}
-              />
-            </FormRow>
-
-            <FormRow label="Deadline" last>
-              <FormInput
-                type="date"
-                value={taskFormData.deadline || ''}
-                onChange={(e) => setTaskFormData({ ...taskFormData, deadline: e.target.value })}
-              />
-            </FormRow>
-          </FormSection>
-
-          <FormActions>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddTaskModalOpen(false)
-                setTaskFormData({
-                  title: '',
-                  description: '',
-                  project_id: '',
-                  assign_to: '',
-                  collaborators: [],
-                  status: 'Incomplete',
-                  priority: 'Medium',
-                  labels: [],
-                  start_date: '',
-                  deadline: ''
-                })
-              }}
-              className="px-6"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleAddTask}
-              className="px-6 flex items-center gap-2"
-            >
-              <IoCheckmarkCircle size={18} />
-              Add Task
-            </Button>
-          </FormActions>
-        </div>
-      </RightSideModal>
+        onClose={() => setIsAddTaskModalOpen(false)}
+        onSave={() => fetchTasks()}
+        relatedToType="client"
+        relatedToId={client?.id}
+        companyId={parseInt(localStorage.getItem('companyId') || 1, 10)}
+        labels={taskLabels}
+      />
 
       {/* Add Event Modal */}
       <Modal
@@ -4641,7 +4471,7 @@ const ClientDetail = () => {
             placeholder="Enter event title"
             required
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Date"
               type="date"
@@ -4796,7 +4626,7 @@ const ClientDetail = () => {
             onChange={(e) => setEstimateFormData({ ...estimateFormData, estimate_number: e.target.value })}
             placeholder="Auto-generated if empty"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Estimate Date"
               type="date"
@@ -4810,7 +4640,7 @@ const ClientDetail = () => {
               onChange={(e) => setEstimateFormData({ ...estimateFormData, valid_till: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">Currency</label>
               <select
@@ -4843,7 +4673,7 @@ const ClientDetail = () => {
             onChange={(e) => setEstimateFormData({ ...estimateFormData, amount: e.target.value })}
             placeholder="Enter total amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -4948,7 +4778,7 @@ const ClientDetail = () => {
             onChange={(e) => setProposalFormData({ ...proposalFormData, title: e.target.value })}
             placeholder="Enter proposal title"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Valid Till"
               type="date"
@@ -4976,7 +4806,7 @@ const ClientDetail = () => {
             onChange={(e) => setProposalFormData({ ...proposalFormData, amount: e.target.value })}
             placeholder="Enter total amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -5080,7 +4910,7 @@ const ClientDetail = () => {
             onChange={(e) => setContractFormData({ ...contractFormData, title: e.target.value })}
             placeholder="Enter contract title"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Contract Date"
               type="date"
@@ -5101,7 +4931,7 @@ const ClientDetail = () => {
             onChange={(e) => setContractFormData({ ...contractFormData, amount: e.target.value })}
             placeholder="Enter contract amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">TAX</label>
               <select
@@ -5566,7 +5396,7 @@ const ClientDetail = () => {
         title="Add Invoice"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Invoice Date"
               type="date"
@@ -5600,7 +5430,7 @@ const ClientDetail = () => {
             onChange={(e) => setInvoiceFormData({ ...invoiceFormData, amount: e.target.value })}
             placeholder="Enter total amount"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -5904,7 +5734,7 @@ const ClientDetail = () => {
       >
         {selectedPayment && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Amount</label>
                 <p className="text-primary-text font-semibold text-lg">${parseFloat(selectedPayment.amount || 0).toFixed(2)}</p>
@@ -5914,7 +5744,7 @@ const ClientDetail = () => {
                 <p className="text-primary-text">{selectedPayment.payment_method || '-'}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{selectedPayment.paid_on || selectedPayment.payment_date ? new Date(selectedPayment.paid_on || selectedPayment.payment_date).toLocaleDateString() : '-'}</p>
@@ -5944,7 +5774,7 @@ const ClientDetail = () => {
       >
         {selectedOrder && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Title</label>
                 <p className="text-primary-text font-medium">{selectedOrder.title || '-'}</p>
@@ -5978,7 +5808,7 @@ const ClientDetail = () => {
       >
         {selectedSubscription && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Plan</label>
                 <p className="text-primary-text font-medium">{selectedSubscription.plan || selectedSubscription.title || '-'}</p>
@@ -5988,7 +5818,7 @@ const ClientDetail = () => {
                 <p className="text-primary-text font-semibold">${parseFloat(selectedSubscription.amount || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Billing Cycle</label>
                 <p className="text-primary-text">{selectedSubscription.billing_cycle || '-'}</p>
@@ -6018,7 +5848,7 @@ const ClientDetail = () => {
       >
         {selectedContract && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Title</label>
                 <p className="text-primary-text font-medium">{selectedContract.title || '-'}</p>
@@ -6028,7 +5858,7 @@ const ClientDetail = () => {
                 <p className="text-primary-text font-semibold">${parseFloat(selectedContract.amount || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Contract Date</label>
                 <p className="text-primary-text">{selectedContract.contract_date ? new Date(selectedContract.contract_date).toLocaleDateString() : '-'}</p>
@@ -6062,7 +5892,7 @@ const ClientDetail = () => {
               <label className="block text-sm font-medium text-secondary-text mb-1">Title</label>
               <p className="text-primary-text font-medium">{selectedTask.title || '-'}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Status</label>
                 <Badge className={`text-xs ${selectedTask.status === 'Done' ? 'bg-green-100 text-green-800' : selectedTask.status === 'Doing' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{selectedTask.status || 'Incomplete'}</Badge>
@@ -6096,7 +5926,7 @@ const ClientDetail = () => {
       >
         {selectedExpense && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Title</label>
                 <p className="text-primary-text font-medium">{selectedExpense.title || selectedExpense.expense_name || '-'}</p>
@@ -6106,7 +5936,7 @@ const ClientDetail = () => {
                 <p className="text-primary-text font-semibold text-lg">${parseFloat(selectedExpense.total || selectedExpense.amount || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{selectedExpense.expense_date ? new Date(selectedExpense.expense_date).toLocaleDateString() : '-'}</p>

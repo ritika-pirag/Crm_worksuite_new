@@ -6,6 +6,7 @@ import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import { 
   IoArrowBack,
   IoBriefcase,
@@ -904,60 +905,17 @@ const OrderDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal */}
-      <Modal
+      {/* Add Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddTaskModalOpen}
         onClose={() => setIsAddTaskModalOpen(false)}
-        title="Add Task"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-1">Title *</label>
-            <Input
-              value={taskFormData.title}
-              onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
-              placeholder="Task title"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-1">Description</label>
-            <textarea
-              value={taskFormData.description}
-              onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              rows={3}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-1">Due Date</label>
-            <Input
-              type="date"
-              value={taskFormData.due_date}
-              onChange={(e) => setTaskFormData({ ...taskFormData, due_date: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-1">Priority</label>
-            <select
-              value={taskFormData.priority}
-              onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
-          </div>
-          <div className="flex gap-3 pt-4 border-t">
-            <Button onClick={handleSaveTask} className="flex-1">
-              Save Task
-            </Button>
-            <Button variant="outline" onClick={() => setIsAddTaskModalOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onSave={async () => {
+          await fetchTasks()
+        }}
+        relatedToType="client"
+        relatedToId={order?.client_id}
+        companyId={companyId}
+      />
 
       {/* Create Invoice Modal */}
       <Modal

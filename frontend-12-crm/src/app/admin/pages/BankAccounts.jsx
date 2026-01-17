@@ -432,7 +432,7 @@ const BankAccounts = () => {
         <div className="space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
           <div>
             <h3 className="text-lg font-semibold text-primary-text mb-4">Account Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-primary-text mb-2">
                   Account Name
@@ -551,7 +551,7 @@ const BankAccounts = () => {
 
           <div>
             <h3 className="text-lg font-semibold text-primary-text mb-4">Bank Address</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-primary-text mb-2">
                   Address
@@ -607,7 +607,7 @@ const BankAccounts = () => {
 
           <div>
             <h3 className="text-lg font-semibold text-primary-text mb-4">Contact Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-primary-text mb-2">
                   Contact Person

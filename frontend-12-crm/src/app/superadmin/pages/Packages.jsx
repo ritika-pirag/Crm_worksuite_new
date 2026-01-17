@@ -86,11 +86,26 @@ const Packages = () => {
 
   const handleEdit = (pkg) => {
     setSelectedPackage(pkg)
+    
+    // Parse features if it's a string
+    let parsedFeatures = [];
+    if (pkg.features) {
+      if (typeof pkg.features === 'string') {
+        try {
+          parsedFeatures = JSON.parse(pkg.features);
+        } catch (e) {
+          parsedFeatures = pkg.features.split(',').map(f => f.trim()).filter(f => f);
+        }
+      } else if (Array.isArray(pkg.features)) {
+        parsedFeatures = pkg.features;
+      }
+    }
+    
     setFormData({
       package_name: pkg.package_name || '',
       price: pkg.price || '',
       billing_cycle: pkg.billing_cycle || 'Monthly',
-      features: Array.isArray(pkg.features) ? pkg.features : [],
+      features: parsedFeatures,
       status: pkg.status || 'Active',
     })
     setIsEditModalOpen(true)
@@ -135,6 +150,43 @@ const Packages = () => {
       key: 'billing_cycle',
       label: 'Billing Cycle',
       render: (value) => <Badge variant="info">{value}</Badge>,
+    },
+    {
+      key: 'features',
+      label: 'Features',
+      render: (value, row) => {
+        // Handle features as JSON string or array
+        let featuresArray = []
+        if (typeof value === 'string') {
+          try {
+            featuresArray = JSON.parse(value)
+          } catch {
+            featuresArray = value ? value.split(',').map(f => f.trim()) : []
+          }
+        } else if (Array.isArray(value)) {
+          featuresArray = value
+        }
+        
+        if (featuresArray.length === 0) {
+          return <span className="text-secondary-text text-sm">No features</span>
+        }
+        
+        return (
+          <div className="flex flex-wrap gap-1 max-w-xs">
+            {featuresArray.slice(0, 3).map((feature, idx) => (
+              <Badge key={idx} variant="default" className="text-xs">
+                <IoCheckmarkCircle size={12} className="mr-1 text-green-500" />
+                {feature}
+              </Badge>
+            ))}
+            {featuresArray.length > 3 && (
+              <Badge variant="default" className="text-xs">
+                +{featuresArray.length - 3} more
+              </Badge>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: 'assigned_companies',
@@ -225,7 +277,7 @@ const Packages = () => {
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Price"
               type="number"

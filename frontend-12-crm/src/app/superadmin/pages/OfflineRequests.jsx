@@ -436,7 +436,7 @@ const OfflineRequests = () => {
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Contact Email"
               type="email"
@@ -452,7 +452,7 @@ const OfflineRequests = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Amount"
               type="number"
@@ -560,7 +560,7 @@ const OfflineRequests = () => {
       >
         {selectedRequest && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-secondary-text">Company</p>
                 <p className="font-medium">{selectedRequest.company_name_from_db || selectedRequest.company_name || 'N/A'}</p>

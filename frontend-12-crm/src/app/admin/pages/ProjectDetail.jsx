@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { projectsAPI, tasksAPI, documentsAPI, timeTrackingAPI, expensesAPI, employeesAPI, notesAPI, notificationsAPI, invoicesAPI, paymentsAPI, contractsAPI, clientsAPI, usersAPI } from '../../../api'
+import { projectsAPI, tasksAPI, documentsAPI, timeTrackingAPI, expensesAPI, employeesAPI, notesAPI, notificationsAPI, invoicesAPI, paymentsAPI, contractsAPI, clientsAPI, usersAPI, eventsAPI } from '../../../api'
+import EventsSection from '../../../components/shared/EventsSection'
 import Timer from '../../../components/ui/Timer'
 import Card from '../../../components/ui/Card'
 import DataTable from '../../../components/ui/DataTable'
@@ -19,6 +20,7 @@ import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
 import RightSideModal from '../../../components/ui/RightSideModal'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import {
   IoArrowBack,
   IoPerson,
@@ -2160,7 +2162,7 @@ const ProjectDetail = () => {
             scrollbarColor: '#cbd5e1 #f1f5f9',
             WebkitOverflowScrolling: 'touch'
           }}>
-            {['Overview', 'Tasks List', 'Tasks Kanban', 'Notes', 'Files', 'Comments', 'Timesheets', 'Invoices', 'Payments', 'Expenses', 'Contracts'].map((tab) => (
+            {['Overview', 'Tasks List', 'Tasks Kanban', 'Notes', 'Files', 'Comments', 'Timesheets', 'Invoices', 'Payments', 'Expenses', 'Contracts', 'Events'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab.toLowerCase())}
@@ -2293,7 +2295,7 @@ const ProjectDetail = () => {
                       </div>
 
                       {/* Legend */}
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-sm bg-orange-500"></div>
                           <span className="text-gray-600">To do</span>
@@ -2611,114 +2613,20 @@ const ProjectDetail = () => {
             </div>
           )}
 
-          {/* Add/Edit Task Modal */}
-          {(isAddTaskModalOpen || isEditTaskModalOpen) && (
-            <Modal
-              isOpen={true}
-              onClose={() => { setIsAddTaskModalOpen(false); setIsEditTaskModalOpen(false); }}
-              title={isEditTaskModalOpen ? 'Edit Task' : 'Add New Task'}
-              maxWidth="4xl"
-            >
-              <div className="p-4 sm:p-6 space-y-6">
-                {/* Project Fixed Field */}
-                <FormRow label="Project">
-                  <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
-                    {project?.name || 'Current Project'}
-                  </div>
-                </FormRow>
-
-                <FormSection title="Task Details">
-                  <FormRow label="Title" required>
-                    <FormInput
-                      value={taskFormData.title}
-                      onChange={e => setTaskFormData({ ...taskFormData, title: e.target.value })}
-                      placeholder="Task Title"
-                    />
-                  </FormRow>
-                  <FormRow label="Description">
-                    <RichTextEditor
-                      value={taskFormData.description || ''}
-                      onChange={val => setTaskFormData({ ...taskFormData, description: val })}
-                    />
-                  </FormRow>
-                </FormSection>
-
-                <FormSection title="Assignment & Schedule">
-                  <FormRow label="Assign To" required>
-                    <FormSelect
-                      value={taskFormData.assign_to}
-                      onChange={e => setTaskFormData({ ...taskFormData, assign_to: e.target.value })}
-                    >
-                      <option value="">-- Select Employee --</option>
-                      {filteredEmployees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.email})</option>
-                      ))}
-                    </FormSelect>
-                  </FormRow>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormRow label="Start Date">
-                      <FormInput type="date" value={taskFormData.start_date} onChange={e => setTaskFormData({ ...taskFormData, start_date: e.target.value })} />
-                    </FormRow>
-                    <FormRow label="Due Date">
-                      <FormInput type="date" value={taskFormData.deadline} onChange={e => setTaskFormData({ ...taskFormData, deadline: e.target.value })} />
-                    </FormRow>
-                  </div>
-                </FormSection>
-
-                <FormSection title="Recurrence Settings">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FormCheckbox
-                      label="Repeat Task?"
-                      checked={taskFormData.is_recurring}
-                      onChange={e => setTaskFormData({ ...taskFormData, is_recurring: e.target.checked })}
-                    />
-                  </div>
-                  {taskFormData.is_recurring && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <FormRow label="Frequency">
-                        <FormSelect
-                          value={taskFormData.recurring_frequency}
-                          onChange={e => setTaskFormData({ ...taskFormData, recurring_frequency: e.target.value })}
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="bi-weekly">Bi-Weekly</option>
-                          <option value="monthly">Monthly</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="yearly">Yearly</option>
-                        </FormSelect>
-                      </FormRow>
-                    </div>
-                  )}
-                </FormSection>
-
-                <FormSection title="Status & Priority">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormRow label="Status">
-                      <FormSelect value={taskFormData.status} onChange={e => setTaskFormData({ ...taskFormData, status: e.target.value })}>
-                        <option value="Incomplete">To Do</option>
-                        <option value="Doing">In Progress</option>
-                        <option value="Done">Done</option>
-                      </FormSelect>
-                    </FormRow>
-                    <FormRow label="Priority">
-                      <FormSelect value={taskFormData.priority} onChange={e => setTaskFormData({ ...taskFormData, priority: e.target.value })}>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Urgent">Urgent</option>
-                      </FormSelect>
-                    </FormRow>
-                  </div>
-                </FormSection>
-
-                <FormActions>
-                  <Button variant="outline" onClick={() => { setIsAddTaskModalOpen(false); setIsEditTaskModalOpen(false); }}>Cancel</Button>
-                  <Button onClick={handleSaveTask}>{isEditTaskModalOpen ? 'Update Task' : 'Create Task'}</Button>
-                </FormActions>
-              </div>
-            </Modal>
-          )}
+          {/* Add/Edit Task Modal - Using unified TaskFormModal */}
+          <TaskFormModal
+            isOpen={isAddTaskModalOpen || isEditTaskModalOpen}
+            onClose={() => {
+              setIsAddTaskModalOpen(false)
+              setIsEditTaskModalOpen(false)
+              setSelectedTask(null)
+            }}
+            task={isEditTaskModalOpen ? selectedTask : null}
+            onSave={() => fetchTasks()}
+            relatedToType="project"
+            relatedToId={project?.id}
+            companyId={project?.company_id}
+          />
 
 
 
@@ -3696,6 +3604,17 @@ const ProjectDetail = () => {
               />
             </Card>
           )}
+
+          {activeTab === 'events' && (
+            <EventsSection
+              relatedToType="project"
+              relatedToId={parseInt(id)}
+              canCreate={true}
+              canEdit={true}
+              canDelete={true}
+              title="Project Events"
+            />
+          )}
         </div>
       </div>
 
@@ -3920,7 +3839,7 @@ const ProjectDetail = () => {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-secondary-text uppercase">Category</p>
                 <p className="text-sm font-medium">{viewingNote.category || 'General'}</p>
@@ -4135,7 +4054,7 @@ const ProjectDetail = () => {
                 ))}
               </FormSelect>
             </FormRow>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormRow label="Start Date/Time">
                 <FormInput
                   type="datetime-local"
@@ -4541,7 +4460,7 @@ const ProjectDetail = () => {
               placeholder="Enter reminder description"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Reminder Date"
               type="date"
@@ -4674,7 +4593,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text whitespace-pre-wrap">{selectedTask.description}</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Status</label>
                 <Badge variant={
@@ -4743,7 +4662,7 @@ const ProjectDetail = () => {
       >
         {selectedTimesheet && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">User</label>
                 <p className="text-primary-text font-medium">{selectedTimesheet.user_name || 'Unknown'}</p>
@@ -4753,7 +4672,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text font-medium">{parseFloat(selectedTimesheet.hours || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{selectedTimesheet.date ? new Date(selectedTimesheet.date).toLocaleDateString() : '-'}</p>
@@ -4794,7 +4713,7 @@ const ProjectDetail = () => {
       >
         {selectedExpense && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Expense #</label>
                 <p className="text-primary-text font-medium">{selectedExpense.expense_number || `EXP#${selectedExpense.id}`}</p>
@@ -4809,7 +4728,7 @@ const ProjectDetail = () => {
                 </Badge>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Amount</label>
                 <p className="text-primary-text font-semibold text-lg">${parseFloat(selectedExpense.total || selectedExpense.amount || 0).toFixed(2)}</p>
@@ -4819,7 +4738,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text">{selectedExpense.category || '-'}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{selectedExpense.expense_date ? new Date(selectedExpense.expense_date).toLocaleDateString() : selectedExpense.created_at ? new Date(selectedExpense.created_at).toLocaleDateString() : '-'}</p>
@@ -4928,7 +4847,7 @@ const ProjectDetail = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</label>
                 <div className="mt-1 flex items-center gap-2 text-gray-900 font-medium">
@@ -5024,7 +4943,7 @@ const ProjectDetail = () => {
       >
         {selectedInvoice && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Invoice #</label>
                 <p className="text-primary-text font-medium">{selectedInvoice.invoice_number || `INV-${selectedInvoice.id}`}</p>
@@ -5039,7 +4958,7 @@ const ProjectDetail = () => {
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Client</label>
                 <p className="text-primary-text">{selectedInvoice.client_name || '-'}</p>
@@ -5049,7 +4968,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text font-semibold text-lg">${parseFloat(selectedInvoice.total || selectedInvoice.amount || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Issue Date</label>
                 <p className="text-primary-text">{selectedInvoice.issue_date ? new Date(selectedInvoice.issue_date).toLocaleDateString() : '-'}</p>
@@ -5183,7 +5102,7 @@ const ProjectDetail = () => {
       >
         {selectedPayment && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Payment #</label>
                 <p className="text-primary-text font-medium">PAY-{selectedPayment.id}</p>
@@ -5198,7 +5117,7 @@ const ProjectDetail = () => {
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Invoice</label>
                 <p className="text-primary-text">{selectedPayment.invoice_number || (selectedPayment.invoice_id ? `INV-${selectedPayment.invoice_id}` : '-')}</p>
@@ -5208,7 +5127,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text font-semibold text-lg">${parseFloat(selectedPayment.amount || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Payment Date</label>
                 <p className="text-primary-text">{selectedPayment.payment_date ? new Date(selectedPayment.payment_date).toLocaleDateString() : '-'}</p>
@@ -5301,7 +5220,7 @@ const ProjectDetail = () => {
       >
         {selectedContract && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Contract #</label>
                 <p className="text-primary-text font-medium">#{selectedContract.id}</p>
@@ -5315,7 +5234,7 @@ const ProjectDetail = () => {
               <label className="block text-sm font-medium text-secondary-text mb-1">Subject</label>
               <p className="text-primary-text font-medium">{selectedContract.subject || '-'}</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Client</label>
                 <p className="text-primary-text">{selectedContract.client_name || '-'}</p>
@@ -5325,7 +5244,7 @@ const ProjectDetail = () => {
                 <p className="text-primary-text font-semibold text-lg">{selectedContract.contract_value ? `$${parseFloat(selectedContract.contract_value).toFixed(2)}` : '-'}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Start Date</label>
                 <p className="text-primary-text">{selectedContract.start_date ? new Date(selectedContract.start_date).toLocaleDateString() : '-'}</p>

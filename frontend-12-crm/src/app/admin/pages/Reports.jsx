@@ -226,10 +226,10 @@ const Reports = () => {
           <DataTable
             columns={[
               { key: 'category', header: 'Category' },
-              { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) },
-              { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
-              { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row.second_tax) },
-              { key: 'total', header: 'Total', render: (row) => formatCurrency(row.total) }
+              { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row?.amount) },
+              { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row?.tax) },
+              { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row?.second_tax) },
+              { key: 'total', header: 'Total', render: (row) => formatCurrency(row?.total) }
             ]}
             data={filterData(expensesData.data || [])}
             searchable={false}
@@ -261,13 +261,13 @@ const Reports = () => {
           columns={[
             { key: 'client_name', header: 'Client Name' },
             { key: 'count', header: 'Count' },
-            { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row.invoice_total) },
-            { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row.discount) },
-            { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
-            { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row.second_tax) },
-            { key: 'tds', header: 'TDS', render: (row) => formatCurrency(row.tds) },
-            { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row.payment_received) },
-            { key: 'due', header: 'Due', render: (row) => formatCurrency(row.due) }
+            { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row?.invoice_total) },
+            { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row?.discount) },
+            { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row?.tax) },
+            { key: 'second_tax', header: 'Second TAX', render: (row) => formatCurrency(row?.second_tax) },
+            { key: 'tds', header: 'TDS', render: (row) => formatCurrency(row?.tds) },
+            { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row?.payment_received) },
+            { key: 'due', header: 'Due', render: (row) => formatCurrency(row?.due) }
           ]}
           data={filterData(invoicesSummaryData.data || [])}
           searchable={false}
@@ -290,18 +290,18 @@ const Reports = () => {
           { key: 'vat_gst', header: 'VAT/GST' },
           { key: 'bill_date', header: 'Bill Date' },
           { key: 'due_date', header: 'Due Date' },
-          { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row.invoice_total) },
-          { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row.discount) },
-          { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row.tax) },
-          { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row.payment_received) },
-          { key: 'due', header: 'Due', render: (row) => formatCurrency(row.due) },
+          { key: 'invoice_total', header: 'Invoice Total', render: (row) => formatCurrency(row?.invoice_total) },
+          { key: 'discount', header: 'Discount', render: (row) => formatCurrency(row?.discount) },
+          { key: 'tax', header: 'TAX', render: (row) => formatCurrency(row?.tax) },
+          { key: 'payment_received', header: 'Payment Received', render: (row) => formatCurrency(row?.payment_received) },
+          { key: 'due', header: 'Due', render: (row) => formatCurrency(row?.due) },
           {
             key: 'status', header: 'Status', render: (row) => (
-              <span className={`px-2 py-1 rounded text-xs font-medium ${row.status === 'Paid' ? 'bg-green-100 text-green-700' :
-                row.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-700' :
-                  row.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+              <span className={`px-2 py-1 rounded text-xs font-medium ${row?.status === 'Paid' ? 'bg-green-100 text-green-700' :
+                row?.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-700' :
+                  row?.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
                 }`}>
-                {row.status}
+                {row?.status || '-'}
               </span>
             )
           }
@@ -375,11 +375,11 @@ const Reports = () => {
           columns={paymentsView === 'monthly' ? [
             { key: 'period', header: 'Month' },
             { key: 'count', header: 'Count' },
-            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) }
+            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row?.amount) }
           ] : [
             { key: 'client_name', header: 'Client' },
             { key: 'count', header: 'Count' },
-            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) }
+            { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row?.amount) }
           ]}
           data={filterData(paymentsSummaryData.data || [])}
           searchable={false}
@@ -433,16 +433,16 @@ const Reports = () => {
               { key: 'task', header: 'Task' },
               { key: 'start_time', header: 'Start Time' },
               { key: 'end_time', header: 'End Time' },
-              { key: 'total', header: 'Total', render: (row) => `${row.total || 0}h` },
+              { key: 'total', header: 'Total', render: (row) => `${row?.total || 0}h` },
               { key: 'note', header: 'Note' }
             ] : timesheetsView === 'summary' ? [
               { key: 'member', header: 'Member' },
               { key: 'entries', header: 'Entries' },
-              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row.total_hours || 0}h` }
+              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row?.total_hours || 0}h` }
             ] : [
               { key: 'date', header: 'Date' },
               { key: 'member', header: 'Member' },
-              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row.total_hours || 0}h` },
+              { key: 'total_hours', header: 'Total Hours', render: (row) => `${row?.total_hours || 0}h` },
               { key: 'entries', header: 'Entries' }
             ]}
             data={filterData(timesheetsData.data || [])}
@@ -480,13 +480,13 @@ const Reports = () => {
             { key: 'hold_projects', header: 'Hold Projects' },
             { key: 'open_tasks', header: 'Open Tasks' },
             { key: 'completed_tasks', header: 'Completed Tasks' },
-            { key: 'total_time_logged', header: 'Total Time Logged', render: (row) => `${row.total_time_logged || 0}h` }
+            { key: 'total_time_logged', header: 'Total Time Logged', render: (row) => `${row?.total_time_logged || 0}h` }
           ] : [
             { key: 'client_name', header: 'Client' },
             { key: 'open_projects', header: 'Open Projects' },
             { key: 'completed_projects', header: 'Completed Projects' },
             { key: 'hold_projects', header: 'Hold Projects' },
-            { key: 'total_budget', header: 'Total Budget', render: (row) => formatCurrency(row.total_budget) }
+            { key: 'total_budget', header: 'Total Budget', render: (row) => formatCurrency(row?.total_budget) }
           ]}
           data={filterData(projectsReportData.data || [])}
           searchable={false}

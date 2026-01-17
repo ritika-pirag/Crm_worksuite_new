@@ -9,7 +9,7 @@ import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
 import UniqueIdBadge, { ID_PREFIXES } from '../../../components/ui/UniqueIdBadge'
-import { projectsAPI, clientsAPI, usersAPI, employeesAPI, departmentsAPI } from '../../../api'
+import { projectsAPI, clientsAPI, usersAPI, employeesAPI, departmentsAPI, projectTemplatesAPI } from '../../../api'
 import { useAuth } from '../../../context/AuthContext'
 import {
   IoEye,
@@ -65,6 +65,8 @@ const Projects = () => {
     navigate(`/app/admin/projects/${project.id}`)
   }
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [projectTemplates, setProjectTemplates] = useState([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false)
@@ -507,6 +509,44 @@ const Projects = () => {
     return new Date(deadline) < new Date()
   }
 
+
+  // Fetch project templates
+  const fetchProjectTemplates = useCallback(async () => {
+    try {
+      setLoadingTemplates(true)
+      const response = await projectTemplatesAPI.getAll({ company_id: companyId })
+      if (response.data?.success) {
+        setProjectTemplates(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching project templates:', error)
+      setProjectTemplates([])
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }, [companyId])
+
+  // Handle template selection
+  const handleTemplateSelect = (template) => {
+    setFormData(prev => ({
+      ...prev,
+      company_id: companyId,
+      projectName: template.name || '',
+      description: template.summary || '',
+      projectCategory: template.category || '',
+      projectSubCategory: template.sub_category || '',
+      projectSummary: template.summary || '',
+      notes: template.notes || '',
+    }))
+    setIsTemplateModalOpen(false)
+    setIsAddModalOpen(true)
+  }
+
+  // Open template modal
+  const handleOpenTemplateModal = () => {
+    fetchProjectTemplates()
+    setIsTemplateModalOpen(true)
+  }
 
   const handleAdd = () => {
     // Auto-set company_id from Admin session and fetch filtered data
@@ -1137,6 +1177,14 @@ const Projects = () => {
               accept=".csv,.xlsx,.xls"
               onChange={handleFileImport}
             />
+            <button
+              onClick={handleOpenTemplateModal}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white rounded-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              style={{ backgroundColor: '#0891b2' }}
+            >
+              <IoFolder size={16} />
+              <span className="hidden sm:inline">Use Template</span>
+            </button>
             <AddButton onClick={handleAdd} label="Add project" />
           </div>
         </div>
@@ -1911,7 +1959,7 @@ const Projects = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">Start Date From</label>
               <input
@@ -2280,6 +2328,79 @@ const Projects = () => {
             >
               Close
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Project Templates Selection Modal */}
+      <Modal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        title="Select Project Template"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Select a template to quickly create a new project with pre-filled details.</p>
+          
+          {loadingTemplates ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary-accent border-t-transparent"></div>
+              <p className="text-gray-500 mt-2">Loading templates...</p>
+            </div>
+          ) : projectTemplates.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <IoFolder size={48} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-500">No project templates found.</p>
+              <button
+                onClick={() => {
+                  setIsTemplateModalOpen(false)
+                  window.location.href = '/app/admin/project-templates'
+                }}
+                className="mt-3 text-sm text-primary-accent hover:underline"
+              >
+                Create a template
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+              {projectTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  onClick={() => handleTemplateSelect(template)}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-primary-accent hover:shadow-md cursor-pointer transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-primary-accent flex items-center justify-center text-white font-bold">
+                      {template.name?.charAt(0).toUpperCase() || 'P'}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">{template.name}</h4>
+                      {template.category && (
+                        <span className="text-xs text-gray-500">{template.category}</span>
+                      )}
+                    </div>
+                  </div>
+                  {template.summary && (
+                    <p className="text-sm text-gray-600 line-clamp-2" dangerouslySetInnerHTML={{ __html: template.summary }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setIsTemplateModalOpen(false)
+                handleAdd()
+              }}
+              className="text-sm text-primary-accent hover:underline"
+            >
+              Skip, create without template
+            </button>
+            <Button variant="outline" onClick={() => setIsTemplateModalOpen(false)}>
+              Cancel
+            </Button>
           </div>
         </div>
       </Modal>

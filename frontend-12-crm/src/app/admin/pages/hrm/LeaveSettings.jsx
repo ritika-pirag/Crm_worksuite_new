@@ -136,7 +136,7 @@ const LeaveSettings = () => {
             >
                 <div className="space-y-5">
                     <Input label="Name" placeholder="e.g. Privilege Leave" value={formData.type_name} onChange={(e) => setFormData({ ...formData, type_name: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input type="number" label="No. of Leaves" value={formData.no_of_leaves} onChange={(e) => setFormData({ ...formData, no_of_leaves: e.target.value })} />
                         <Input type="color" label="Color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="h-[42px] p-1" />
                     </div>

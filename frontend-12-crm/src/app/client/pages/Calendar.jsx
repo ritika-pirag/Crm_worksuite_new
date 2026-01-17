@@ -284,7 +284,7 @@ const CalendarPage = () => {
               </h3>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Start Date</label>
                 <p className="text-primary-text">

@@ -14,6 +14,12 @@ router.get('/today-status', attendanceController.getTodayStatus);
 // Get employee attendance for a month
 router.get('/employee/:employeeId', attendanceController.getEmployeeAttendance);
 
+// Get monthly calendar for employee
+router.get('/calendar', attendanceController.getMonthlyCalendar);
+
+// Get attendance percentage
+router.get('/percentage', attendanceController.getAttendancePercentage);
+
 // Get attendance by ID
 router.get('/:id', attendanceController.getById);
 

@@ -19,7 +19,6 @@ import {
   IoRefresh,
   IoStatsChart,
   IoCube,
-  IoCloseCircle,
   IoCheckmarkCircle,
   IoTime,
   IoCalendar,
@@ -103,24 +102,6 @@ const SuperAdminDashboard = () => {
       trend: calculateTrend(stats.totals.companies, stats.totals.companies - 1)
     },
     {
-      label: 'License Expired',
-      value: stats.totals.license_expired,
-      icon: IoCloseCircle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-50',
-      path: '/app/superadmin/packages',
-      trend: calculateTrend(stats.totals.license_expired, stats.totals.license_expired + 1)
-    },
-    {
-      label: 'Total Packages',
-      value: stats.totals.packages,
-      icon: IoCube,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      path: '/app/superadmin/packages',
-      trend: { value: `+${stats.totals.packages}`, up: true }
-    },
-    {
       label: 'Active Companies',
       value: stats.totals.active_companies,
       icon: IoCheckmarkCircle,
@@ -130,13 +111,13 @@ const SuperAdminDashboard = () => {
       trend: calculateTrend(stats.totals.active_companies, stats.totals.active_companies - 1)
     },
     {
-      label: 'Inactive Companies',
-      value: stats.totals.inactive_companies,
-      icon: IoBusiness,
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-50',
-      path: '/app/superadmin/companies',
-      trend: { value: '0%', up: null }
+      label: 'Total Packages',
+      value: stats.totals.packages,
+      icon: IoCube,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      path: '/app/superadmin/packages',
+      trend: { value: `+${stats.totals.packages}`, up: true }
     },
     {
       label: 'Total Users',
@@ -369,7 +350,7 @@ const SuperAdminDashboard = () => {
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((stat, index) => {
           const Icon = stat.icon
           return (

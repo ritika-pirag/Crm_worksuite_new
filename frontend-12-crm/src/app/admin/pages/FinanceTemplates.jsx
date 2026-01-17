@@ -1,44 +1,42 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { financeTemplatesAPI, companiesAPI } from '../../../api'
+import { financeTemplatesAPI } from '../../../api'
+import { useTheme } from '../../../context/ThemeContext'
 import AddButton from '../../../components/ui/AddButton'
-import DataTable from '../../../components/ui/DataTable'
 import RightSideModal from '../../../components/ui/RightSideModal'
 import Modal from '../../../components/ui/Modal'
 import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
-import { IoCreate, IoTrash, IoEye, IoDocumentText, IoColorPalette, IoDownload, IoCopy } from 'react-icons/io5'
+import { IoCreate, IoTrash, IoEye, IoDocumentText, IoColorPalette, IoDownload, IoCopy, IoImage } from 'react-icons/io5'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
 
 const FinanceTemplates = () => {
   const fileInputRef = useRef(null)
+  const { theme } = useTheme()
+  const primaryColor = theme?.primaryAccent || '#0891b2'
+  
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [templates, setTemplates] = useState([])
-  const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'invoice',
+    type: 'proposal',
     template_data: {
       logo: '',
       primaryColor: '#3B82F6',
       secondaryColor: '#1E40AF',
       template: '',
+      background: '',
+      scope: '',
+      terms: '',
     },
   })
-
-  const documentTypes = [
-    { value: 'invoice', label: 'Invoice' },
-    { value: 'proposal', label: 'Proposal' },
-    { value: 'estimate', label: 'Estimate' },
-    { value: 'expense', label: 'Expense' },
-  ]
 
   useEffect(() => {
     fetchTemplates()
@@ -47,78 +45,56 @@ const FinanceTemplates = () => {
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true)
-      console.log('Fetching finance templates...')
-      const response = await financeTemplatesAPI.getAll()
-      console.log('Finance Templates API response:', response.data)
+      const response = await financeTemplatesAPI.getAll({ type: 'proposal' })
 
       if (response.data && response.data.success) {
         const fetchedTemplates = response.data.data || []
-        console.log('Fetched templates count:', fetchedTemplates.length)
-
-        const transformedTemplates = fetchedTemplates.map(template => {
-          const templateData = template.template_data || {}
-          return {
-            id: template.id,
-            company_id: template.company_id,
-            company_name: template.company_name || '--',
-            name: template.name,
-            type: template.type,
-            status: 'Active',
-            preview: `${template.type} template`,
-            primaryColor: templateData.primaryColor || '#3B82F6',
-            secondaryColor: templateData.secondaryColor || '#1E40AF',
-            logo: templateData.logo || '',
-            template: templateData.template || '',
-            template_data: templateData,
-          }
-        })
-        console.log('Transformed templates:', transformedTemplates)
+        const transformedTemplates = fetchedTemplates
+          .filter(t => t.type === 'proposal')
+          .map(template => {
+            const templateData = template.template_data || {}
+            return {
+              id: template.id,
+              company_id: template.company_id,
+              company_name: template.company_name || '--',
+              name: template.name,
+              type: template.type,
+              status: 'Active',
+              preview: `${template.type} template`,
+              primaryColor: templateData.primaryColor || '#3B82F6',
+              secondaryColor: templateData.secondaryColor || '#1E40AF',
+              logo: templateData.logo || '',
+              template: templateData.template || '',
+              background: templateData.background || '',
+              scope: templateData.scope || '',
+              terms: templateData.terms || '',
+              template_data: templateData,
+            }
+          })
         setTemplates(transformedTemplates)
       } else {
-        console.error('Failed to fetch templates:', response.data?.error)
         setTemplates([])
       }
     } catch (error) {
       console.error('Error fetching templates:', error)
-      console.error('Error details:', error.response?.data || error.message)
       setTemplates([])
-      alert(error.response?.data?.error || 'Failed to fetch templates. Please check console for details.')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const columns = [
-    { key: 'name', label: 'Template Name' },
-    { key: 'company_name', label: 'Company' },
-    {
-      key: 'type',
-      label: 'Type',
-      render: (value) => (
-        <Badge variant="default">{value}</Badge>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (value) => (
-        <Badge variant={value === 'Active' ? 'success' : 'default'}>
-          {value}
-        </Badge>
-      ),
-    },
-    { key: 'preview', label: 'Preview' },
-  ]
-
   const handleAdd = () => {
     setFormData({
       name: '',
-      type: 'invoice',
+      type: 'proposal',
       template_data: {
         logo: '',
-        primaryColor: '#3B82F6',
+        primaryColor: primaryColor,
         secondaryColor: '#1E40AF',
         template: '',
+        background: '',
+        scope: '',
+        terms: '',
       },
     })
     setSelectedTemplate(null)
@@ -134,12 +110,15 @@ const FinanceTemplates = () => {
         setSelectedTemplate(template)
         setFormData({
           name: data.name || '',
-          type: data.type || 'invoice',
+          type: data.type || 'proposal',
           template_data: {
             logo: templateData.logo || '',
-            primaryColor: templateData.primaryColor || '#3B82F6',
+            primaryColor: templateData.primaryColor || primaryColor,
             secondaryColor: templateData.secondaryColor || '#1E40AF',
             template: templateData.template || '',
+            background: templateData.background || '',
+            scope: templateData.scope || '',
+            terms: templateData.terms || '',
           },
         })
         setIsEditModalOpen(true)
@@ -160,10 +139,13 @@ const FinanceTemplates = () => {
           ...template,
           ...data,
           company_name: data.company_name || '--',
-          primaryColor: templateData.primaryColor || '#3B82F6',
+          primaryColor: templateData.primaryColor || primaryColor,
           secondaryColor: templateData.secondaryColor || '#1E40AF',
           logo: templateData.logo || '',
           template: templateData.template || '',
+          background: templateData.background || '',
+          scope: templateData.scope || '',
+          terms: templateData.terms || '',
         })
         setIsViewModalOpen(true)
       }
@@ -174,9 +156,29 @@ const FinanceTemplates = () => {
     }
   }
 
-  const handlePreview = (template) => {
-    setSelectedTemplate(template)
-    setIsPreviewModalOpen(true)
+  const handlePreview = async (template) => {
+    try {
+      const response = await financeTemplatesAPI.getById(template.id)
+      if (response.data.success) {
+        const data = response.data.data
+        const templateData = data.template_data || {}
+        setSelectedTemplate({
+          ...template,
+          ...data,
+          primaryColor: templateData.primaryColor || primaryColor,
+          secondaryColor: templateData.secondaryColor || '#1E40AF',
+          logo: templateData.logo || '',
+          template: templateData.template || '',
+          background: templateData.background || '',
+          scope: templateData.scope || '',
+          terms: templateData.terms || '',
+        })
+        setIsPreviewModalOpen(true)
+      }
+    } catch (error) {
+      setSelectedTemplate(template)
+      setIsPreviewModalOpen(true)
+    }
   }
 
   const handleSave = async () => {
@@ -235,35 +237,6 @@ const FinanceTemplates = () => {
     }
   }
 
-  const handleGenerateReport = async (template) => {
-    try {
-      // Sample document data - in production, this would come from selected invoice/proposal/estimate
-      const sampleData = {
-        type: template.type,
-        number: `${template.type.toUpperCase()}-001`,
-        client_name: 'Sample Client',
-        date: new Date().toLocaleDateString(),
-        items: [
-          { description: 'Item 1', quantity: 1, rate: 100, amount: 100 },
-          { description: 'Item 2', quantity: 2, rate: 50, amount: 100 },
-        ],
-        total: 200,
-      }
-
-      const response = await financeTemplatesAPI.generateReport(template.id, sampleData, 'pdf')
-      if (response.data.success) {
-        alert('Report generated successfully! Check console for details.')
-        console.log('Generated report:', response.data.data)
-        // In production, you would download the PDF/Excel file here
-      } else {
-        alert(response.data.error || 'Failed to generate report')
-      }
-    } catch (error) {
-      console.error('Error generating report:', error)
-      alert(error.response?.data?.error || 'Failed to generate report')
-    }
-  }
-
   const handleLogoClick = () => {
     fileInputRef.current?.click()
   }
@@ -289,61 +262,6 @@ const FinanceTemplates = () => {
       reader.readAsDataURL(file)
     }
   }
-
-  const actions = (row) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handleView(row)
-        }}
-        className="p-1.5 sm:p-2 text-primary-accent hover:bg-primary-accent hover:bg-opacity-10 rounded transition-colors"
-        title="View"
-      >
-        <IoEye size={16} className="sm:w-[18px] sm:h-[18px]" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handlePreview(row)
-        }}
-        className="p-1.5 sm:p-2 text-primary-accent hover:bg-primary-accent hover:bg-opacity-10 rounded transition-colors"
-        title="Preview"
-      >
-        <IoDocumentText size={16} className="sm:w-[18px] sm:h-[18px]" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handleGenerateReport(row)
-        }}
-        className="p-1.5 sm:p-2 text-secondary-green hover:bg-secondary-green hover:bg-opacity-10 rounded transition-colors"
-        title="Generate Report"
-      >
-        <IoDownload size={16} className="sm:w-[18px] sm:h-[18px]" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handleEdit(row)
-        }}
-        className="p-1.5 sm:p-2 text-warning hover:bg-warning hover:bg-opacity-10 rounded transition-colors"
-        title="Edit"
-      >
-        <IoCreate size={16} className="sm:w-[18px] sm:h-[18px]" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          handleDelete(row)
-        }}
-        className="p-1.5 sm:p-2 text-danger hover:bg-danger hover:bg-opacity-10 rounded transition-colors"
-        title="Delete"
-      >
-        <IoTrash size={16} className="sm:w-[18px] sm:h-[18px]" />
-      </button>
-    </div>
-  )
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -383,28 +301,36 @@ const FinanceTemplates = () => {
               </div>
               <div className="mb-3">
                 <div
-                  className="h-32 rounded-lg border-2 border-dashed flex items-center justify-center"
-                  style={{ borderColor: template.primaryColor }}
+                  className="h-32 rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden"
+                  style={{ borderColor: template.primaryColor || primaryColor }}
                 >
-                  <div className="text-center">
-                    <IoDocumentText
-                      className="mx-auto mb-2"
-                      size={32}
-                      style={{ color: template.primaryColor }}
+                  {template.logo ? (
+                    <img 
+                      src={template.logo} 
+                      alt="Template logo" 
+                      className="max-h-full max-w-full object-contain"
                     />
-                    <p className="text-xs text-secondary-text">{template.preview}</p>
-                  </div>
+                  ) : (
+                    <div className="text-center">
+                      <IoDocumentText
+                        className="mx-auto mb-2"
+                        size={32}
+                        style={{ color: template.primaryColor || primaryColor }}
+                      />
+                      <p className="text-xs text-secondary-text">{template.preview}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
                 <div className="flex items-center gap-1">
                   <div
                     className="w-4 h-4 rounded"
-                    style={{ backgroundColor: template.primaryColor }}
+                    style={{ backgroundColor: template.primaryColor || primaryColor }}
                   />
                   <div
                     className="w-4 h-4 rounded"
-                    style={{ backgroundColor: template.secondaryColor }}
+                    style={{ backgroundColor: template.secondaryColor || '#1E40AF' }}
                   />
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
@@ -422,7 +348,8 @@ const FinanceTemplates = () => {
                       e.stopPropagation()
                       handleView(template)
                     }}
-                    className="p-1.5 text-primary-accent hover:bg-primary-accent/10 rounded"
+                    className="p-1.5 hover:bg-gray-100 rounded"
+                    style={{ color: primaryColor }}
                   >
                     <IoEye size={16} />
                   </button>
@@ -441,7 +368,7 @@ const FinanceTemplates = () => {
           setIsEditModalOpen(false)
           setSelectedTemplate(null)
         }}
-        title={isAddModalOpen ? 'Add Finance Template' : 'Edit Finance Template'}
+        title={isAddModalOpen ? 'Add Proposal Template' : 'Edit Proposal Template'}
         width="max-w-5xl"
       >
         <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -449,24 +376,10 @@ const FinanceTemplates = () => {
             label="Template Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g., Modern Invoice"
+            placeholder="e.g., Modern Proposal"
             required
           />
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">
-              Document Type <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              required
-            >
-              {documentTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-          </div>
+          
           <div>
             <label className="block text-sm font-medium text-primary-text mb-2">
               Logo Upload
@@ -495,7 +408,7 @@ const FinanceTemplates = () => {
                 </div>
               ) : (
                 <>
-                  <IoDocumentText className="mx-auto text-gray-400 mb-2" size={32} />
+                  <IoImage className="mx-auto text-gray-400 mb-2" size={32} />
                   <p className="text-sm text-secondary-text">Click to upload logo</p>
                   <p className="text-xs text-secondary-text mt-1">PNG, JPG (Max 2MB)</p>
                 </>
@@ -514,7 +427,8 @@ const FinanceTemplates = () => {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2 flex items-center gap-2">
                 <IoColorPalette size={16} />
@@ -579,110 +493,88 @@ const FinanceTemplates = () => {
             </div>
           </div>
 
-          {/* Dynamic Editor based on Type */}
-          {formData.type === 'proposal' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-primary-text mb-2">
-                  Proposal Background
-                </label>
-                <RichTextEditor
-                  value={formData.template_data.background}
-                  onChange={(content) => setFormData({
-                    ...formData,
-                    template_data: {
-                      ...formData.template_data,
-                      background: content
-                    }
-                  })}
-                  placeholder="Enter proposal background..."
-                />
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {['{CLIENT_NAME}', '{CLIENT_COMPANY}', '{PROPOSAL_DATE}'].map(variable => (
-                    <Badge
-                      key={variable}
-                      className="cursor-pointer hover:bg-gray-200"
-                      onClick={() => {
-                        // Copy logic here or user can just copy paste in this version
-                        navigator.clipboard.writeText(variable)
-                        alert(`Copied ${variable} to clipboard!`)
-                      }}
-                    >
-                      {variable} <IoCopy size={10} className="ml-1 inline" />
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary-text mb-2">
-                  Scope of Work
-                </label>
-                <RichTextEditor
-                  value={formData.template_data.scope}
-                  onChange={(content) => setFormData({
-                    ...formData,
-                    template_data: {
-                      ...formData.template_data,
-                      scope: content
-                    }
-                  })}
-                  placeholder="Enter scope of work..."
-                />
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {['{PROPOSAL_ITEMS}', '{TOTAL_AMOUNT}'].map(variable => (
-                    <Badge
-                      key={variable}
-                      className="cursor-pointer hover:bg-gray-200"
-                      onClick={() => {
-                        navigator.clipboard.writeText(variable)
-                        alert(`Copied ${variable} to clipboard!`)
-                      }}
-                    >
-                      {variable} <IoCopy size={10} className="ml-1 inline" />
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-primary-text mb-2">
-                  Terms & Conditions
-                </label>
-                <RichTextEditor
-                  value={formData.template_data.terms}
-                  onChange={(content) => setFormData({
-                    ...formData,
-                    template_data: {
-                      ...formData.template_data,
-                      terms: content
-                    }
-                  })}
-                  placeholder="Enter terms and conditions..."
-                />
-              </div>
-            </div>
-          ) : (
+          {/* Proposal Template Fields */}
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">
-                Template Content (Rich Text)
+                Proposal Background
               </label>
               <RichTextEditor
-                value={formData.template_data.template}
+                value={formData.template_data.background}
                 onChange={(content) => setFormData({
                   ...formData,
                   template_data: {
                     ...formData.template_data,
-                    template: content
+                    background: content
                   }
                 })}
-                placeholder="Design your template..."
+                placeholder="Enter proposal background..."
               />
-              <p className="text-xs text-secondary-text mt-2">
-                Use variables like {'{{invoice_number}}'}, {'{{client_name}}'}, {'{{amount}}'}, etc.
-              </p>
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {['{CLIENT_NAME}', '{CLIENT_COMPANY}', '{PROPOSAL_DATE}'].map(variable => (
+                  <Badge
+                    key={variable}
+                    className="cursor-pointer hover:bg-gray-200"
+                    onClick={() => {
+                      navigator.clipboard.writeText(variable)
+                      alert(`Copied ${variable} to clipboard!`)
+                    }}
+                  >
+                    {variable} <IoCopy size={10} className="ml-1 inline" />
+                  </Badge>
+                ))}
+              </div>
             </div>
-          )}
+
+            <div>
+              <label className="block text-sm font-medium text-primary-text mb-2">
+                Scope of Work
+              </label>
+              <RichTextEditor
+                value={formData.template_data.scope}
+                onChange={(content) => setFormData({
+                  ...formData,
+                  template_data: {
+                    ...formData.template_data,
+                    scope: content
+                  }
+                })}
+                placeholder="Enter scope of work..."
+              />
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {['{PROPOSAL_ITEMS}', '{TOTAL_AMOUNT}'].map(variable => (
+                  <Badge
+                    key={variable}
+                    className="cursor-pointer hover:bg-gray-200"
+                    onClick={() => {
+                      navigator.clipboard.writeText(variable)
+                      alert(`Copied ${variable} to clipboard!`)
+                    }}
+                  >
+                    {variable} <IoCopy size={10} className="ml-1 inline" />
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-primary-text mb-2">
+                Terms & Conditions
+              </label>
+              <RichTextEditor
+                value={formData.template_data.terms}
+                onChange={(content) => setFormData({
+                  ...formData,
+                  template_data: {
+                    ...formData.template_data,
+                    terms: content
+                  }
+                })}
+                placeholder="Enter terms and conditions..."
+              />
+            </div>
+          </div>
+
           <div className="flex gap-3 pt-4 justify-end">
             <Button
               variant="outline"
@@ -702,55 +594,93 @@ const FinanceTemplates = () => {
         </div>
       </RightSideModal>
 
-      {/* View Modal */}
-      <RightSideModal
+      {/* View Modal - Full Template Preview */}
+      <Modal
         isOpen={isViewModalOpen}
         onClose={() => {
           setIsViewModalOpen(false)
           setSelectedTemplate(null)
         }}
         title="Template Details"
-        width="max-w-5xl"
+        size="xl"
       >
         {selectedTemplate && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-secondary-text">Company</label>
-                <p className="text-primary-text mt-1 text-base">{selectedTemplate.company_name || '--'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-secondary-text">Type</label>
-                <p className="text-primary-text mt-1 text-base">
-                  <Badge variant="default">{selectedTemplate.type || '--'}</Badge>
-                </p>
-              </div>
-              <div className="col-span-2">
-                <label className="text-sm font-medium text-secondary-text">Template Name</label>
-                <p className="text-primary-text mt-1 text-base font-semibold">{selectedTemplate.name || '--'}</p>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-secondary-text mb-2 block">Template Preview</label>
-              <div className="p-4 bg-white border border-gray-200 rounded-lg">
-                <div
-                  className="p-8 border-2 rounded-lg"
-                  style={{ borderColor: selectedTemplate.primaryColor || '#3B82F6' }}
-                >
-                  <div className="text-center mb-6">
-                    <div
-                      className="text-2xl font-bold mb-2"
-                      style={{ color: selectedTemplate.primaryColor || '#3B82F6' }}
-                    >
-                      {selectedTemplate.type?.toUpperCase() || 'DOCUMENT'}
-                    </div>
-                    <div className="text-sm text-secondary-text">
-                      Template: {selectedTemplate.name}
-                    </div>
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Header with Logo */}
+            <div className="flex items-start justify-between p-6 rounded-lg" style={{ backgroundColor: `${selectedTemplate.primaryColor}10` }}>
+              <div className="flex items-center gap-4">
+                {selectedTemplate.logo ? (
+                  <img 
+                    src={selectedTemplate.logo} 
+                    alt="Template logo" 
+                    className="h-20 w-auto object-contain"
+                  />
+                ) : (
+                  <div 
+                    className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-xl"
+                    style={{ backgroundColor: selectedTemplate.primaryColor }}
+                  >
+                    {selectedTemplate.name?.charAt(0) || 'P'}
                   </div>
+                )}
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">{selectedTemplate.name}</h3>
+                  <Badge variant="default">{selectedTemplate.type}</Badge>
                 </div>
               </div>
+              <Badge variant="success">Active</Badge>
             </div>
+
+            {/* Template Content */}
+            <div className="space-y-4">
+              {selectedTemplate.background && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Background</h4>
+                  <div className="prose max-w-full text-gray-700" dangerouslySetInnerHTML={{ __html: selectedTemplate.background }} />
+                </div>
+              )}
+
+              {selectedTemplate.scope && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Scope of Work</h4>
+                  <div className="prose max-w-full text-gray-700" dangerouslySetInnerHTML={{ __html: selectedTemplate.scope }} />
+                </div>
+              )}
+
+              {selectedTemplate.terms && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Terms & Conditions</h4>
+                  <div className="prose max-w-full text-gray-700" dangerouslySetInnerHTML={{ __html: selectedTemplate.terms }} />
+                </div>
+              )}
+
+              {selectedTemplate.template && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Template Content</h4>
+                  <div className="prose max-w-full text-gray-700" dangerouslySetInnerHTML={{ __html: selectedTemplate.template }} />
+                </div>
+              )}
+            </div>
+
+            {/* Colors */}
+            <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
+              <span className="text-sm font-medium text-gray-600">Colors:</span>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded"
+                  style={{ backgroundColor: selectedTemplate.primaryColor }}
+                />
+                <span className="text-sm text-gray-500">{selectedTemplate.primaryColor}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded"
+                  style={{ backgroundColor: selectedTemplate.secondaryColor }}
+                />
+                <span className="text-sm text-gray-500">{selectedTemplate.secondaryColor}</span>
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <Button
                 variant="outline"
@@ -775,58 +705,117 @@ const FinanceTemplates = () => {
             </div>
           </div>
         )}
-      </RightSideModal>
+      </Modal>
 
       {/* Preview Modal */}
       <Modal
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
-        title={`${selectedTemplate?.type?.toUpperCase() || 'DOCUMENT'} Template Preview`}
-        size="lg"
+        title="Proposal Template Preview"
+        size="xl"
       >
         {selectedTemplate && (
-          <div className="space-y-4">
-            <div
-              className="p-8 border-2 rounded-lg"
-              style={{ borderColor: selectedTemplate.primaryColor || '#3B82F6' }}
-            >
-              <div className="text-center mb-6">
-                <div
-                  className="text-2xl font-bold mb-2"
-                  style={{ color: selectedTemplate.primaryColor || '#3B82F6' }}
-                >
-                  {selectedTemplate.type?.toUpperCase() || 'DOCUMENT'}
-                </div>
-                <div className="text-sm text-secondary-text">
-                  Template: {selectedTemplate.name}
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Proposal Preview */}
+            <div className="bg-white border-2 rounded-lg overflow-hidden" style={{ borderColor: selectedTemplate.primaryColor }}>
+              {/* Header */}
+              <div className="p-6" style={{ backgroundColor: selectedTemplate.primaryColor }}>
+                <div className="flex items-center justify-between">
+                  {selectedTemplate.logo ? (
+                    <img 
+                      src={selectedTemplate.logo} 
+                      alt="Logo" 
+                      className="h-16 w-auto object-contain bg-white rounded p-2"
+                    />
+                  ) : (
+                    <div className="text-white text-2xl font-bold">
+                      {selectedTemplate.name}
+                    </div>
+                  )}
+                  <div className="text-right text-white">
+                    <p className="text-xl font-bold">PROPOSAL</p>
+                    <p className="text-sm opacity-80">{new Date().toLocaleDateString()}</p>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* Client Info Preview */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <p className="text-xs text-secondary-text">Document Number</p>
-                    <p className="text-sm font-semibold text-primary-text">DOC-001</p>
+                    <p className="text-xs text-gray-500 uppercase mb-1">Prepared For</p>
+                    <p className="font-semibold text-gray-900">[Client Name]</p>
+                    <p className="text-sm text-gray-600">[Client Company]</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-secondary-text">Date</p>
-                    <p className="text-sm font-semibold text-primary-text">{new Date().toLocaleDateString()}</p>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase mb-1">Proposal #</p>
+                    <p className="font-semibold text-gray-900">PROP-001</p>
+                    <p className="text-sm text-gray-600">Valid until: [Date]</p>
                   </div>
                 </div>
+
+                {/* Background */}
+                {selectedTemplate.background && (
+                  <div>
+                    <h4 className="font-semibold mb-2" style={{ color: selectedTemplate.primaryColor }}>Background</h4>
+                    <div className="text-gray-600 prose max-w-full" dangerouslySetInnerHTML={{ __html: selectedTemplate.background }} />
+                  </div>
+                )}
+
+                {/* Scope */}
+                {selectedTemplate.scope && (
+                  <div>
+                    <h4 className="font-semibold mb-2" style={{ color: selectedTemplate.primaryColor }}>Scope of Work</h4>
+                    <div className="text-gray-600 prose max-w-full" dangerouslySetInnerHTML={{ __html: selectedTemplate.scope }} />
+                  </div>
+                )}
+
+                {/* Items Preview */}
                 <div>
-                  <p className="text-xs text-secondary-text">Client</p>
-                  <p className="text-sm font-semibold text-primary-text">Sample Client Name</p>
+                  <h4 className="font-semibold mb-2" style={{ color: selectedTemplate.primaryColor }}>Pricing</h4>
+                  <table className="w-full">
+                    <thead>
+                      <tr style={{ backgroundColor: `${selectedTemplate.primaryColor}15` }}>
+                        <th className="text-left py-2 px-3 text-sm font-semibold">Item</th>
+                        <th className="text-center py-2 px-3 text-sm font-semibold">Qty</th>
+                        <th className="text-right py-2 px-3 text-sm font-semibold">Rate</th>
+                        <th className="text-right py-2 px-3 text-sm font-semibold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-3 px-3 text-sm">Sample Item 1</td>
+                        <td className="py-3 px-3 text-sm text-center">1</td>
+                        <td className="py-3 px-3 text-sm text-right">$500.00</td>
+                        <td className="py-3 px-3 text-sm text-right font-medium">$500.00</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="py-3 px-3 text-sm">Sample Item 2</td>
+                        <td className="py-3 px-3 text-sm text-center">2</td>
+                        <td className="py-3 px-3 text-sm text-right">$250.00</td>
+                        <td className="py-3 px-3 text-sm text-right font-medium">$500.00</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="3" className="py-3 px-3 text-right font-semibold">Total:</td>
+                        <td className="py-3 px-3 text-right font-bold" style={{ color: selectedTemplate.primaryColor }}>$1,000.00</td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-                <div className="pt-4 border-t border-gray-200">
-                  <p className="text-xs text-secondary-text mb-2">Amount</p>
-                  <p
-                    className="text-2xl font-bold"
-                    style={{ color: selectedTemplate.primaryColor || '#3B82F6' }}
-                  >
-                    $1,000.00
-                  </p>
-                </div>
+
+                {/* Terms */}
+                {selectedTemplate.terms && (
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="font-semibold mb-2" style={{ color: selectedTemplate.primaryColor }}>Terms & Conditions</h4>
+                    <div className="text-gray-600 text-sm prose max-w-full" dangerouslySetInnerHTML={{ __html: selectedTemplate.terms }} />
+                  </div>
+                )}
               </div>
             </div>
+
             <div className="flex gap-3 pt-4">
               <Button
                 variant="outline"

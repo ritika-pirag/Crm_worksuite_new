@@ -30,6 +30,7 @@ import Companies from '../app/admin/pages/Companies'
 import Projects from '../app/admin/pages/Projects'
 import ProjectDetail from '../app/admin/pages/ProjectDetail'
 import ProjectTemplates from '../app/admin/pages/ProjectTemplates'
+import ProjectTemplateForm from '../app/admin/pages/ProjectTemplateForm'
 import Tasks from '../app/admin/pages/Tasks'
 import AdminCalendar from '../app/admin/pages/Calendar'
 import Messages from '../app/admin/pages/Messages'
@@ -69,6 +70,7 @@ import CustomFields from '../app/admin/pages/CustomFields'
 import SocialMediaLeads from '../app/admin/pages/SocialMediaLeads'
 import SystemHealth from '../app/admin/pages/SystemHealth'
 import Settings from '../app/admin/pages/Settings'
+import ModuleSettings from '../app/admin/pages/ModuleSettings'
 import CompanyPackages from '../app/admin/pages/CompanyPackages'
 import LicenseManagement from '../app/admin/pages/LicenseManagement'
 import ZohoBooks from '../app/admin/pages/ZohoBooks'
@@ -111,9 +113,11 @@ import PwaSettings from '../app/superadmin/pages/PwaSettings'
 import ClientDashboard from '../app/client/pages/ClientDashboard'
 import Contracts from '../app/client/pages/Contracts'
 import ClientProjects from '../app/client/pages/Projects'
+import ClientProjectDetail from '../app/client/pages/ProjectDetail'
 import ClientTasks from '../app/client/pages/Tasks'
 import ClientEstimates from '../app/client/pages/Estimates'
 import ClientInvoices from '../app/client/pages/Invoices'
+import ClientInvoiceDetail from '../app/client/pages/InvoiceDetail'
 import Payments from '../app/client/pages/Payments'
 import CreditNotes from '../app/client/pages/CreditNotes'
 import Profile from '../app/client/pages/Profile'
@@ -121,6 +125,7 @@ import ClientNotifications from '../app/client/pages/Notifications'
 import ClientSettings from '../app/client/pages/Settings'
 import ClientMessages from '../app/client/pages/Messages'
 import ClientProposals from '../app/client/pages/Proposals'
+import ClientProposalDetail from '../app/client/pages/ProposalDetail'
 import ClientStore from '../app/client/pages/Store'
 import ClientFiles from '../app/client/pages/Files'
 import ClientNotes from '../app/client/pages/Notes'
@@ -128,6 +133,7 @@ import ClientTickets from '../app/client/pages/Tickets'
 import ClientSubscriptions from '../app/client/pages/Subscriptions'
 import ClientOrders from '../app/client/pages/Orders'
 import ClientCalendar from '../app/client/pages/Calendar'
+import ClientEvents from '../app/client/pages/Events'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -236,6 +242,9 @@ function AppRoutes() {
         <Route path="admin/projects" element={<Projects />} />
         <Route path="admin/projects/:id" element={<ProjectDetail />} />
         <Route path="admin/project-templates" element={<ProjectTemplates />} />
+        <Route path="admin/project-templates/add" element={<ProjectTemplateForm />} />
+        <Route path="admin/project-templates/:id" element={<ProjectTemplateForm />} />
+        <Route path="admin/project-templates/:id/edit" element={<ProjectTemplateForm />} />
         <Route path="admin/tasks" element={<Tasks />} />
         <Route path="admin/calendar" element={<AdminCalendar />} />
         <Route path="admin/messages" element={<Messages />} />
@@ -282,6 +291,7 @@ function AppRoutes() {
         <Route path="admin/social-media-leads" element={<SocialMediaLeads />} />
         <Route path="admin/system-health" element={<SystemHealth />} />
         <Route path="admin/settings" element={<Settings />} />
+        <Route path="admin/settings/modules" element={<ModuleSettings />} />
 
         {/* Employee Routes */}
         <Route path="employee/dashboard" element={<EmployeeDashboard />} />
@@ -301,11 +311,14 @@ function AppRoutes() {
         {/* Client Routes */}
         <Route path="client/dashboard" element={<ClientDashboard />} />
         <Route path="client/projects" element={<ClientProjects />} />
+        <Route path="client/projects/:id" element={<ClientProjectDetail />} />
         <Route path="client/proposals" element={<ClientProposals />} />
+        <Route path="client/proposals/:id" element={<ClientProposalDetail />} />
         <Route path="client/store" element={<ClientStore />} />
         <Route path="client/files" element={<ClientFiles />} />
         <Route path="client/estimates" element={<ClientEstimates />} />
         <Route path="client/invoices" element={<ClientInvoices />} />
+        <Route path="client/invoices/:id" element={<ClientInvoiceDetail />} />
         <Route path="client/payments" element={<Payments />} />
         <Route path="client/subscriptions" element={<ClientSubscriptions />} />
         <Route path="client/orders" element={<ClientOrders />} />
@@ -318,6 +331,7 @@ function AppRoutes() {
         <Route path="client/notifications" element={<ClientNotifications />} />
         <Route path="client/settings" element={<ClientSettings />} />
         <Route path="client/calendar" element={<ClientCalendar />} />
+        <Route path="client/events" element={<ClientEvents />} />
       </Route>
 
       {/* Catch all */}

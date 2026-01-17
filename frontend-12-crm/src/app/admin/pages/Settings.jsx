@@ -6,7 +6,8 @@ import Button from '../../../components/ui/Button'
 import Badge from '../../../components/ui/Badge'
 import { useTheme } from '../../../context/ThemeContext.jsx'
 import { useLanguage } from '../../../context/LanguageContext.jsx'
-import { settingsAPI } from '../../../api'
+import { useSettings } from '../../../context/SettingsContext.jsx'
+import { settingsAPI, companiesAPI } from '../../../api'
 import BaseUrl from '../../../api/baseUrl'
 import {
   IoSettings,
@@ -49,7 +50,13 @@ import {
   IoAdd,
   IoCreate,
   IoEye,
-  IoEyeOff
+  IoEyeOff,
+  IoBusiness,
+  IoCall,
+  IoGlobeOutline,
+  IoLocation,
+  IoImageOutline,
+  IoSave
 } from 'react-icons/io5'
 import AttendanceSettings from './hrm/AttendanceSettings'
 import LeaveSettings from './hrm/LeaveSettings'
@@ -58,8 +65,18 @@ const Settings = () => {
   const navigate = useNavigate()
   const { theme, updateTheme, resetTheme } = useTheme()
   const { changeLanguage, t } = useLanguage()
+  const { 
+    refreshSettings, 
+    updateCompany, 
+    updateSettings: updateContextSettings,
+    timezoneOptions,
+    dateFormatOptions,
+    timeFormatOptions,
+    currencySymbols
+  } = useSettings()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
 
   // Sidebar menu state
   const [activeSection, setActiveSection] = useState('app-settings')
@@ -73,31 +90,29 @@ const Settings = () => {
     'plugins': false
   })
 
-  // Settings data state
+  // Company Information State
+  const [companyInfo, setCompanyInfo] = useState({
+    id: null,
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    logo: ''
+  })
+
+  // Settings data state (system settings only)
   const [settings, setSettings] = useState({
-    // General Settings
-    company_name: '',
-    company_email: '',
-    company_phone: '',
-    company_address: '',
-    company_website: '',
-    company_logo: '',
+    // System Settings
     system_name: 'Developo',
     default_currency: 'USD',
     default_timezone: 'UTC',
     date_format: 'Y-m-d',
     time_format: 'H:i',
-    fiscal_year_start: '01-01',
-    session_timeout: 30,
-    max_file_size: 10,
-    allowed_file_types: 'pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+    currency_symbol_position: 'before',
 
     // Localization
     default_language: 'en',
-    date_format_localization: 'Y-m-d',
-    time_format_localization: 'H:i',
-    timezone_localization: 'UTC',
-    currency_symbol_position: 'before',
 
     // Email Settings
     email_from: 'noreply@developo.com',
@@ -188,15 +203,42 @@ const Settings = () => {
     last_update_check: null,
   })
 
-  // Fetch settings on mount
+  // Show toast notification
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
+  }
+
+  // Fetch settings and company info on mount
   useEffect(() => {
-    fetchSettings()
+    fetchAllData()
   }, [])
 
-  const fetchSettings = async () => {
+  const fetchAllData = async () => {
     try {
       setLoading(true)
       const companyId = localStorage.getItem('companyId') || 1
+
+      // Fetch company info
+      try {
+        const companyResponse = await companiesAPI.getById(companyId)
+        if (companyResponse.data.success && companyResponse.data.data) {
+          const company = companyResponse.data.data
+          setCompanyInfo({
+            id: company.id,
+            name: company.name || '',
+            email: company.email || '',
+            phone: company.phone || '',
+            website: company.website || '',
+            address: company.address || '',
+            logo: company.logo || ''
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching company:', err)
+      }
+
+      // Fetch settings
       const response = await settingsAPI.get({ company_id: companyId })
       if (response.data.success) {
         const settingsData = response.data.data || []
@@ -205,7 +247,6 @@ const Settings = () => {
         // Transform settings array to object
         settingsData.forEach(setting => {
           try {
-            // Try to parse JSON values
             if (setting.setting_value && (setting.setting_value.startsWith('{') || setting.setting_value.startsWith('['))) {
               settingsObj[setting.setting_key] = JSON.parse(setting.setting_value)
             } else {
@@ -215,6 +256,19 @@ const Settings = () => {
             settingsObj[setting.setting_key] = setting.setting_value
           }
         })
+
+        // Update company info from settings if not already set
+        if (!companyInfo.name && settingsObj.company_name) {
+          setCompanyInfo(prev => ({
+            ...prev,
+            name: settingsObj.company_name || prev.name,
+            email: settingsObj.company_email || prev.email,
+            phone: settingsObj.company_phone || prev.phone,
+            website: settingsObj.company_website || prev.website,
+            address: settingsObj.company_address || prev.address,
+            logo: settingsObj.company_logo || prev.logo
+          }))
+        }
 
         // Merge with defaults
         setSettings(prev => ({
@@ -271,9 +325,14 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('Error fetching settings:', error)
+      showToast('Failed to load settings', 'error')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCompanyChange = (field, value) => {
+    setCompanyInfo(prev => ({ ...prev, [field]: value }))
   }
 
   const handleChange = (field, value) => {
@@ -283,20 +342,45 @@ const Settings = () => {
   const handleSave = async (category = null) => {
     try {
       setSaving(true)
+      const companyId = localStorage.getItem('companyId') || 1
 
-      // Prepare settings to save based on category or all
+      // Save company info to companies table
+      if (category === 'general' || !category) {
+        try {
+          await companiesAPI.update(companyId, {
+            name: companyInfo.name,
+            email: companyInfo.email,
+            phone: companyInfo.phone,
+            website: companyInfo.website,
+            address: companyInfo.address,
+            logo: companyInfo.logo
+          })
+          // Update context
+          updateCompany(companyInfo)
+        } catch (err) {
+          console.error('Error saving company info:', err)
+        }
+      }
+
+      // Prepare settings to save
       let settingsToSave = []
 
+      // Also save company info to settings table for backwards compatibility
+      if (category === 'general' || !category) {
+        settingsToSave.push(
+          { setting_key: 'company_name', setting_value: String(companyInfo.name || '') },
+          { setting_key: 'company_email', setting_value: String(companyInfo.email || '') },
+          { setting_key: 'company_phone', setting_value: String(companyInfo.phone || '') },
+          { setting_key: 'company_website', setting_value: String(companyInfo.website || '') },
+          { setting_key: 'company_address', setting_value: String(companyInfo.address || '') },
+          { setting_key: 'company_logo', setting_value: String(companyInfo.logo || '') }
+        )
+      }
+
       if (category) {
-        // Save only settings for specific category
         const categoryPrefixes = {
-          // General Settings page includes: General, UI Options, Top Menu, Footer, PWA tabs
-          'general': [
-            'company_', 'system_', 'default_', 'date_', 'time_', 'fiscal_', 'session_', 'max_', 'allowed_',
-            'theme_mode', 'font_family', 'primary_color', 'secondary_color', 'sidebar_style', 'top_menu_style',
-            'top_menu_', 'footer_', 'pwa_'
-          ],
-          'localization': ['default_language', 'date_format_localization', 'time_format_localization', 'timezone_localization', 'currency_symbol_position'],
+          'general': ['system_', 'default_currency', 'default_timezone', 'date_format', 'time_format', 'currency_symbol_position'],
+          'localization': ['default_language', 'currency_symbol_position'],
           'email': ['email_', 'smtp_'],
           'ui-options': ['theme_mode', 'font_family', 'primary_color', 'secondary_color', 'sidebar_style', 'top_menu_style'],
           'top-menu': ['top_menu_'],
@@ -312,7 +396,7 @@ const Settings = () => {
 
         const prefixes = categoryPrefixes[category] || []
         Object.keys(settings).forEach(key => {
-          if (prefixes.some(prefix => key.startsWith(prefix))) {
+          if (prefixes.some(prefix => key.startsWith(prefix) || key === prefix)) {
             settingsToSave.push({
               setting_key: key,
               setting_value: typeof settings[key] === 'object' ? JSON.stringify(settings[key]) : String(settings[key])
@@ -330,16 +414,15 @@ const Settings = () => {
       }
 
       if (settingsToSave.length === 0) {
-        alert('No settings to save')
+        showToast('No settings to save', 'warning')
         return
       }
 
       // Use bulk update API
-      const companyId = localStorage.getItem('companyId') || 1
       const response = await settingsAPI.bulkUpdate(settingsToSave, { company_id: companyId })
 
       if (response.data.success) {
-        // Apply theme changes immediately without page reload
+        // Apply theme changes immediately
         if (settings.theme_mode) {
           updateTheme({ mode: settings.theme_mode })
         }
@@ -353,39 +436,43 @@ const Settings = () => {
           updateTheme({ fontFamily: settings.font_family })
         }
 
-        alert(category ? `${category} settings saved successfully!` : 'All settings saved successfully!')
-        await fetchSettings()
+        // Refresh global settings context
+        await refreshSettings()
+
+        showToast('Settings saved successfully!', 'success')
       } else {
-        alert(response.data.error || 'Failed to save settings')
+        showToast(response.data.error || 'Failed to save settings', 'error')
       }
     } catch (error) {
       console.error('Error saving settings:', error)
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to save settings'
-      alert(`Error: ${errorMessage}`)
+      showToast(error.response?.data?.error || error.message || 'Failed to save settings', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleLogoUpload = async (e, type = 'logo') => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file')
+      showToast('Please select an image file', 'error')
       return
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB')
+      showToast('File size must be less than 5MB', 'error')
       return
     }
 
     try {
       setSaving(true)
+      const companyId = localStorage.getItem('companyId') || 1
+
+      // Create FormData for file upload
       const formData = new FormData()
       formData.append('logo', file)
-      formData.append('setting_key', type === 'logo' ? 'company_logo' : type)
+      formData.append('setting_key', 'company_logo')
 
       const response = await settingsAPI.update(formData, {
         headers: {
@@ -394,15 +481,28 @@ const Settings = () => {
       })
 
       if (response.data.success) {
-        const previewUrl = URL.createObjectURL(file)
-        handleChange(type === 'logo' ? 'company_logo' : type, previewUrl)
-        alert(`${type === 'logo' ? 'Logo' : 'Image'} uploaded successfully!`)
+        // Get the uploaded file URL
+        const logoUrl = response.data.data?.setting_value || `/uploads/${file.name}`
+        
+        // Update local state
+        setCompanyInfo(prev => ({ ...prev, logo: logoUrl }))
+        
+        // Update company in database
+        await companiesAPI.update(companyId, { logo: logoUrl })
+        
+        // Update global context
+        updateCompany({ logo: logoUrl })
+        
+        // Refresh settings
+        await refreshSettings()
+        
+        showToast('Logo uploaded successfully!', 'success')
       } else {
-        alert(response.data.error || `Failed to upload ${type}`)
+        showToast(response.data.error || 'Failed to upload logo', 'error')
       }
     } catch (error) {
-      console.error(`Error uploading ${type}:`, error)
-      alert(error.response?.data?.error || `Failed to upload ${type}`)
+      console.error('Error uploading logo:', error)
+      showToast(error.response?.data?.error || 'Failed to upload logo', 'error')
     } finally {
       setSaving(false)
     }
@@ -487,7 +587,19 @@ const Settings = () => {
   const renderContent = () => {
     switch (activeSubMenu) {
       case 'general':
-        return <GeneralSettings settings={settings} handleChange={handleChange} handleLogoUpload={handleLogoUpload} />
+        return (
+          <GeneralSettings 
+            companyInfo={companyInfo}
+            settings={settings} 
+            handleCompanyChange={handleCompanyChange}
+            handleChange={handleChange} 
+            handleLogoUpload={handleLogoUpload}
+            timezoneOptions={timezoneOptions}
+            dateFormatOptions={dateFormatOptions}
+            timeFormatOptions={timeFormatOptions}
+            currencySymbols={currencySymbols}
+          />
+        )
       case 'localization':
         return <LocalizationSettings settings={settings} handleChange={handleChange} onLanguageChange={changeLanguage} />
       case 'email':
@@ -521,7 +633,19 @@ const Settings = () => {
       case 'hrm-leaves':
         return <LeaveSettings />
       default:
-        return <GeneralSettings settings={settings} handleChange={handleChange} handleLogoUpload={handleLogoUpload} />
+        return (
+          <GeneralSettings 
+            companyInfo={companyInfo}
+            settings={settings} 
+            handleCompanyChange={handleCompanyChange}
+            handleChange={handleChange} 
+            handleLogoUpload={handleLogoUpload}
+            timezoneOptions={timezoneOptions}
+            dateFormatOptions={dateFormatOptions}
+            timeFormatOptions={timeFormatOptions}
+            currencySymbols={currencySymbols}
+          />
+        )
     }
   }
 
@@ -538,8 +662,21 @@ const Settings = () => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-120px)]">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 ${
+          toast.type === 'success' ? 'bg-green-500 text-white' :
+          toast.type === 'error' ? 'bg-red-500 text-white' :
+          'bg-yellow-500 text-white'
+        }`}>
+          {toast.type === 'success' && <IoCheckmarkCircle size={20} />}
+          {toast.type === 'error' && <IoClose size={20} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* Left Sidebar Menu */}
-      <div className="w-full lg:w-64 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto">
+      <div className="w-full lg:w-64 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto flex-shrink-0">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-primary-text">{t('settings.title')}</h2>
         </div>
@@ -596,22 +733,35 @@ const Settings = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto">
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           {renderContent()}
-          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
             <Button
               variant="outline"
-              onClick={() => fetchSettings()}
+              onClick={() => fetchAllData()}
               disabled={saving}
+              className="w-full sm:w-auto"
             >
-              Cancel
+              <IoRefresh size={18} className="mr-2" />
+              Reset
             </Button>
             <Button
               variant="primary"
               onClick={() => handleSave(activeSubMenu)}
               disabled={saving}
+              className="w-full sm:w-auto"
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <IoSave size={18} className="mr-2" />
+                  Save Changes
+                </>
+              )}
             </Button>
           </div>
         </Card>
@@ -620,31 +770,50 @@ const Settings = () => {
   )
 }
 
-// General Settings Component
-const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
+// General Settings Component - Updated with proper company info
+const GeneralSettings = ({ 
+  companyInfo, 
+  settings, 
+  handleCompanyChange, 
+  handleChange, 
+  handleLogoUpload,
+  timezoneOptions,
+  dateFormatOptions,
+  timeFormatOptions,
+  currencySymbols
+}) => {
   const [activeTab, setActiveTab] = useState('general')
   const { t } = useLanguage()
 
   const tabs = [
-    { id: 'general', label: t('settings.general_settings') },
-    { id: 'ui-options', label: t('settings.ui_options') },
-    { id: 'pwa', label: t('settings.pwa') }
+    { id: 'general', label: 'General Settings' },
+    { id: 'ui-options', label: 'UI Options' },
+    { id: 'pwa', label: 'PWA Settings' }
   ]
+
+  // Get logo URL
+  const getLogoUrl = () => {
+    if (!companyInfo.logo) return null
+    if (companyInfo.logo.startsWith('http') || companyInfo.logo.startsWith('blob:') || companyInfo.logo.startsWith('data:')) {
+      return companyInfo.logo
+    }
+    return `${BaseUrl}${companyInfo.logo.startsWith('/') ? '' : '/'}${companyInfo.logo}`
+  }
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-primary-text mb-2">General Settings</h1>
-        <p className="text-secondary-text">Configure general application settings</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">General Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure company information and system settings</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200">
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeTab === tab.id
+            className={`px-3 sm:px-4 py-2 font-medium text-xs sm:text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
               ? 'border-primary-accent text-primary-accent'
               : 'border-transparent text-secondary-text hover:text-primary-text'
               }`}
@@ -657,71 +826,95 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
       {/* Tab Content */}
       {activeTab === 'general' && (
         <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-primary-text mb-4">Company Information</h3>
+          {/* Company Information Section */}
+          <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <IoBusiness size={24} className="text-primary-accent" />
+              <h3 className="text-lg font-semibold text-primary-text">Company Information</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Company Name"
-                value={settings.company_name || ''}
-                onChange={(e) => handleChange('company_name', e.target.value)}
+                value={companyInfo.name || ''}
+                onChange={(e) => handleCompanyChange('name', e.target.value)}
                 placeholder="Enter company name"
+                icon={IoBusiness}
               />
               <Input
                 label="Company Email"
                 type="email"
-                value={settings.company_email || ''}
-                onChange={(e) => handleChange('company_email', e.target.value)}
+                value={companyInfo.email || ''}
+                onChange={(e) => handleCompanyChange('email', e.target.value)}
                 placeholder="company@example.com"
+                icon={IoMail}
               />
               <Input
                 label="Company Phone"
-                value={settings.company_phone || ''}
-                onChange={(e) => handleChange('company_phone', e.target.value)}
+                value={companyInfo.phone || ''}
+                onChange={(e) => handleCompanyChange('phone', e.target.value)}
                 placeholder="+1 234 567 8900"
+                icon={IoCall}
               />
               <Input
                 label="Company Website"
-                value={settings.company_website || ''}
-                onChange={(e) => handleChange('company_website', e.target.value)}
+                value={companyInfo.website || ''}
+                onChange={(e) => handleCompanyChange('website', e.target.value)}
                 placeholder="https://example.com"
+                icon={IoGlobeOutline}
               />
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-primary-text mb-2">Company Address</label>
+                <label className="block text-sm font-medium text-primary-text mb-2">
+                  <div className="flex items-center gap-2">
+                    <IoLocation size={18} />
+                    Company Address
+                  </div>
+                </label>
                 <textarea
-                  value={settings.company_address || ''}
-                  onChange={(e) => handleChange('company_address', e.target.value)}
+                  value={companyInfo.address || ''}
+                  onChange={(e) => handleCompanyChange('address', e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none resize-none"
                   placeholder="Enter company address"
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-primary-text mb-2">Company Logo</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleLogoUpload(e, 'logo')}
-                    className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-                  />
-                  {settings.company_logo && (
-                    <img
-                      src={settings.company_logo.startsWith('http') || settings.company_logo.startsWith('blob:')
-                        ? settings.company_logo
-                        : `${BaseUrl}${settings.company_logo.startsWith('/') ? '' : '/'}${settings.company_logo}`
-                      }
-                      alt="Company Logo"
-                      className="h-16 w-auto object-contain rounded-lg border border-gray-200 p-2 bg-gray-50"
-                      onError={(e) => e.target.style.display = 'none'}
+                <label className="block text-sm font-medium text-primary-text mb-2">
+                  <div className="flex items-center gap-2">
+                    <IoImageOutline size={18} />
+                    Company Logo
+                  </div>
+                </label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex-1 w-full">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none text-sm"
                     />
+                    <p className="text-xs text-secondary-text mt-1">Recommended: PNG or SVG, max 5MB</p>
+                  </div>
+                  {getLogoUrl() && (
+                    <div className="flex-shrink-0">
+                      <img
+                        src={getLogoUrl()}
+                        alt="Company Logo"
+                        className="h-16 w-auto max-w-[200px] object-contain rounded-lg border border-gray-200 p-2 bg-white"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-primary-text mb-4">System Settings</h3>
+          {/* System Settings Section */}
+          <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <IoSettings size={24} className="text-primary-accent" />
+              <h3 className="text-lg font-semibold text-primary-text">System Settings</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="System Name"
@@ -736,11 +929,9 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
                   onChange={(e) => handleChange('default_currency', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
                 >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="INR">INR (₹)</option>
-                  <option value="AED">AED (د.إ)</option>
+                  {Object.entries(currencySymbols || {}).map(([code, symbol]) => (
+                    <option key={code} value={code}>{code} ({symbol})</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -750,11 +941,9 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
                   onChange={(e) => handleChange('default_timezone', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
                 >
-                  <option value="UTC">UTC</option>
-                  <option value="America/New_York">America/New_York</option>
-                  <option value="Europe/London">Europe/London</option>
-                  <option value="Asia/Kolkata">Asia/Kolkata</option>
-                  <option value="Asia/Dubai">Asia/Dubai</option>
+                  {(timezoneOptions || []).map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -764,10 +953,9 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
                   onChange={(e) => handleChange('date_format', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
                 >
-                  <option value="Y-m-d">YYYY-MM-DD</option>
-                  <option value="m/d/Y">MM/DD/YYYY</option>
-                  <option value="d/m/Y">DD/MM/YYYY</option>
-                  <option value="d-m-Y">DD-MM-YYYY</option>
+                  {(dateFormatOptions || []).map(df => (
+                    <option key={df.value} value={df.value}>{df.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -777,32 +965,22 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
                   onChange={(e) => handleChange('time_format', e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
                 >
-                  <option value="H:i">24 Hour (HH:MM)</option>
-                  <option value="h:i A">12 Hour (HH:MM AM/PM)</option>
+                  {(timeFormatOptions || []).map(tf => (
+                    <option key={tf.value} value={tf.value}>{tf.label}</option>
+                  ))}
                 </select>
               </div>
-              <Input
-                label="Session Timeout (minutes)"
-                type="number"
-                value={settings.session_timeout || 30}
-                onChange={(e) => handleChange('session_timeout', parseInt(e.target.value))}
-                min="5"
-                max="480"
-              />
-              <Input
-                label="Max File Size (MB)"
-                type="number"
-                value={settings.max_file_size || 10}
-                onChange={(e) => handleChange('max_file_size', parseInt(e.target.value))}
-                min="1"
-                max="100"
-              />
-              <Input
-                label="Allowed File Types"
-                value={settings.allowed_file_types || ''}
-                onChange={(e) => handleChange('allowed_file_types', e.target.value)}
-                placeholder="pdf,doc,docx,jpg,png"
-              />
+              <div>
+                <label className="block text-sm font-medium text-primary-text mb-2">Currency Symbol Position</label>
+                <select
+                  value={settings.currency_symbol_position || 'before'}
+                  onChange={(e) => handleChange('currency_symbol_position', e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
+                >
+                  <option value="before">Before Amount ($100)</option>
+                  <option value="after">After Amount (100$)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -810,14 +988,6 @@ const GeneralSettings = ({ settings, handleChange, handleLogoUpload }) => {
 
       {activeTab === 'ui-options' && (
         <UIOptionsTab settings={settings} handleChange={handleChange} />
-      )}
-
-      {activeTab === 'top-menu' && (
-        <TopMenuTab settings={settings} handleChange={handleChange} />
-      )}
-
-      {activeTab === 'footer' && (
-        <FooterTab settings={settings} handleChange={handleChange} />
       )}
 
       {activeTab === 'pwa' && (
@@ -971,95 +1141,6 @@ const UIOptionsTab = ({ settings, handleChange }) => {
   )
 }
 
-// Top Menu Tab Component
-const TopMenuTab = ({ settings, handleChange }) => {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-primary-text mb-4">Top Menu Configuration</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Top Menu Logo</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files[0]
-                if (file) {
-                  const reader = new FileReader()
-                  reader.onload = (e) => handleChange('top_menu_logo', e.target.result)
-                  reader.readAsDataURL(file)
-                }
-              }}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-            />
-            {settings.top_menu_logo && (
-              <img src={settings.top_menu_logo} alt="Top Menu Logo" className="h-12 mt-2" />
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Top Menu Background Color</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.top_menu_color || '#ffffff'}
-                onChange={(e) => handleChange('top_menu_color', e.target.value)}
-                className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer"
-              />
-              <Input
-                value={settings.top_menu_color || '#ffffff'}
-                onChange={(e) => handleChange('top_menu_color', e.target.value)}
-                placeholder="#ffffff"
-                className="flex-1"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Footer Tab Component
-const FooterTab = ({ settings, handleChange }) => {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-primary-text mb-4">Footer Configuration</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Footer Text</label>
-            <textarea
-              value={settings.footer_text || ''}
-              onChange={(e) => handleChange('footer_text', e.target.value)}
-              rows={3}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-              placeholder="© 2024 Developo. All rights reserved."
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Footer Background Color</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.footer_color || '#102D2C'}
-                onChange={(e) => handleChange('footer_color', e.target.value)}
-                className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer"
-              />
-              <Input
-                value={settings.footer_color || '#102D2C'}
-                onChange={(e) => handleChange('footer_color', e.target.value)}
-                placeholder="#102D2C"
-                className="flex-1"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // PWA Tab Component
 const PWATab = ({ settings, handleChange, handleLogoUpload }) => {
   return (
@@ -1155,7 +1236,6 @@ const LocalizationSettings = ({ settings, handleChange, onLanguageChange }) => {
   const handleLanguageSelect = (e) => {
     const newLang = e.target.value
     handleChange('default_language', newLang)
-    // Apply language change immediately
     if (onLanguageChange) {
       onLanguageChange(newLang)
     }
@@ -1164,8 +1244,8 @@ const LocalizationSettings = ({ settings, handleChange, onLanguageChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Localization Settings</h1>
-        <p className="text-secondary-text">Configure language and regional settings</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Localization Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure language and regional settings</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -1183,44 +1263,6 @@ const LocalizationSettings = ({ settings, handleChange, onLanguageChange }) => {
             <option value="hi">Hindi (हिंदी)</option>
           </select>
           <p className="text-xs text-secondary-text mt-1">Language will be applied immediately</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-primary-text mb-2">Date Format</label>
-          <select
-            value={settings.date_format_localization || 'Y-m-d'}
-            onChange={(e) => handleChange('date_format_localization', e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-          >
-            <option value="Y-m-d">YYYY-MM-DD</option>
-            <option value="m/d/Y">MM/DD/YYYY</option>
-            <option value="d/m/Y">DD/MM/YYYY</option>
-            <option value="d-m-Y">DD-MM-YYYY</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-primary-text mb-2">Time Format</label>
-          <select
-            value={settings.time_format_localization || 'H:i'}
-            onChange={(e) => handleChange('time_format_localization', e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-          >
-            <option value="H:i">24 Hour (HH:MM)</option>
-            <option value="h:i A">12 Hour (HH:MM AM/PM)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-primary-text mb-2">Timezone</label>
-          <select
-            value={settings.timezone_localization || 'UTC'}
-            onChange={(e) => handleChange('timezone_localization', e.target.value)}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
-          >
-            <option value="UTC">UTC</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="Europe/London">Europe/London</option>
-            <option value="Asia/Kolkata">Asia/Kolkata</option>
-            <option value="Asia/Dubai">Asia/Dubai</option>
-          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-primary-text mb-2">Currency Symbol Position</label>
@@ -1245,8 +1287,8 @@ const EmailSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Email Settings</h1>
-        <p className="text-secondary-text">Configure email server settings</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Email Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure email server settings</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -1334,8 +1376,8 @@ const EmailTemplatesSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Email Templates</h1>
-        <p className="text-secondary-text">Manage email templates</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Email Templates</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Manage email templates</p>
       </div>
       <div className="text-center py-8 text-secondary-text">
         <IoDocumentText size={48} className="mx-auto mb-2 text-gray-300" />
@@ -1381,10 +1423,10 @@ const ModulesSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Modules Settings</h1>
-        <p className="text-secondary-text">Enable or disable application modules</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Modules Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Enable or disable application modules</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {modules.map((module) => (
           <label
             key={module.key}
@@ -1412,8 +1454,8 @@ const LeftMenuSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Left Menu Settings</h1>
-        <p className="text-secondary-text">Configure left sidebar menu</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Left Menu Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure left sidebar menu</p>
       </div>
       <div className="space-y-4">
         <div>
@@ -1443,8 +1485,8 @@ const NotificationsSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Notifications Settings</h1>
-        <p className="text-secondary-text">Configure notification preferences</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Notifications Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure notification preferences</p>
       </div>
       <div className="space-y-4">
         <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
@@ -1505,13 +1547,13 @@ const IntegrationSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Integration Settings</h1>
-        <p className="text-secondary-text">Configure third-party integrations</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Integration Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure third-party integrations</p>
       </div>
 
       {/* Google Calendar */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
           <div className="flex items-center gap-3">
             <IoCalendar size={24} className="text-blue-600" />
             <div>
@@ -1550,7 +1592,7 @@ const IntegrationSettings = ({ settings, handleChange }) => {
 
       {/* Slack */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
           <div className="flex items-center gap-3">
             <IoNotifications size={24} className="text-purple-600" />
             <div>
@@ -1582,7 +1624,7 @@ const IntegrationSettings = ({ settings, handleChange }) => {
 
       {/* Zapier */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
           <div className="flex items-center gap-3">
             <IoExtensionPuzzle size={24} className="text-orange-600" />
             <div>
@@ -1620,8 +1662,8 @@ const CronJobSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Cron Job Settings</h1>
-        <p className="text-secondary-text">Configure automated tasks</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Cron Job Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure automated tasks</p>
       </div>
       <div className="space-y-4">
         <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
@@ -1668,8 +1710,8 @@ const UpdatesSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Updates Settings</h1>
-        <p className="text-secondary-text">Manage system updates</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Updates Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Manage system updates</p>
       </div>
       <div className="space-y-4">
         <label className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
@@ -1723,8 +1765,8 @@ const AccessPermissionSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Access Permission Settings</h1>
-        <p className="text-secondary-text">Configure access permissions and role-based access control</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Access Permission Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure access permissions and role-based access control</p>
       </div>
       <div className="space-y-4">
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1769,8 +1811,8 @@ const ClientPortalSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Client Portal Settings</h1>
-        <p className="text-secondary-text">Configure client portal access and features</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Client Portal Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure client portal access and features</p>
       </div>
       <div className="space-y-4">
         <div>
@@ -1836,8 +1878,8 @@ const SalesProspectsSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Sales & Prospects Settings</h1>
-        <p className="text-secondary-text">Configure sales pipeline and prospect management</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Sales & Prospects Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Configure sales pipeline and prospect management</p>
       </div>
       <div className="space-y-4">
         <div>
@@ -1883,8 +1925,8 @@ const SetupSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Setup Settings</h1>
-        <p className="text-secondary-text">Initial setup and configuration</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Setup Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Initial setup and configuration</p>
       </div>
       <div className="space-y-4">
         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -1917,8 +1959,8 @@ const PluginsSettings = ({ settings, handleChange }) => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-primary-text mb-2">Plugins Settings</h1>
-        <p className="text-secondary-text">Manage installed plugins and extensions</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Plugins Settings</h1>
+        <p className="text-secondary-text text-sm sm:text-base">Manage installed plugins and extensions</p>
       </div>
       <div className="space-y-4">
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">

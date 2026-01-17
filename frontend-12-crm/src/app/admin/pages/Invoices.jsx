@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import AddButton from "../../../components/ui/AddButton";
 import RightSideModal from "../../../components/ui/RightSideModal";
 import Modal from "../../../components/ui/Modal";
 import Badge from "../../../components/ui/Badge";
@@ -12,7 +11,9 @@ import {
   clientsAPI,
   projectsAPI,
   companiesAPI,
+  paymentsAPI,
 } from "../../../api";
+import { useSettings } from "../../../context/SettingsContext";
 import {
   IoAdd,
   IoClose,
@@ -38,18 +39,17 @@ import {
   IoAttach,
   IoMic,
   IoDocumentText,
-  IoGrid,
   IoCheckmark,
   IoChevronBack,
   IoChevronForward,
   IoCopy,
   IoWarning,
   IoColorPalette,
-  IoNotifications,
 } from "react-icons/io5";
 
 const Invoices = () => {
   const navigate = useNavigate();
+  const { settings, formatDate, formatCurrency } = useSettings();
   const companyId = parseInt(localStorage.getItem("companyId") || 1, 10);
   const userId = parseInt(localStorage.getItem("userId") || 1, 10);
 
@@ -60,18 +60,26 @@ const Invoices = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isManageLabelsModalOpen, setIsManageLabelsModalOpen] = useState(false);
-  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
+  const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
 
   // Labels state
-  const [labels, setLabels] = useState([
-    { name: 'Urgent', color: '#ef4444' },
-    { name: 'Pending Review', color: '#eab308' },
-    { name: 'Approved', color: '#22c55e' },
-    { name: 'In Progress', color: '#3b82f6' },
-    { name: 'Taxable', color: '#8b5cf6' },
-  ]);
+  const [labels, setLabels] = useState(() => {
+    try {
+      const stored = localStorage.getItem("invoiceLabels");
+      if (stored) return JSON.parse(stored);
+    } catch (error) {
+      console.warn("Failed to load labels from storage", error);
+    }
+    return [
+      { name: "Urgent", color: "#ef4444" },
+      { name: "Pending Review", color: "#eab308" },
+      { name: "Approved", color: "#22c55e" },
+      { name: "In Progress", color: "#3b82f6" },
+      { name: "Taxable", color: "#8b5cf6" },
+    ];
+  });
   const [newLabelName, setNewLabelName] = useState("");
-  const [newLabelColor, setNewLabelColor] = useState("#22c55e");
+  const [newLabelColor, setNewLabelColor] = useState("");
 
   // Data states
   const [invoices, setInvoices] = useState([]);
@@ -86,12 +94,15 @@ const Invoices = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [clientFilter, setClientFilter] = useState("All");
+  const [invoiceFilter, setInvoiceFilter] = useState("All");
+  const [currencyFilter, setCurrencyFilter] = useState("All");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [periodFilter, setPeriodFilter] = useState("yearly");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [customDateStart, setCustomDateStart] = useState("");
   const [customDateEnd, setCustomDateEnd] = useState("");
+  const [dynamicRange, setDynamicRange] = useState("30");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,6 +110,7 @@ const Invoices = () => {
 
   // Invoice items state
   const [invoiceItems, setInvoiceItems] = useState([]);
+  const [uploadedFile, setUploadedFile] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -114,13 +126,21 @@ const Invoices = () => {
     secondTaxRate: 0,
     tds: "",
     note: "",
-    labels: "",
+    labels: [],
     isRecurring: true,
     repeatEvery: 1,
     repeatType: "Month",
     cycles: "",
     discount: 0,
     discountType: "%",
+  });
+
+  const [paymentForm, setPaymentForm] = useState({
+    invoiceId: "",
+    amount: "",
+    paymentDate: new Date().toISOString().split("T")[0],
+    method: "Cash",
+    note: "",
   });
 
   // Fetch functions
@@ -139,6 +159,15 @@ const Invoices = () => {
           const numMatch = invNumber.match(/\d+/);
           const numPart = numMatch ? numMatch[0] : String(invoice.id);
           const formattedInvoiceNumber = `INV #${numPart}`;
+          const totalValue = parseFloat(invoice.total || 0);
+          const paidValue = parseFloat(invoice.paid_amount || 0);
+          const dueValue = parseFloat(invoice.due_amount || Math.max(totalValue - paidValue, 0));
+          const statusValue = calculateInvoiceStatus({
+            ...invoice,
+            total: totalValue,
+            paid_amount: paidValue,
+            due_amount: dueValue,
+          });
 
           return {
             id: invoice.id,
@@ -149,12 +178,13 @@ const Invoices = () => {
             project: invoice.project_name || "-",
             invoiceDate: invoice.bill_date || invoice.invoice_date || "",
             dueDate: invoice.due_date || "",
-            total: parseFloat(invoice.total || 0),
-            paid: parseFloat(invoice.paid_amount || 0),
-            unpaid: parseFloat(invoice.due_amount || invoice.total || 0),
-            status: (invoice.status || "Unpaid").charAt(0).toUpperCase() + (invoice.status || "Unpaid").slice(1).toLowerCase(),
-            labels: invoice.labels || "",
+            total: totalValue,
+            paid: paidValue,
+            unpaid: dueValue,
+            status: statusValue,
+            labels: parseLabels(invoice.labels),
             items: invoice.items || [],
+            currency: invoice.currency || settings?.default_currency || "USD",
           };
         });
         setInvoices(transformedInvoices);
@@ -164,7 +194,7 @@ const Invoices = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyId, statusFilter]);
+  }, [companyId, statusFilter, settings?.default_currency]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -194,6 +224,14 @@ const Invoices = () => {
     fetchClients();
     fetchProjects();
   }, [fetchInvoices, fetchClients, fetchProjects]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("invoiceLabels", JSON.stringify(labels));
+    } catch (error) {
+      console.warn("Failed to persist labels", error);
+    }
+  }, [labels]);
 
   useEffect(() => {
     if (formData.client) {
@@ -228,7 +266,7 @@ const Invoices = () => {
       secondTaxRate: 0,
       tds: "",
       note: "",
-      labels: "",
+      labels: [],
       isRecurring: true,
       repeatEvery: 1,
       repeatType: "Month",
@@ -237,6 +275,7 @@ const Invoices = () => {
       discountType: "%",
     });
     setInvoiceItems([]);
+    setUploadedFile(null);
   };
 
   const handleSave = async () => {
@@ -265,7 +304,7 @@ const Invoices = () => {
         discount: formData.discount || 0,
         discount_type: formData.discountType || "%",
         note: formData.note || null,
-        labels: formData.labels || null,
+        labels: formData.labels?.length ? formData.labels.join(", ") : null,
         tax: formData.tax || null,
         tax_rate: formData.taxRate || 0,
         second_tax: formData.secondTax || null,
@@ -301,6 +340,10 @@ const Invoices = () => {
           await fetchInvoices();
           setIsAddModalOpen(false);
           resetForm();
+          const createdId = response.data.data?.id || response.data.data?.invoice_id;
+          if (createdId) {
+            navigate(`/app/admin/invoices/${createdId}`);
+          }
         }
       }
     } catch (error) {
@@ -328,7 +371,7 @@ const Invoices = () => {
           secondTaxRate: data.second_tax_rate || 0,
           tds: data.tds || "",
           note: data.note || "",
-          labels: data.labels || "",
+          labels: parseLabels(data.labels),
           isRecurring: data.is_recurring || false,
           repeatEvery: data.repeat_every || 1,
           repeatType: data.repeat_type || "Month",
@@ -415,9 +458,12 @@ const Invoices = () => {
               <tr>
                 <th>Invoice</th>
                 <th>Client</th>
+                <th>Project</th>
                 <th>Bill date</th>
                 <th>Due date</th>
-                <th>Amount</th>
+                <th>Total invoiced</th>
+                <th>Payment received</th>
+                <th>Due</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -426,16 +472,19 @@ const Invoices = () => {
                 <tr>
                   <td>${inv.invoiceNumber}</td>
                   <td>${inv.client?.name || ""}</td>
+                  <td>${inv.project || ""}</td>
                   <td>${formatDate(inv.invoiceDate)}</td>
                   <td>${formatDate(inv.dueDate)}</td>
-                  <td>$${parseFloat(inv.total || 0).toFixed(2)}</td>
+                  <td>${formatCurrency(inv.total, inv.currency)}</td>
+                  <td>${formatCurrency(inv.paid, inv.currency)}</td>
+                  <td>${formatCurrency(inv.unpaid, inv.currency)}</td>
                   <td>${inv.status}</td>
                 </tr>
               `).join("")}
               <tr class="total-row">
-                <td colspan="4" style="text-align: right;">Total:</td>
-                <td>$${filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0).toFixed(2)}</td>
-                <td></td>
+                <td colspan="5" style="text-align: right;">Total:</td>
+                <td>${formatCurrency(filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0), settings?.default_currency)}</td>
+                <td colspan="3"></td>
               </tr>
             </tbody>
           </table>
@@ -451,9 +500,12 @@ const Invoices = () => {
     const csvData = filteredInvoices.map((inv) => ({
       "Invoice": inv.invoiceNumber,
       "Client": inv.client?.name || "",
+      "Project": inv.project || "",
       "Bill date": formatDate(inv.invoiceDate),
       "Due date": formatDate(inv.dueDate),
-      "Amount": inv.total,
+      "Total invoiced": inv.total,
+      "Payment received": inv.paid,
+      "Due": inv.unpaid,
       "Status": inv.status,
     }));
 
@@ -477,11 +529,14 @@ const Invoices = () => {
   const handleResetFilters = () => {
     setStatusFilter("All");
     setClientFilter("All");
+    setInvoiceFilter("All");
+    setCurrencyFilter("All");
     setPeriodFilter("yearly");
     setSelectedYear(new Date().getFullYear());
     setSelectedMonth(new Date().getMonth() + 1);
     setCustomDateStart("");
     setCustomDateEnd("");
+    setDynamicRange("30");
     setSearchQuery("");
     setShowFilterPanel(false);
     fetchInvoices();
@@ -495,7 +550,7 @@ const Invoices = () => {
     }
     setLabels([...labels, { name: newLabelName.trim(), color: newLabelColor }]);
     setNewLabelName("");
-    setNewLabelColor("#22c55e");
+    setNewLabelColor(primaryColor);
   };
 
   const handleDeleteLabel = (labelName) => {
@@ -503,41 +558,194 @@ const Invoices = () => {
     setLabels(labels.filter((l) => l.name !== labelName));
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "--";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).replace(/\//g, "-");
+  const updateLabelAt = (index, updates) => {
+    setLabels((prev) =>
+      prev.map((label, idx) => (idx === index ? { ...label, ...updates } : label))
+    );
   };
 
-  const formatCurrency = (amount) => {
-    return `$${parseFloat(amount || 0).toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  const toggleLabelSelection = (labelName) => {
+    setFormData((prev) => {
+      const existing = prev.labels || [];
+      if (existing.includes(labelName)) {
+        return { ...prev, labels: existing.filter((label) => label !== labelName) };
+      }
+      return { ...prev, labels: [...existing, labelName] };
+    });
   };
+
+  const handleSavePayment = async () => {
+    if (!paymentForm.invoiceId) {
+      alert("Please select an invoice");
+      return;
+    }
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      alert("Payment amount is required");
+      return;
+    }
+    try {
+      const response = await paymentsAPI.create({
+        company_id: companyId,
+        invoice_id: parseInt(paymentForm.invoiceId),
+        amount: parseFloat(paymentForm.amount),
+        payment_date: paymentForm.paymentDate,
+        payment_method: paymentForm.method,
+        reference_note: paymentForm.note || null,
+      });
+      if (response.data.success) {
+        alert("Payment added successfully!");
+        await fetchInvoices();
+        setIsAddPaymentModalOpen(false);
+        setPaymentForm({
+          invoiceId: "",
+          amount: "",
+          paymentDate: new Date().toISOString().split("T")[0],
+          method: "Cash",
+          note: "",
+        });
+      }
+    } catch (error) {
+      console.error("Error saving payment:", error);
+      alert(error.response?.data?.error || "Failed to save payment");
+    }
+  };
+
+  const parseLabels = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return String(value)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+
+  const hexToHsl = (hex) => {
+    if (!hex) return { h: 210, s: 100, l: 45 };
+    let clean = hex.replace("#", "").trim();
+    if (clean.length === 3) {
+      clean = clean.split("").map((c) => c + c).join("");
+    }
+    const num = parseInt(clean, 16);
+    if (Number.isNaN(num)) return { h: 210, s: 100, l: 45 };
+    const r = ((num >> 16) & 255) / 255;
+    const g = ((num >> 8) & 255) / 255;
+    const b = (num & 255) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d !== 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      switch (max) {
+        case r:
+          h = ((g - b) / d) % 6;
+          break;
+        case g:
+          h = (b - r) / d + 2;
+          break;
+        default:
+          h = (r - g) / d + 4;
+      }
+      h = Math.round(h * 60);
+      if (h < 0) h += 360;
+    }
+    return { h, s: Math.round(s * 100), l: Math.round(l * 100) };
+  };
+
+  const hexToRgb = (hex) => {
+    if (!hex) return { r: 33, g: 126, b: 69 };
+    let clean = hex.replace("#", "").trim();
+    if (clean.length === 3) {
+      clean = clean.split("").map((c) => c + c).join("");
+    }
+    const num = parseInt(clean, 16);
+    if (Number.isNaN(num)) return { r: 33, g: 126, b: 69 };
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  };
+
+  const primaryColor = useMemo(() => {
+    const fromSettings = settings?.primary_color;
+    if (fromSettings) return fromSettings;
+    if (typeof window !== "undefined") {
+      const cssVar = getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-primary-accent")
+        .trim();
+      if (cssVar) return cssVar;
+    }
+    return "#217E45";
+  }, [settings?.primary_color]);
+
+  useEffect(() => {
+    if (!newLabelColor) {
+      setNewLabelColor(primaryColor);
+    }
+  }, [primaryColor, newLabelColor]);
 
   const getStatusStyle = (status) => {
+    const base = hexToHsl(primaryColor);
     const s = status?.toLowerCase() || "";
-    switch (s) {
-      case "paid":
-      case "fully paid":
-        return "bg-green-500 text-white";
-      case "partially paid":
-        return "bg-blue-500 text-white";
-      case "unpaid":
-      case "not paid":
-        return "bg-yellow-500 text-white";
-      case "overdue":
-        return "bg-red-500 text-white";
-      case "draft":
-        return "bg-gray-500 text-white";
-      default:
-        return "bg-gray-400 text-white";
+    const hueOffsets = {
+      paid: 0,
+      "fully paid": 0,
+      "partially paid": 25,
+      unpaid: 55,
+      "not paid": 55,
+      overdue: 145,
+    };
+    if (s === "draft") {
+      return {
+        backgroundColor: `hsl(${base.h} 10% 92%)`,
+        color: `hsl(${base.h} 20% 35%)`,
+        borderColor: `hsl(${base.h} 15% 85%)`,
+      };
     }
+    const hue = (base.h + (hueOffsets[s] || 0)) % 360;
+    return {
+      backgroundColor: `hsl(${hue} ${Math.max(45, base.s)}% 90%)`,
+      color: `hsl(${hue} ${Math.max(55, base.s)}% 35%)`,
+      borderColor: `hsl(${hue} ${Math.max(45, base.s)}% 80%)`,
+    };
+  };
+
+  const labelColorMap = useMemo(() => {
+    const map = new Map();
+    labels.forEach((label) => {
+      map.set(label.name, label.color);
+    });
+    return map;
+  }, [labels]);
+
+  const getLabelStyle = (labelName) => {
+    const color = labelColorMap.get(labelName) || primaryColor;
+    const { r, g, b } = hexToRgb(color);
+    return {
+      backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
+      color,
+      borderColor: `rgba(${r}, ${g}, ${b}, 0.35)`,
+    };
+  };
+
+  const calculateInvoiceStatus = (invoice) => {
+    const total = parseFloat(invoice.total || invoice.total_amount || 0);
+    const paid = parseFloat(invoice.paid_amount || invoice.paid || 0);
+    const due = Math.max(total - paid, 0);
+    const dueDate = invoice.due_date || invoice.dueDate;
+    if (!total) return "Draft";
+    if (paid >= total) return "Paid";
+    if (paid > 0 && paid < total) return "Partially Paid";
+    if (dueDate) {
+      const dueTime = new Date(dueDate).getTime();
+      if (!Number.isNaN(dueTime) && dueTime < new Date().setHours(0, 0, 0, 0)) {
+        return "Overdue";
+      }
+    }
+    return "Not Paid";
   };
 
   // Filtered invoices
@@ -550,6 +758,16 @@ const Invoices = () => {
     }
 
     if (statusFilter !== "All" && invoice.status?.toLowerCase() !== statusFilter.toLowerCase()) {
+      return false;
+    }
+
+    if (invoiceFilter !== "All") {
+      if (String(invoice.id) !== String(invoiceFilter) && invoice.invoiceNumber !== invoiceFilter) {
+        return false;
+      }
+    }
+
+    if (currencyFilter !== "All" && invoice.currency !== currencyFilter) {
       return false;
     }
 
@@ -571,14 +789,20 @@ const Invoices = () => {
       if (invoiceDate.getFullYear() !== selectedYear || invoiceDate.getMonth() + 1 !== selectedMonth) return false;
     }
 
-    if (customDateStart && invoiceDate) {
-      if (invoiceDate < new Date(customDateStart)) return false;
+    if (periodFilter === "custom" && invoiceDate) {
+      if (customDateStart && invoiceDate < new Date(customDateStart)) return false;
+      if (customDateEnd) {
+        const endDate = new Date(customDateEnd);
+        endDate.setHours(23, 59, 59, 999);
+        if (invoiceDate > endDate) return false;
+      }
     }
 
-    if (customDateEnd && invoiceDate) {
-      const endDate = new Date(customDateEnd);
-      endDate.setHours(23, 59, 59, 999);
-      if (invoiceDate > endDate) return false;
+    if (periodFilter === "dynamic" && invoiceDate) {
+      const days = parseInt(dynamicRange) || 30;
+      const start = new Date();
+      start.setDate(start.getDate() - days);
+      if (invoiceDate < start) return false;
     }
 
     return true;
@@ -601,174 +825,314 @@ const Invoices = () => {
   const totalAmount = filteredInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0);
 
   return (
-    <div className="space-y-4 bg-gray-100 min-h-screen p-4">
+    <div className="space-y-3 sm:space-y-4 bg-main-bg min-h-screen p-2 sm:p-4 text-primary-text">
       {/* Top Bar */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          {/* Left Side */}
-          <div className="flex items-center gap-3">
-            <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-              <IoGrid size={18} className="text-gray-500" />
-            </button>
-
-            {/* Filters Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
-                className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Filters
-                <IoChevronDown size={16} className="text-gray-500" />
-              </button>
-              {showFiltersDropdown && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  <button
-                    onClick={() => { setStatusFilter("All"); setShowFiltersDropdown(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    All Invoices
-                  </button>
-                  <button
-                    onClick={() => { setStatusFilter("Paid"); setShowFiltersDropdown(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    Paid
-                  </button>
-                  <button
-                    onClick={() => { setStatusFilter("Unpaid"); setShowFiltersDropdown(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    Not Paid
-                  </button>
-                  <button
-                    onClick={() => { setStatusFilter("Overdue"); setShowFiltersDropdown(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    Overdue
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setActiveTab("credit-notes")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "credit-notes" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
-              }`}
-            >
-              + Credit Notes
-            </button>
-
+      <div className="bg-card-bg rounded-lg shadow-soft border border-border-light overflow-visible">
+        {/* Header with tabs and action buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <button
               onClick={() => setActiveTab("invoices")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "invoices" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === "invoices"
+                  ? "bg-primary-accent text-white"
+                  : "text-secondary-text hover:bg-main-bg border border-border-light"
               }`}
             >
               Invoices
             </button>
-
             <button
-              onClick={() => setStatusFilter("Overdue")}
-              className="p-2 text-orange-500 border border-orange-300 rounded-lg hover:bg-orange-50"
-              title="View Overdue Invoices"
+              onClick={() => setActiveTab("recurring")}
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                activeTab === "recurring"
+                  ? "bg-primary-accent text-white"
+                  : "text-secondary-text hover:bg-main-bg border border-border-light"
+              }`}
             >
-              <IoNotifications size={18} />
+              Recurring
             </button>
           </div>
-
-          {/* Right Side */}
-          <div className="flex items-center gap-3">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              onClick={() => setIsManageLabelsModalOpen(true)}
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg hover:bg-main-bg text-secondary-text whitespace-nowrap"
+            >
+              <IoPricetag size={14} /> <span className="hidden xs:inline">Labels</span>
+            </button>
+            <button
+              onClick={() => setIsAddPaymentModalOpen(true)}
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg hover:bg-main-bg text-secondary-text whitespace-nowrap"
+            >
+              <IoCash size={14} /> <span className="hidden xs:inline">Payment</span>
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setIsAddModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold bg-primary-accent text-white rounded-lg hover:opacity-90 whitespace-nowrap"
+            >
+              <IoAdd size={14} /> <span className="hidden xs:inline">Add</span> Invoice
+            </button>
+          </div>
+        </div>
+        {/* Filter bar */}
+        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 sm:gap-3 border-t border-border-light px-3 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilterPanel((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg hover:bg-main-bg text-secondary-text"
+            >
+              <IoFilter size={14} /> Filters
+              {showFilterPanel ? <IoChevronUp size={14} /> : <IoChevronDown size={14} />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-1 xs:flex-initial justify-end">
             <button
               onClick={handleExportExcel}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg hover:bg-main-bg text-secondary-text hidden xs:block"
             >
               Excel
             </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg hover:bg-main-bg text-secondary-text hidden xs:block"
             >
               Print
             </button>
-            <div className="relative">
+            <div className="relative flex-1 xs:flex-initial max-w-[200px] sm:max-w-[220px]">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="pl-8 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg w-full focus:ring-2 focus:ring-primary-accent outline-none bg-input-bg text-primary-text"
               />
-              <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <IoSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-text" size={14} />
             </div>
-            <AddButton
-              onClick={() => {
-                resetForm();
-                setIsAddModalOpen(true);
-              }}
-              label="Add invoice"
-              className="bg-green-500 hover:bg-green-600"
-            />
           </div>
         </div>
+        {/* Filter Panel */}
+        {showFilterPanel && (
+          <div className="border-t border-border-light px-3 sm:px-4 py-3 sm:py-4 bg-main-bg/40 overflow-visible relative z-20">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+              <div className="col-span-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-secondary-text uppercase tracking-wider">Invoice</label>
+                <select
+                  value={invoiceFilter}
+                  onChange={(e) => setInvoiceFilter(e.target.value)}
+                  className="mt-1 w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                >
+                  <option value="All">All</option>
+                  {invoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>{inv.invoiceNumber}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-secondary-text uppercase tracking-wider">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="mt-1 w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                >
+                  <option value="All">All</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Partially Paid">Partial</option>
+                  <option value="Not Paid">Not Paid</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Draft">Draft</option>
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-secondary-text uppercase tracking-wider">Currency</label>
+                <select
+                  value={currencyFilter}
+                  onChange={(e) => setCurrencyFilter(e.target.value)}
+                  className="mt-1 w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                >
+                  <option value="All">All</option>
+                  {[...new Set(invoices.map((inv) => inv.currency))].map((code) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-[10px] sm:text-xs font-semibold text-secondary-text uppercase tracking-wider">Period</label>
+                <div className="mt-1 flex flex-wrap gap-1 sm:gap-2">
+                  {["monthly", "yearly", "custom", "dynamic"].map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setPeriodFilter(period)}
+                      className={`px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-md border ${
+                        periodFilter === period
+                          ? "bg-primary-accent text-white border-transparent"
+                          : "border-border-light text-secondary-text hover:bg-main-bg"
+                      }`}
+                    >
+                      {period.charAt(0).toUpperCase() + period.slice(1, 3)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-2 lg:col-span-2">
+                <label className="text-[10px] sm:text-xs font-semibold text-secondary-text uppercase tracking-wider">Date Range</label>
+                {periodFilter === "monthly" && (
+                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                    >
+                      {Array.from({ length: 6 }, (_, idx) => new Date().getFullYear() - idx).map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                    >
+                      {Array.from({ length: 12 }, (_, idx) => idx + 1).map((month) => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {periodFilter === "yearly" && (
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="mt-1 w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                  >
+                    {Array.from({ length: 6 }, (_, idx) => new Date().getFullYear() - idx).map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                )}
+                {periodFilter === "custom" && (
+                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      value={customDateStart}
+                      onChange={(e) => setCustomDateStart(e.target.value)}
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                    />
+                    <input
+                      type="date"
+                      value={customDateEnd}
+                      onChange={(e) => setCustomDateEnd(e.target.value)}
+                      className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                    />
+                  </div>
+                )}
+                {periodFilter === "dynamic" && (
+                  <select
+                    value={dynamicRange}
+                    onChange={(e) => setDynamicRange(e.target.value)}
+                    className="mt-1 w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg bg-input-bg"
+                  >
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-3 sm:mt-4">
+              <button
+                onClick={handleResetFilters}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-border-light rounded-lg text-secondary-text hover:bg-main-bg"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => setShowFilterPanel(false)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-primary-accent text-white rounded-lg hover:opacity-90"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Invoices Table */}
-      <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      <Card className="p-0 overflow-hidden bg-card-bg border border-border-light">
+        {/* Desktop Table - hidden on mobile */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-[900px] text-xs sm:text-sm">
+            <thead className="bg-main-bg border-b border-border-light">
               <tr>
-                <th className="w-[14%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Invoice</th>
-                <th className="w-[18%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Client</th>
-                <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Bill date</th>
-                <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Due date</th>
-                <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Amount</th>
-                <th className="w-[14%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="w-[18%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"></th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Invoice</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Client</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase hidden lg:table-cell">Project</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Bill</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Due</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Total</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase hidden xl:table-cell">Paid</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Balance</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-secondary-text uppercase">Status</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-3 text-right text-[10px] sm:text-xs font-semibold text-secondary-text uppercase sticky right-0 bg-main-bg">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card-bg divide-y divide-border-light">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Loading invoices...</td>
+                  <td colSpan={10} className="px-4 py-6 sm:py-8 text-center text-secondary-text text-sm">Loading...</td>
                 </tr>
               ) : paginatedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No invoices found</td>
+                  <td colSpan={10} className="px-4 py-6 sm:py-8 text-center text-secondary-text text-sm">No invoices found</td>
                 </tr>
               ) : (
                 paginatedInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <button onClick={() => handleView(invoice)} className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                  <tr key={invoice.id} className="hover:bg-main-bg">
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 align-top">
+                      <button onClick={() => handleView(invoice)} className="text-primary-accent hover:underline font-semibold text-xs sm:text-sm">
                         {invoice.invoiceNumber}
                       </button>
+                      {invoice.labels?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-0.5">
+                          {invoice.labels.slice(0, 2).map((label) => (
+                            <span
+                              key={`${invoice.id}-${label}`}
+                              className="px-1.5 py-0.5 text-[8px] sm:text-[10px] font-semibold rounded-full border"
+                              style={getLabelStyle(label)}
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-700">
-                      {invoice.client?.name || "Unknown Client"}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-600">{formatDate(invoice.invoiceDate)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-600">{formatDate(invoice.dueDate)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-medium">{formatCurrency(invoice.total)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(invoice.status)}`}>
-                        {invoice.status === "Unpaid" ? "Not paid" : invoice.status}
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-primary-text text-xs sm:text-sm truncate max-w-[120px]">{invoice.client?.name || "-"}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-secondary-text text-xs sm:text-sm hidden lg:table-cell truncate max-w-[100px]">{invoice.project || "-"}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-secondary-text text-xs sm:text-sm whitespace-nowrap">{formatDate(invoice.invoiceDate)}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-secondary-text text-xs sm:text-sm whitespace-nowrap">{formatDate(invoice.dueDate)}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-primary-text font-semibold text-xs sm:text-sm whitespace-nowrap">{formatCurrency(invoice.total, invoice.currency)}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-secondary-text text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">{formatCurrency(invoice.paid, invoice.currency)}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 text-secondary-text text-xs sm:text-sm whitespace-nowrap">{formatCurrency(invoice.unpaid, invoice.currency)}</td>
+                    <td className="px-2 sm:px-4 py-2 sm:py-3">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold border whitespace-nowrap" style={getStatusStyle(invoice.status)}>
+                        {invoice.status}
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleCopy(invoice)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="Copy">
-                          <IoCopy size={16} />
+                    <td className="px-2 sm:px-4 py-2 sm:py-3 sticky right-0 bg-card-bg">
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button onClick={() => handleCopy(invoice)} className="p-1 sm:p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Copy">
+                          <IoCopy size={14} />
                         </button>
-                        <button onClick={() => handleEdit(invoice)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="Edit">
-                          <IoCreate size={16} />
+                        <button onClick={() => handleEdit(invoice)} className="p-1 sm:p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Edit">
+                          <IoCreate size={14} />
                         </button>
-                        <button onClick={() => handleDelete(invoice)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">
-                          <IoClose size={16} />
+                        <button onClick={() => handleDelete(invoice)} className="p-1 sm:p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Delete">
+                          <IoClose size={14} />
                         </button>
-                        <button onClick={() => handleView(invoice)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="More">
-                          <IoEllipsisVertical size={16} />
+                        <button onClick={() => handleView(invoice)} className="p-1 sm:p-1.5 text-secondary-text hover:bg-main-bg rounded" title="View">
+                          <IoEllipsisVertical size={14} />
                         </button>
                       </div>
                     </td>
@@ -779,39 +1143,98 @@ const Invoices = () => {
           </table>
         </div>
 
+        {/* Mobile cards - visible only on mobile */}
+        <div className="md:hidden divide-y divide-border-light">
+          {loading ? (
+            <div className="p-6 text-center text-secondary-text">Loading...</div>
+          ) : paginatedInvoices.length === 0 ? (
+            <div className="p-6 text-center text-secondary-text">No invoices found</div>
+          ) : (
+            paginatedInvoices.map((invoice) => (
+              <div 
+                key={`card-${invoice.id}`} 
+                className="p-3 space-y-2 active:bg-main-bg/50"
+                onClick={() => handleView(invoice)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <button onClick={(e) => { e.stopPropagation(); handleView(invoice); }} className="text-primary-accent font-semibold text-sm">
+                      {invoice.invoiceNumber}
+                    </button>
+                    <div className="text-xs text-secondary-text truncate mt-0.5">{invoice.client?.name}</div>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0" style={getStatusStyle(invoice.status)}>
+                    {invoice.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-secondary-text">
+                  <div>
+                    <span className="block text-[9px] uppercase tracking-wider text-muted-text">Bill date</span>
+                    <span className="text-primary-text">{formatDate(invoice.invoiceDate)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] uppercase tracking-wider text-muted-text">Due date</span>
+                    <span className="text-primary-text">{formatDate(invoice.dueDate)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] uppercase tracking-wider text-muted-text">Total</span>
+                    <span className="text-primary-text font-semibold">{formatCurrency(invoice.total, invoice.currency)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] uppercase tracking-wider text-muted-text">Balance</span>
+                    <span className="text-primary-text">{formatCurrency(invoice.unpaid, invoice.currency)}</span>
+                  </div>
+                </div>
+                {/* Mobile action buttons */}
+                <div className="flex items-center justify-end gap-1 pt-1 border-t border-border-light" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => handleCopy(invoice)} className="p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Copy">
+                    <IoCopy size={14} />
+                  </button>
+                  <button onClick={() => handleEdit(invoice)} className="p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Edit">
+                    <IoCreate size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(invoice)} className="p-1.5 text-secondary-text hover:bg-main-bg rounded" title="Delete">
+                    <IoClose size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         {/* Footer with Pagination and Total */}
-        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-4">
+        <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-border-light flex flex-wrap items-center justify-between gap-2 sm:gap-3 bg-main-bg">
+          <div className="flex items-center gap-2 sm:gap-4">
             <select
               value={itemsPerPage}
               onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
-              className="px-2 py-1 text-sm border border-gray-300 rounded"
+              className="px-1.5 sm:px-2 py-1 text-xs sm:text-sm border border-border-light rounded bg-input-bg"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
             </select>
-            <span className="text-sm text-gray-600">
-              {startIndex + 1}-{Math.min(endIndex, filteredInvoices.length)} / {filteredInvoices.length}
+            <span className="text-xs sm:text-sm text-secondary-text">
+              {startIndex + 1}-{Math.min(endIndex, filteredInvoices.length)}/{filteredInvoices.length}
             </span>
           </div>
-          <div className="text-sm font-semibold text-gray-700">
-            Total: {formatCurrency(totalAmount)}
+          <div className="text-xs sm:text-sm font-semibold text-primary-text hidden xs:block">
+            Total: {formatCurrency(totalAmount, settings?.default_currency)}
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`p-1.5 border border-gray-300 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+              className={`p-1 sm:p-1.5 border border-border-light rounded ${currentPage === 1 ? 'text-muted-text cursor-not-allowed' : 'hover:bg-main-bg'}`}
             >
-              <IoChevronBack size={16} />
+              <IoChevronBack size={14} />
             </button>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className={`p-1.5 border border-gray-300 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+              className={`p-1 sm:p-1.5 border border-border-light rounded ${currentPage === totalPages || totalPages === 0 ? 'text-muted-text cursor-not-allowed' : 'hover:bg-main-bg'}`}
             >
-              <IoChevronForward size={16} />
+              <IoChevronForward size={14} />
             </button>
           </div>
         </div>
@@ -981,37 +1404,124 @@ const Invoices = () => {
           </div>
 
           {/* Labels */}
-          <div className="flex items-center">
-            <label className="w-32 text-sm font-medium text-gray-700">Labels</label>
-            <Input
-              value={formData.labels}
-              onChange={(e) => setFormData({ ...formData, labels: e.target.value })}
-              placeholder="Urgent, Taxable"
-              className="flex-1"
-            />
+          <div className="flex items-start">
+            <label className="w-32 text-sm font-medium text-secondary-text pt-2">Labels</label>
+            <div className="flex-1">
+              <div className="flex flex-wrap gap-2">
+                {labels.map((label) => {
+                  const selected = formData.labels.includes(label.name);
+                  return (
+                    <button
+                      key={label.name}
+                      type="button"
+                      onClick={() => toggleLabelSelection(label.name)}
+                      className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${
+                        selected ? "shadow-sm" : "opacity-70 hover:opacity-100"
+                      }`}
+                      style={getLabelStyle(label.name)}
+                    >
+                      {label.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {formData.labels.length === 0 && (
+                <p className="text-xs text-muted-text mt-2">Select labels to tag this invoice.</p>
+              )}
+            </div>
+          </div>
+
+          {/* File Upload */}
+          <div className="flex items-start">
+            <label className="w-32 text-sm font-medium text-secondary-text pt-2">File Upload</label>
+            <div className="flex-1">
+              <input
+                type="file"
+                onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-border-light rounded-lg bg-input-bg text-sm"
+              />
+              {uploadedFile && (
+                <p className="text-xs text-secondary-text mt-2">Selected: {uploadedFile.name}</p>
+              )}
+            </div>
           </div>
 
           {/* Bottom Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                <IoAttach size={16} /> Upload File
-              </button>
-              <button className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-                <IoMic size={16} />
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }}
-              >
-                Close
-              </Button>
-              <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <IoCheckmark size={18} className="mr-1" /> Save
-              </Button>
-            </div>
+          <div className="flex items-center justify-end pt-4 border-t border-border-light gap-3">
+            <Button
+              variant="outline"
+              onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedInvoice(null); resetForm(); }}
+            >
+              Close
+            </Button>
+            <Button onClick={handleSave} className="bg-primary-accent hover:opacity-90 text-white">
+              <IoCheckmark size={18} className="mr-1" /> Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Payment Modal */}
+      <Modal isOpen={isAddPaymentModalOpen} onClose={() => setIsAddPaymentModalOpen(false)} title="Add payment">
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-secondary-text">Invoice</label>
+            <select
+              value={paymentForm.invoiceId}
+              onChange={(e) => setPaymentForm({ ...paymentForm, invoiceId: e.target.value })}
+              className="mt-2 w-full px-3 py-2 border border-border-light rounded-lg bg-input-bg"
+            >
+              <option value="">Select invoice</option>
+              {invoices.map((inv) => (
+                <option key={inv.id} value={inv.id}>{inv.invoiceNumber}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-secondary-text">Amount</label>
+            <Input
+              type="number"
+              value={paymentForm.amount}
+              onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+              placeholder="0.00"
+              className="mt-2"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-secondary-text">Payment date</label>
+            <Input
+              type="date"
+              value={paymentForm.paymentDate}
+              onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+              className="mt-2"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-secondary-text">Method</label>
+            <select
+              value={paymentForm.method}
+              onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+              className="mt-2 w-full px-3 py-2 border border-border-light rounded-lg bg-input-bg"
+            >
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Card">Card</option>
+              <option value="UPI">UPI</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-secondary-text">Note</label>
+            <textarea
+              value={paymentForm.note}
+              onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })}
+              rows={3}
+              className="mt-2 w-full px-3 py-2 border border-border-light rounded-lg bg-input-bg resize-none"
+              placeholder="Add payment note..."
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-light">
+            <Button variant="outline" onClick={() => setIsAddPaymentModalOpen(false)}>Close</Button>
+            <Button onClick={handleSavePayment} className="bg-primary-accent hover:opacity-90 text-white">Save</Button>
           </div>
         </div>
       </Modal>
@@ -1023,27 +1533,34 @@ const Invoices = () => {
             <div className="flex-1">
               <Input value={newLabelName} onChange={(e) => setNewLabelName(e.target.value)} placeholder="Label name" />
             </div>
-            <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border border-gray-300" />
-            <Button onClick={handleAddLabel} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <input type="color" value={newLabelColor} onChange={(e) => setNewLabelColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border border-border-light" />
+            <Button onClick={handleAddLabel} className="bg-primary-accent hover:opacity-90 text-white">
               <IoAdd size={18} /> Add
             </Button>
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {labels.map((label) => (
-              <div key={label.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full" style={{ backgroundColor: label.color }}></div>
-                  <span className="font-medium" style={{ color: label.color }}>{label.name}</span>
-                </div>
-                <button onClick={() => handleDeleteLabel(label.name)} className="p-1 text-red-500 hover:bg-red-50 rounded">
+            {labels.map((label, index) => (
+              <div key={`${label.name}-${index}`} className="flex items-center gap-3 p-3 bg-main-bg rounded-lg border border-border-light">
+                <input
+                  value={label.name}
+                  onChange={(e) => updateLabelAt(index, { name: e.target.value })}
+                  className="flex-1 px-3 py-2 text-sm border border-border-light rounded-lg bg-input-bg"
+                />
+                <input
+                  type="color"
+                  value={label.color}
+                  onChange={(e) => updateLabelAt(index, { color: e.target.value })}
+                  className="w-10 h-10 rounded cursor-pointer border border-border-light"
+                />
+                <button onClick={() => handleDeleteLabel(label.name)} className="p-2 text-secondary-text hover:bg-main-bg rounded">
                   <IoTrash size={16} />
                 </button>
               </div>
             ))}
           </div>
 
-          <div className="flex justify-end pt-4 border-t">
+          <div className="flex justify-end pt-4 border-t border-border-light">
             <Button variant="outline" onClick={() => setIsManageLabelsModalOpen(false)}>Close</Button>
           </div>
         </div>

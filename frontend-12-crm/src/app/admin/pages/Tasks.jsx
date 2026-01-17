@@ -8,6 +8,7 @@ import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
 import UniqueIdBadge, { ID_PREFIXES } from '../../../components/ui/UniqueIdBadge'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import { tasksAPI, projectsAPI, usersAPI, companiesAPI, employeesAPI } from '../../../api'
 import {
   IoEye,
@@ -1763,266 +1764,24 @@ const Tasks = () => {
         </div>
       </Modal>
 
-      {/* Add/Edit Task Modal */}
-      <RightSideModal
+      {/* Add/Edit Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddModalOpen || isEditModalOpen}
         onClose={() => {
           setIsAddModalOpen(false)
           setIsEditModalOpen(false)
           setSelectedTask(null)
-          setFormData({
-            company_id: '',
-            title: '',
-            description: '',
-            related_to: '',
-            related_to_type: 'project',
-            points: '1',
-            assign_to: '',
-            collaborators: [],
-            status: 'Incomplete',
-            priority: 'Medium',
-            labels: [],
-            start_date: '',
-            deadline: '',
-            is_recurring: false,
-            recurring_frequency: 'daily',
-            uploaded_file: null,
-          })
-          setFilteredEmployees([])
         }}
-        title={isEditModalOpen ? "Edit Task" : "Add Task"}
-        width="800px"
-      >
-        <div className="space-y-0 pb-4">
-          <FormSection title="Task Details">
-            <FormRow label="Title" required>
-              <FormInput
-                value={formData.title || ''}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter task title"
-                required
-              />
-            </FormRow>
-
-            <FormRow label="Description">
-              <RichTextEditor
-                value={formData.description || ''}
-                onChange={(content) => setFormData({ ...formData, description: content })}
-                placeholder="Enter task description"
-              />
-            </FormRow>
-
-            <FormRow label="Related To" required>
-              <FormSelect
-                value={formData.related_to || ''}
-                onChange={(e) => setFormData({ ...formData, related_to: e.target.value, related_to_type: 'project' })}
-                required
-              >
-                <option value="">-- Select Project --</option>
-                {projects
-                  .filter(p => parseInt(p.company_id) === parseInt(companyId))
-                  .map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.project_name || p.name || p.title || `Project #${p.id}`}
-                    </option>
-                  ))}
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Points">
-              <FormInput
-                type="number"
-                value={formData.points || '1'}
-                onChange={(e) => setFormData({ ...formData, points: e.target.value })}
-                placeholder="Task points"
-                min="1"
-              />
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Assignment & Status">
-            <FormRow label="Assign To" required>
-              <FormSelect
-                value={formData.assign_to || ''}
-                onChange={(e) => setFormData({ ...formData, assign_to: e.target.value })}
-                required
-              >
-                <option value="">-- Select Employee --</option>
-                {filteredEmployees.map(emp => (
-                  <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
-                    {emp.name || emp.email}
-                  </option>
-                ))}
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Collaborators">
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
-                  {formData.collaborators && formData.collaborators.length > 0 ? (
-                    formData.collaborators.map((collabId) => {
-                      const collab = filteredEmployees.find(e => parseInt(e.user_id || e.id) === parseInt(collabId))
-                      return collab ? (
-                        <span key={collabId} className="inline-flex items-center gap-1 px-3 py-1 bg-primary-accent/10 text-primary-accent rounded-full text-sm">
-                          {collab.name || collab.email}
-                          <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, collaborators: formData.collaborators.filter(id => parseInt(id) !== parseInt(collabId)) })}
-                            className="hover:text-red-600"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ) : null
-                    })
-                  ) : (
-                    <span className="text-gray-400 text-sm">No collaborators added</span>
-                  )}
-                </div>
-                <FormSelect
-                  onChange={(e) => {
-                    const empId = parseInt(e.target.value)
-                    if (empId && !formData.collaborators.map(c => parseInt(c)).includes(empId)) {
-                      setFormData({ ...formData, collaborators: [...formData.collaborators, empId] })
-                    }
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">+ Add Collaborator</option>
-                  {filteredEmployees
-                    .filter(emp => {
-                      const empId = parseInt(emp.user_id || emp.id)
-                      return empId !== parseInt(formData.assign_to) && !(formData.collaborators || []).map(c => parseInt(c)).includes(empId)
-                    })
-                    .map(emp => (
-                      <option key={emp.user_id || emp.id} value={emp.user_id || emp.id}>
-                        {emp.name || emp.email}
-                      </option>
-                    ))}
-                </FormSelect>
-              </div>
-            </FormRow>
-
-            <FormRow label="Status">
-              <FormSelect
-                value={formData.status || 'Incomplete'}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              >
-                <option value="Incomplete">To do</option>
-                <option value="Doing">In progress</option>
-                <option value="Done">Done</option>
-              </FormSelect>
-            </FormRow>
-
-            <FormRow label="Priority">
-              <FormSelect
-                value={formData.priority || 'Medium'}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
-              </FormSelect>
-            </FormRow>
-          </FormSection>
-
-          <FormSection title="Additional Info" last>
-            <FormRow label="Labels">
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50 min-h-[50px]">
-                  {formData.labels && formData.labels.length > 0 ? (
-                    formData.labels.map((label, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                        {label}
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, labels: formData.labels.filter((_, i) => i !== idx) })}
-                          className="hover:text-red-600"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400 text-sm">No labels added</span>
-                  )}
-                </div>
-                <FormSelect
-                  onChange={(e) => {
-                    if (e.target.value && !(formData.labels || []).includes(e.target.value)) {
-                      setFormData({ ...formData, labels: [...(formData.labels || []), e.target.value] })
-                    }
-                    e.target.value = ''
-                  }}
-                >
-                  <option value="">+ Add Label</option>
-                  {labels.filter(l => !(formData.labels || []).includes(l?.name)).map(l => (
-                    <option key={l?.name} value={l?.name}>{l?.name}</option>
-                  ))}
-                </FormSelect>
-              </div>
-            </FormRow>
-
-            <FormRow label="Start Date">
-              <FormInput
-                type="date"
-                value={formData.start_date || ''}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              />
-            </FormRow>
-
-            <FormRow label="Deadline" last>
-              <FormInput
-                type="date"
-                value={formData.deadline || ''}
-                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-              />
-            </FormRow>
-          </FormSection>
-
-          <FormActions>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddModalOpen(false)
-                setIsEditModalOpen(false)
-                setSelectedTask(null)
-                setFormData({
-                  company_id: '',
-                  title: '',
-                  description: '',
-                  related_to: '',
-                  related_to_type: 'project',
-                  points: '1',
-                  assign_to: '',
-                  collaborators: [],
-                  status: 'Incomplete',
-                  priority: 'Medium',
-                  labels: [],
-                  start_date: '',
-                  deadline: '',
-                  is_recurring: false,
-                  recurring_frequency: 'daily',
-                  uploaded_file: null,
-                })
-                setFilteredEmployees([])
-              }}
-              className="px-6"
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => handleSave(false)}
-              className="px-6 flex items-center gap-2"
-            >
-              <IoCheckmarkCircle size={18} />
-              {isEditModalOpen ? 'Update Task' : 'Save Task'}
-            </Button>
-          </FormActions>
-        </div>
-      </RightSideModal>
+        task={isEditModalOpen ? selectedTask : null}
+        onSave={(savedTask, showAfterSave) => {
+          fetchTasks()
+          if (showAfterSave && savedTask) {
+            handleView(savedTask)
+          }
+        }}
+        labels={labels}
+        companyId={companyId}
+      />
 
       {/* View Task Modal */}
       <RightSideModal

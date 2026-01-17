@@ -649,7 +649,7 @@ const SocialMediaLeads = () => {
       >
         {selectedIntegration && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-secondary-text">Company</label>
                 <p className="text-primary-text mt-1 text-base">{selectedIntegration.company_name || '--'}</p>

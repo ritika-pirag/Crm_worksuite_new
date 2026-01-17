@@ -6,6 +6,7 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import {
   IoArrowBack,
   IoBriefcase,
@@ -31,9 +32,12 @@ import {
   IoList,
   IoNotifications,
   IoSettings,
-  IoChevronDown
+  IoChevronDown,
+  IoShareOutline,
+  IoTimeOutline
 } from 'react-icons/io5'
-import { FaAnchor } from 'react-icons/fa'
+import { FaAnchor, FaRegFilePdf, FaPrint, FaDownload, FaEye } from 'react-icons/fa'
+import BaseUrl from '../../../api/baseUrl'
 
 const ProposalDetail = () => {
   const { id } = useParams()
@@ -223,43 +227,6 @@ const ProposalDetail = () => {
     setIsPreviewModalOpen(true)
   }
 
-  const handleCopyProposalURL = () => {
-    const publicUrl = `${window.location.origin}/public/proposals/${id}`
-    navigator.clipboard.writeText(publicUrl).then(() => {
-      alert('Proposal URL copied to clipboard!')
-    }).catch(() => {
-      prompt('Copy this URL:', publicUrl)
-    })
-  }
-
-  const handleSendToClient = () => {
-    setEmailData({
-      to: proposal?.signer_email || '',
-      subject: `Proposal ${proposal?.estimate_number}`,
-      message: 'Please review the attached proposal.'
-    })
-    setIsSendEmailModalOpen(true)
-  }
-
-  const handleSendEmail = async () => {
-    try {
-      if (!emailData.to) {
-        alert('Please enter recipient email')
-        return
-      }
-      const response = await proposalsAPI.sendEmail(id, emailData)
-      if (response.data.success) {
-        alert('Proposal sent successfully!')
-        setIsSendEmailModalOpen(false)
-        await fetchProposal()
-      } else {
-        alert(response.data.error || 'Failed to send proposal')
-      }
-    } catch (error) {
-      console.error('Error sending proposal:', error)
-      alert(error.response?.data?.error || 'Failed to send proposal')
-    }
-  }
 
   const handleAddItemFromModal = async (item) => {
     try {
@@ -549,7 +516,7 @@ const ProposalDetail = () => {
   }
 
   const handleViewPDF = () => {
-    const pdfUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/v1/proposals/${id}/pdf?company_id=${companyId}`
+    const pdfUrl = `${BaseUrl}/api/v1/proposals/${id}/pdf?company_id=${companyId}`
     window.open(pdfUrl, '_blank')
   }
 
@@ -628,6 +595,46 @@ const ProposalDetail = () => {
     }
   }
 
+  const handleCopyPublicUrl = () => {
+    const url = `${window.location.origin}/proposal/${id}/view`
+    navigator.clipboard.writeText(url)
+    alert('Proposal URL copied to clipboard!')
+  }
+
+  const handleSendProposalToClient = () => {
+    setEmailData({
+      ...emailData,
+      to: proposal.client_email || '',
+      subject: `Proposal ${proposal.estimate_number}`,
+      message: `Dear ${proposal.client_name},\n\nPlease find the proposal ${proposal.estimate_number} for your review.\n\nYou can view it online at: ${window.location.origin}/proposal/${id}/view\n\nBest regards,\n${proposal.company_name}`
+    })
+    setIsSendEmailModalOpen(true)
+  }
+
+  const handleSendEmail = async () => {
+    try {
+      if (!emailData.to) {
+        alert('Recipient email is required')
+        return
+      }
+      const response = await proposalsAPI.sendEmail(id, {
+        to: emailData.to,
+        subject: emailData.subject,
+        message: emailData.message
+      })
+      if (response.data.success) {
+        alert('Proposal sent successfully!')
+        setIsSendEmailModalOpen(false)
+        await fetchProposal()
+      } else {
+        alert(response.data.error || 'Failed to send proposal')
+      }
+    } catch (error) {
+      console.error('Error sending email:', error)
+      alert(error.response?.data?.error || 'Failed to send proposal')
+    }
+  }
+
   const handleChangeTemplate = () => {
     navigate('/app/admin/finance-templates')
   }
@@ -658,129 +665,131 @@ const ProposalDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
+    <div className="min-h-screen bg-[#F0F2F5]">
       {/* HEADER SECTION */}
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 max-w-[1600px] mx-auto">
           {/* Left Side */}
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/app/admin/proposals')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Back to Proposals"
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+              title="Back"
             >
               <IoArrowBack size={20} />
             </button>
 
-            <div className="flex items-center gap-2">
-              <FaAnchor className="text-gray-600" size={20} />
-              <h1 className="text-xl sm:text-2xl font-bold text-primary-text">
-                {proposal.estimate_number}
-              </h1>
-            </div>
-
-            {/* Status Badge */}
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(isExpired() ? 'expired' : proposal.status)}`}>
-              {isExpired() ? 'Expired' : proposal.status?.charAt(0).toUpperCase() + proposal.status?.slice(1) || 'Draft'}
-            </span>
-
-            {/* Email Status */}
-            <div className="flex items-center gap-1 text-sm text-secondary-text">
-              <IoMail size={16} />
-              <span>{getEmailStatus()}</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <FaAnchor className="text-gray-400" size={18} />
+                <h1 className="text-xl font-bold text-[#374151]">
+                  {proposal.estimate_number}
+                </h1>
+              </div>
+              <div className="flex items-center gap-3 mt-1">
+                <span className={`px-3 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(isExpired() ? 'expired' : proposal.status)} shadow-sm`}>
+                  {isExpired() ? 'Expired' : (proposal.status || 'Draft').toUpperCase()}
+                </span>
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <IoMail size={14} />
+                  <span>{getEmailStatus()}</span>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyProposalURL}
-              className="flex items-center gap-2 hover:bg-gray-100"
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleCopyPublicUrl}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all bg-white"
             >
-              <IoLink size={16} />
-              <span className="hidden sm:inline">Proposal URL</span>
-            </Button>
+              <IoShareOutline size={18} />
+              <span>Proposal URL</span>
+            </button>
 
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSendToClient}
-              className="flex items-center gap-2"
+            <button
+              onClick={handleSendProposalToClient}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-accent text-white rounded-md text-sm font-medium hover:opacity-90 transition-all shadow-md"
             >
               <IoSend size={16} />
-              <span className="hidden sm:inline">Send to client</span>
-            </Button>
+              <span>Send to client</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
-      <div className="p-4 sm:p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
+      {/* MAIN CONTENT AREA */}
+      <div className="max-w-[1600px] mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* LEFT SIDE - 70% */}
-          <div className="flex-1 lg:w-[70%] space-y-6">
+          {/* LEFT SIDE - ITEMS & EDITOR (8 cols) */}
+          <div className="lg:col-span-8 space-y-6">
 
-            {/* Proposal Items Section */}
-            <Card className="p-0 overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-semibold text-primary-text flex items-center gap-2">
-                  <IoList size={20} />
-                  Proposal items
-                </h3>
-                <IoChevronDown size={20} className="text-gray-400" />
+            {/* Items Table Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary-accent/10 flex items-center justify-center text-primary-accent">
+                    <IoList size={20} />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Proposal items</h3>
+                </div>
+                <button className="text-gray-400 hover:text-gray-600">
+                  <IoChevronDown size={20} />
+                </button>
               </div>
 
-              {/* Items Table */}
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-100 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-2/5">Item</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/6">Quantity</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/6">Rate</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-1/6">Total</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-20"></th>
+                  <thead>
+                    <tr className="bg-white text-left">
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Item</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Quantity</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Rate</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total</th>
+                      <th className="px-6 py-4 text-center"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-50">
                     {proposal.items && proposal.items.length > 0 ? (
                       proposal.items.map((item, idx) => (
-                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
-                          <td className="px-4 py-3">
-                            <div>
-                              <p className="text-sm font-medium text-primary-text">{item.item_name || '-'}</p>
-                              {item.description && (
-                                <p className="text-xs text-secondary-text mt-1">{item.description}</p>
-                              )}
+                        <tr key={idx} className="hover:bg-primary-accent/5 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex gap-3">
+                              <div className="mt-1 cursor-grab text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <IoEllipsisVertical size={14} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800">{item.item_name || '-'}</p>
+                                {item.description && (
+                                  <p className="text-xs text-secondary-text mt-1 leading-relaxed line-clamp-2">{item.description}</p>
+                                )}
+                              </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-primary-text whitespace-nowrap">
+                          <td className="px-6 py-4 text-right text-sm text-gray-700 font-medium">
                             {item.quantity || 0} {item.unit || 'PC'}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm text-primary-text whitespace-nowrap">
+                          <td className="px-6 py-4 text-right text-sm text-gray-700">
                             {formatCurrency(item.unit_price || 0)}
                           </td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold text-primary-text whitespace-nowrap">
+                          <td className="px-6 py-4 text-right text-sm font-bold text-gray-900 border-l border-transparent">
                             {formatCurrency(item.amount || 0)}
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
-                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                className="p-1.5 text-primary-accent hover:bg-primary-accent/10 rounded"
                                 onClick={() => handleEditItem(idx)}
-                                title="Edit"
                               >
                                 <IoCreate size={16} />
                               </button>
                               <button
-                                className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded"
                                 onClick={() => handleRemoveItem(idx)}
-                                title="Remove"
                               >
-                                <IoClose size={16} />
+                                <IoClose size={18} />
                               </button>
                             </div>
                           </td>
@@ -788,8 +797,11 @@ const ProposalDetail = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-secondary-text">
-                          No items added yet
+                        <td colSpan={5} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2 text-gray-400">
+                            <IoList size={40} className="text-gray-200" />
+                            <p className="text-sm">No items added to this proposal</p>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -797,335 +809,292 @@ const ProposalDetail = () => {
                 </table>
               </div>
 
-              {/* Add Item Button */}
-              <div className="p-4 border-t border-gray-200">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setIsAddItemModalOpen(true)}
-                  className="flex items-center gap-2"
-                >
-                  <IoAdd size={16} />
-                  Add item
-                </Button>
-              </div>
-            </Card>
+              {/* Summary Section */}
+              <div className="px-6 py-4 bg-white border-t border-gray-50">
+                <div className="flex flex-col sm:flex-row justify-between gap-4">
+                  <button
+                    onClick={() => setIsAddItemModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-accent text-white rounded-md text-sm font-medium hover:opacity-90 transition-all self-start shadow-sm"
+                  >
+                    <IoAdd size={18} />
+                    <span>Add item</span>
+                  </button>
 
-            {/* Totals Section */}
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-secondary-text">Sub Total:</span>
-                  <span className="font-semibold text-primary-text">{formatCurrency(proposal.sub_total)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-secondary-text flex items-center gap-2">
-                    Discount:
-                    <button
-                      className="text-blue-500 hover:text-blue-700 transition-colors"
-                      onClick={handleEditDiscount}
-                      title="Edit Discount"
-                    >
-                      <IoCreate size={14} />
-                    </button>
-                  </span>
-                  <span className="font-semibold text-red-500">
-                    -{formatCurrency(proposal.discount_amount)}
-                  </span>
-                </div>
-                {proposal.tax_amount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-secondary-text">Tax:</span>
-                    <span className="font-semibold text-primary-text">{formatCurrency(proposal.tax_amount)}</span>
+                  <div className="w-full sm:w-80 space-y-3">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Sub Total</span>
+                      <span className="font-semibold text-gray-900">{formatCurrency(proposal.sub_total)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600 group">
+                      <span className="flex items-center gap-1">
+                        Discount
+                        <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{proposal.discount}{proposal.discount_type}</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">-{formatCurrency(proposal.discount_amount)}</span>
+                        <button onClick={handleEditDiscount} className="text-primary-accent hover:opacity-80 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <IoCreate size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {proposal.tax_amount > 0 && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Tax</span>
+                        <span className="font-semibold text-gray-900">{formatCurrency(proposal.tax_amount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-100">
+                      <span>Total</span>
+                      <span>{formatCurrency(proposal.total)}</span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between pt-3 border-t border-gray-300">
-                  <span className="text-lg font-bold text-primary-text">Total:</span>
-                  <span className="text-lg font-bold text-green-600">{formatCurrency(proposal.total)}</span>
                 </div>
               </div>
-            </Card>
+            </div>
 
-            {/* Description / Notes Editor */}
-            <Card className="p-4">
-              <h3 className="text-lg font-semibold text-primary-text mb-4">Description</h3>
-              <RichTextEditor
-                value={descriptionContent}
-                onChange={setDescriptionContent}
-                placeholder="Write your proposal description here..."
-              />
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-200">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleChangeTemplate}
-                  className="flex items-center gap-2"
-                >
-                  <IoSettings size={16} />
-                  Change template
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSave}
-                  className="flex items-center gap-2"
-                >
-                  <IoCheckmarkCircle size={16} />
-                  Save
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSaveAndShow}
-                  className="flex items-center gap-2"
-                >
-                  <IoEye size={16} />
-                  Save & show
-                </Button>
+            {/* Template & Editor Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleChangeTemplate}
+                    className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <IoTimeOutline size={16} />
+                    Change template
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSave}
+                    className="px-4 py-1.5 border border-primary-accent text-primary-accent rounded text-sm font-medium hover:bg-primary-accent/5 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleSaveAndShow}
+                    className="px-4 py-1.5 bg-primary-accent text-white rounded text-sm font-medium hover:opacity-90 transition-colors shadow-sm"
+                  >
+                    Save & Show
+                  </button>
+                </div>
               </div>
-            </Card>
+
+              <div className="editor-container border border-gray-200 rounded-lg overflow-hidden">
+                <RichTextEditor
+                  value={descriptionContent}
+                  onChange={setDescriptionContent}
+                  placeholder="Type proposal content here..."
+                />
+              </div>
+            </div>
           </div>
 
-          {/* RIGHT SIDEBAR - 30% */}
-          <div className="lg:w-[30%] space-y-6">
+          {/* RIGHT SIDE - INFO & ACTIONS (4 cols) */}
+          <div className="lg:col-span-4 space-y-6">
 
-            {/* Proposal Info */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-primary-text flex items-center gap-2">
-                  <FaAnchor size={14} />
-                  Proposal info
-                </h3>
-                <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                  <IoEllipsisVertical size={16} className="text-gray-400" />
+            {/* Proposal Info Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-500">
+                    <FaAnchor size={16} />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Proposal info</h3>
+                </div>
+                <IoEllipsisVertical className="text-gray-400 cursor-pointer" />
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
+                    <IoStorefront size={20} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-900">{proposal.client_name}</span>
+                    <span className="text-xs text-gray-500">Client</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Proposal date</span>
+                    <span className="text-sm font-semibold text-gray-700">{formatDate(proposal.proposal_date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Valid until</span>
+                    <span className={`text-sm font-semibold ${isExpired() ? 'text-red-500' : 'text-gray-700'}`}>
+                      {formatDate(proposal.valid_till)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setIsPreviewModalOpen(true)}
+                    className="flex flex-col items-center gap-2 p-3 hover:bg-primary-accent/5 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-primary-accent/10 text-primary-accent flex items-center justify-center group-hover:bg-primary-accent/20 transition-colors">
+                      <FaEye size={14} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-600">Preview</span>
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="flex flex-col items-center gap-2 p-3 hover:bg-green-50 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                      <FaPrint size={14} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-600">Print</span>
+                  </button>
+                  <button
+                    onClick={handleViewPDF}
+                    className="flex flex-col items-center gap-2 p-3 hover:bg-red-50 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                      <FaRegFilePdf size={14} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-600">View PDF</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="flex flex-col items-center gap-2 p-3 hover:bg-blue-50 rounded-lg transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <FaDownload size={14} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-600">Download PDF</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Note Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+                <IoDocumentText className="text-gray-400" size={18} />
+                <h3 className="font-semibold text-gray-800">Note</h3>
+              </div>
+              <div className="p-6">
+                <textarea
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Internal notes here..."
+                  className="w-full min-h-[100px] border-none focus:ring-0 text-sm p-0 placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+
+            {/* Reminders / Tasks Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IoNotifications className="text-gray-400" size={18} />
+                  <h3 className="font-semibold text-gray-800">Reminders</h3>
+                </div>
+                <button
+                  onClick={() => setIsAddReminderModalOpen(true)}
+                  className="text-xs font-bold text-primary-accent hover:opacity-80"
+                >
+                  + Add reminder
                 </button>
               </div>
+              <div className="p-4 space-y-3">
+                {reminders.length > 0 ? (
+                  reminders.map((reminder, idx) => (
+                    <div key={idx} className="flex gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-primary-accent animate-pulse"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-800">{reminder.title}</p>
+                        <p className="text-xs text-gray-500 mt-1">{reminder.message}</p>
+                        <span className="text-[10px] text-gray-400 mt-2 block italic">{new Date(reminder.created_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-center text-gray-400 py-4 italic">No reminders set</p>
+                )}
+              </div>
+            </div>
 
-              <div className="space-y-3">
+            {/* Tasks Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <IoBriefcase size={16} className="text-secondary-text" />
-                  <a href="#" className="text-sm text-blue-600 hover:underline">
-                    {proposal.client_name}
-                  </a>
+                  <IoCheckmarkCircle className="text-gray-400" size={18} />
+                  <h3 className="font-semibold text-gray-800">Tasks</h3>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-secondary-text">
-                  <IoCalendar size={16} />
-                  <span>Proposal date: {formatDate(proposal.proposal_date)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <IoTime size={16} className={isExpired() ? 'text-red-500' : 'text-secondary-text'} />
-                  <span className={isExpired() ? 'text-red-500 font-medium' : 'text-secondary-text'}>
-                    Valid until: {formatDate(proposal.valid_till)} {isExpired() && '(Expired)'}
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Action Buttons Grid */}
-            <Card className="p-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsPreviewModalOpen(true)}
-                  className="flex items-center justify-center gap-2 hover:bg-gray-100"
-                >
-                  <IoEye size={16} />
-                  Preview
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="flex items-center justify-center gap-2 hover:bg-gray-100"
-                >
-                  <IoPrint size={16} />
-                  Print
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleViewPDF}
-                  className="flex items-center justify-center gap-2 hover:bg-gray-100"
-                >
-                  <IoDocumentText size={16} />
-                  View PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadPDF}
-                  className="flex items-center justify-center gap-2 hover:bg-gray-100"
-                >
-                  <IoDownload size={16} />
-                  Download
-                </Button>
-              </div>
-            </Card>
-
-            {/* Note Section */}
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <IoBookmark size={16} className="text-secondary-text" />
-                <h3 className="text-sm font-semibold text-primary-text">Note</h3>
-              </div>
-              <textarea
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Add internal notes here..."
-                rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none resize-none text-sm"
-              />
-            </Card>
-
-            {/* Tasks Section */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <IoCheckmarkCircle size={16} className="text-secondary-text" />
-                  <h3 className="text-sm font-semibold text-primary-text">Tasks</h3>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
+                <button
                   onClick={() => setIsAddTaskModalOpen(true)}
-                  className="flex items-center gap-1 text-xs px-2 py-1"
+                  className="text-xs font-bold text-primary-accent hover:opacity-80"
                 >
-                  <IoAdd size={14} />
-                  Add task
-                </Button>
+                  + Add task
+                </button>
               </div>
-
-              {tasks.length > 0 ? (
-                <div className="space-y-2">
-                  {tasks.map((task, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm">
-                      <input type="checkbox" className="rounded" />
-                      <span className="flex-1 truncate">{task.title}</span>
+              <div className="p-4 space-y-3">
+                {tasks.length > 0 ? (
+                  tasks.map((task, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${task.priority === 'High' ? 'bg-red-400' : 'bg-blue-400'}`}></div>
+                        <span className="text-sm text-gray-700 font-medium">{task.title}</span>
+                      </div>
+                      <IoChevronDown size={14} className="text-gray-300 -rotate-90" />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-secondary-text italic">No tasks yet</p>
-              )}
-            </Card>
-
-            {/* Reminders Section */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <IoNotifications size={16} className="text-secondary-text" />
-                  <h3 className="text-sm font-semibold text-primary-text">Reminders (Private)</h3>
-                </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setIsAddReminderModalOpen(true)}
-                  className="flex items-center gap-1 text-xs px-2 py-1"
-                >
-                  <IoAdd size={14} />
-                  Add reminder
-                </Button>
+                  ))
+                ) : (
+                  <p className="text-xs text-center text-gray-400 py-4 italic">No tasks found</p>
+                )}
               </div>
+            </div>
 
-              {reminders.length > 0 ? (
-                <div className="space-y-2">
-                  {reminders.map((reminder, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-sm">
-                      <IoNotifications size={14} className="text-yellow-500" />
-                      <span className="flex-1 truncate">{reminder.title}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-secondary-text italic">No reminders yet</p>
-              )}
-            </Card>
           </div>
         </div>
       </div>
 
       {/* MODALS */}
+      {/* (Modal implementations remain similar but with improved styling in their content) */}
 
       {/* Add Item Modal */}
       <Modal
         isOpen={isAddItemModalOpen}
         onClose={() => setIsAddItemModalOpen(false)}
-        title="Add Items to Proposal"
-        size="xl"
+        title="Select Item to Add"
+        size="lg"
       >
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Search items..."
-                value={itemSearchQuery}
-                onChange={(e) => setItemSearchQuery(e.target.value)}
-                className="w-full pl-4 pr-10 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none text-sm"
-              />
-            </div>
-            <select
-              value={itemCategoryFilter}
-              onChange={(e) => setItemCategoryFilter(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none text-sm"
-            >
-              <option value="">All Categories</option>
-              {[...new Set(items.map(item => item.category).filter(Boolean))].map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search items..."
+              value={itemSearchQuery}
+              onChange={(e) => setItemSearchQuery(e.target.value)}
+              className="flex-1"
+            />
           </div>
-
-          {(() => {
-            const filteredItems = items.filter(item => {
-              const matchesSearch = !itemSearchQuery ||
-                item.title?.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
-                item.description?.toLowerCase().includes(itemSearchQuery.toLowerCase())
-              const matchesCategory = !itemCategoryFilter || item.category === itemCategoryFilter
-              return matchesSearch && matchesCategory
-            })
-
-            return filteredItems.length === 0 ? (
-              <div className="text-center py-8 text-secondary-text">
-                <p>No items found</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                {filteredItems.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="p-4 hover:shadow-md transition-all cursor-pointer hover:border-primary-accent"
-                    onClick={() => handleAddItemFromModal(item)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <IoStorefront size={20} className="text-gray-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-primary-text text-sm truncate">{item.title}</h3>
-                        <p className="text-primary-accent font-bold text-sm">
-                          ${parseFloat(item.rate || 0).toFixed(2)}
-                          <span className="text-gray-400 font-normal text-xs">/{item.unit_type || 'PC'}</span>
-                        </p>
-                        <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                          <IoCheckmark size={12} />
-                          <span>Click to add</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )
-          })()}
-
-          <div className="flex justify-end pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setIsAddItemModalOpen(false)}>
-              Close
-            </Button>
+          <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
+            {items
+              .filter(item =>
+                (item.title?.toLowerCase().includes((itemSearchQuery || '').toLowerCase())) ||
+                (item.description?.toLowerCase().includes((itemSearchQuery || '').toLowerCase()))
+              )
+              .map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 hover:bg-primary-accent/5 cursor-pointer transition-colors group flex items-center justify-between"
+                  onClick={() => handleAddItemFromModal(item)}
+                >
+                  <div>
+                    <h4 className="font-semibold text-gray-800 group-hover:text-primary-accent">{item.title}</h4>
+                    <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">{formatCurrency(item.rate)}</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-tighter">{item.unit_type}</p>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </Modal>
@@ -1133,28 +1102,27 @@ const ProposalDetail = () => {
       {/* Edit Item Modal */}
       <Modal
         isOpen={isEditItemModalOpen}
-        onClose={() => { setIsEditItemModalOpen(false); setSelectedItemIndex(null) }}
+        onClose={() => setIsEditItemModalOpen(false)}
         title="Edit Item"
-        size="md"
       >
         <div className="space-y-4">
           <Input
             label="Item Name"
-            value={editItemData.item_name || ''}
+            value={editItemData.item_name}
             onChange={(e) => setEditItemData({ ...editItemData, item_name: e.target.value })}
-            placeholder="Item name"
           />
-          <Input
-            label="Description"
-            value={editItemData.description || ''}
-            onChange={(e) => setEditItemData({ ...editItemData, description: e.target.value })}
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg text-sm"
             placeholder="Description"
+            rows={3}
+            value={editItemData.description}
+            onChange={(e) => setEditItemData({ ...editItemData, description: e.target.value })}
           />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Quantity"
               type="number"
-              value={editItemData.quantity || 1}
+              value={editItemData.quantity}
               onChange={(e) => {
                 const qty = parseFloat(e.target.value) || 0
                 const unitPrice = parseFloat(editItemData.unit_price || 0)
@@ -1163,12 +1131,11 @@ const ProposalDetail = () => {
                 if (taxRate > 0) amount += (amount * taxRate / 100)
                 setEditItemData({ ...editItemData, quantity: qty, amount })
               }}
-              min="0"
             />
             <Input
-              label="Unit Price"
+              label="Rate"
               type="number"
-              value={editItemData.unit_price || 0}
+              value={editItemData.unit_price}
               onChange={(e) => {
                 const price = parseFloat(e.target.value) || 0
                 const qty = parseFloat(editItemData.quantity || 0)
@@ -1177,72 +1144,39 @@ const ProposalDetail = () => {
                 if (taxRate > 0) amount += (amount * taxRate / 100)
                 setEditItemData({ ...editItemData, unit_price: price, amount })
               }}
-              min="0"
-              step="0.01"
-            />
-            <Input
-              label="Tax %"
-              type="number"
-              value={editItemData.tax_rate || 0}
-              onChange={(e) => {
-                const tax = parseFloat(e.target.value) || 0
-                const qty = parseFloat(editItemData.quantity || 0)
-                const unitPrice = parseFloat(editItemData.unit_price || 0)
-                let amount = qty * unitPrice
-                if (tax > 0) amount += (amount * tax / 100)
-                setEditItemData({ ...editItemData, tax_rate: tax, amount })
-              }}
-              min="0"
             />
           </div>
-          <div className="text-right">
-            <span className="text-sm text-secondary-text">Amount: </span>
-            <span className="font-semibold text-primary-text">{formatCurrency(editItemData.amount || 0)}</span>
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => { setIsEditItemModalOpen(false); setSelectedItemIndex(null) }}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleUpdateItem}>
-              Update Item
-            </Button>
-          </div>
+          <Button variant="primary" className="w-full py-3" onClick={handleUpdateItem}>Update Item</Button>
         </div>
       </Modal>
 
-      {/* Edit Discount Modal */}
+      {/* Discount Modal */}
       <Modal
         isOpen={isEditDiscountModalOpen}
         onClose={() => setIsEditDiscountModalOpen(false)}
         title="Edit Discount"
-        size="md"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
-              value={discountData.discount || 0}
-              onChange={(e) => setDiscountData({ ...discountData, discount: parseFloat(e.target.value) || 0 })}
-              min="0"
-              step="0.01"
+              value={discountData.discount}
+              onChange={(e) => setDiscountData({ ...discountData, discount: e.target.value })}
             />
-            <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">Type</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Type</label>
               <select
+                className="p-2.5 border border-gray-300 rounded-lg text-sm bg-white"
                 value={discountData.discount_type}
                 onChange={(e) => setDiscountData({ ...discountData, discount_type: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none"
               >
-                <option value="%">Percentage (%)</option>
+                <option value="%">Percent (%)</option>
                 <option value="fixed">Fixed Amount</option>
               </select>
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setIsEditDiscountModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleUpdateDiscount}>Update Discount</Button>
-          </div>
+          <Button variant="primary" className="w-full" onClick={handleUpdateDiscount}>Apply Discount</Button>
         </div>
       </Modal>
 
@@ -1250,71 +1184,88 @@ const ProposalDetail = () => {
       <Modal
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
-        title={`Preview: ${proposal?.estimate_number}`}
+        title="Proposal Preview"
         size="xl"
       >
-        <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <div className="flex justify-between items-start">
+        <div className="bg-white p-8 border border-gray-100 shadow-inner rounded-md max-h-[80vh] overflow-y-auto">
+          <div className="space-y-8">
+            <div className="flex justify-between items-start border-b pb-6">
+              <h1 className="text-3xl font-extrabold text-primary-accent uppercase tracking-wider">PROPOSAL</h1>
+              <div className="text-right">
+                <p className="font-bold text-lg text-gray-900">{proposal.estimate_number}</p>
+                <p className="text-gray-500 text-sm">Date: {formatDate(proposal.proposal_date)}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-primary-text">{proposal.estimate_number}</h2>
-                <p className="text-sm text-secondary-text mt-1">Client: {proposal.client_name}</p>
+                <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">From:</h4>
+                <p className="font-bold text-gray-900">{proposal.company_name || 'CRM WORKSUITE'}</p>
               </div>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(proposal.status)}`}>
-                {proposal.status}
-              </span>
+              <div className="text-right">
+                <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">To:</h4>
+                <p className="font-bold text-gray-900">{proposal.client_name}</p>
+              </div>
             </div>
-          </div>
 
-          {proposal.description && (
-            <div>
-              <h3 className="font-semibold text-primary-text mb-2">Description</h3>
-              <div className="text-secondary-text" dangerouslySetInnerHTML={{ __html: proposal.description }} />
-            </div>
-          )}
-
-          {proposal.items && proposal.items.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-primary-text mb-3">Items</h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-secondary-text">Item</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-secondary-text">Qty</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-secondary-text">Rate</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium text-secondary-text">Total</th>
+            <div className="py-4 border-t border-b overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left bg-gray-50">
+                    <th className="p-3 text-gray-700 font-semibold">Item</th>
+                    <th className="p-3 text-right text-gray-700 font-semibold">Qty</th>
+                    <th className="p-3 text-right text-gray-700 font-semibold">Rate</th>
+                    <th className="p-3 text-right text-gray-700 font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(proposal.items || []).map((item, i) => (
+                    <tr key={i}>
+                      <td className="p-3">
+                        <p className="font-medium text-gray-900">{item.item_name}</p>
+                        {item.description && <p className="text-xs text-gray-500 mt-1">{item.description}</p>}
+                      </td>
+                      <td className="p-3 text-right text-gray-700">{item.quantity} {item.unit}</td>
+                      <td className="p-3 text-right text-gray-700">{formatCurrency(item.unit_price)}</td>
+                      <td className="p-3 text-right font-bold text-gray-900">{formatCurrency(item.amount)}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {proposal.items.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="px-4 py-2 text-primary-text">{item.item_name || '-'}</td>
-                        <td className="px-4 py-2 text-right text-primary-text">{item.quantity || 0}</td>
-                        <td className="px-4 py-2 text-right text-primary-text">{formatCurrency(item.unit_price || 0)}</td>
-                        <td className="px-4 py-2 text-right font-semibold text-primary-text">{formatCurrency(item.amount || 0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="w-72 space-y-3 pt-4">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Sub Total</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(proposal.sub_total)}</span>
+                </div>
+                {proposal.discount_amount > 0 && (
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Discount ({proposal.discount}{proposal.discount_type})</span>
+                    <span className="font-medium text-red-500">-{formatCurrency(proposal.discount_amount)}</span>
+                  </div>
+                )}
+                {proposal.tax_amount > 0 && (
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Tax</span>
+                    <span className="font-medium text-gray-900">{formatCurrency(proposal.tax_amount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-xl pt-3 border-t border-gray-100 text-gray-900">
+                  <span>Total</span>
+                  <span>{formatCurrency(proposal.total)}</span>
+                </div>
               </div>
             </div>
-          )}
-
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-secondary-text">Sub Total:</span><span className="font-semibold">{formatCurrency(proposal.sub_total)}</span></div>
-              {proposal.discount_amount > 0 && <div className="flex justify-between"><span className="text-secondary-text">Discount:</span><span className="font-semibold text-red-500">-{formatCurrency(proposal.discount_amount)}</span></div>}
-              {proposal.tax_amount > 0 && <div className="flex justify-between"><span className="text-secondary-text">Tax:</span><span className="font-semibold">{formatCurrency(proposal.tax_amount)}</span></div>}
-              <div className="flex justify-between pt-2 border-t border-gray-300"><span className="text-lg font-bold">Total:</span><span className="text-lg font-bold text-green-600">{formatCurrency(proposal.total)}</span></div>
-            </div>
           </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setIsPreviewModalOpen(false)}>Close</Button>
-            <Button variant="primary" onClick={handlePrint}><IoPrint size={16} className="mr-2" />Print</Button>
-            <Button variant="primary" onClick={handleDownloadPDF}><IoDownload size={16} className="mr-2" />Download</Button>
-          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-8">
+          <button onClick={() => setIsPreviewModalOpen(false)} className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">Close</button>
+          <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2 bg-primary-accent text-white rounded-md text-sm font-medium hover:opacity-90 transition-colors shadow-sm">
+            <IoPrint size={18} />
+            <span>Print View</span>
+          </button>
         </div>
       </Modal>
 
@@ -1322,93 +1273,95 @@ const ProposalDetail = () => {
       <Modal
         isOpen={isSendEmailModalOpen}
         onClose={() => setIsSendEmailModalOpen(false)}
-        title="Send Proposal to Client"
-        size="md"
+        title="Send Proposal"
       >
         <div className="space-y-4">
-          <Input
-            label="To Email"
-            type="email"
-            value={emailData.to}
-            onChange={(e) => setEmailData({ ...emailData, to: e.target.value })}
-            placeholder="client@example.com"
-            required
-          />
-          <Input
-            label="Subject"
-            value={emailData.subject}
-            onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
-            placeholder="Email subject"
-          />
           <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Message</label>
-            <textarea
-              value={emailData.message}
-              onChange={(e) => setEmailData({ ...emailData, message: e.target.value })}
-              placeholder="Email message..."
-              rows={4}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none resize-none"
+            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+            <Input
+              type="email"
+              placeholder="client@example.com"
+              value={emailData.to}
+              onChange={(e) => setEmailData({ ...emailData, to: e.target.value })}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => setIsSendEmailModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleSendEmail}><IoSend size={16} className="mr-2" />Send</Button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <Input
+              value={emailData.subject}
+              onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea
+              className="w-full p-3 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary-accent focus:border-primary-accent transition-all"
+              rows={6}
+              value={emailData.message}
+              onChange={(e) => setEmailData({ ...emailData, message: e.target.value })}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <button onClick={() => setIsSendEmailModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Cancel</button>
+            <button
+              onClick={handleSendEmail}
+              className="flex items-center gap-2 px-6 py-2 bg-primary-accent text-white rounded-md text-sm font-medium hover:opacity-90 transition-all shadow-md"
+            >
+              <IoSend size={16} />
+              <span>Send Now</span>
+            </button>
           </div>
         </div>
       </Modal>
 
-      {/* Add Task Modal */}
-      <Modal
+      {/* Add Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddTaskModalOpen}
-        onClose={() => { setIsAddTaskModalOpen(false); setTaskData({ title: '', description: '', due_date: '', priority: 'Medium' }) }}
-        title="Add Task"
-        size="md"
-      >
-        <div className="space-y-4">
-          <Input label="Task Title" value={taskData.title} onChange={(e) => setTaskData({ ...taskData, title: e.target.value })} placeholder="Enter task title" required />
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
-            <textarea value={taskData.description} onChange={(e) => setTaskData({ ...taskData, description: e.target.value })} placeholder="Task description" rows={3} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Due Date" type="date" value={taskData.due_date} onChange={(e) => setTaskData({ ...taskData, due_date: e.target.value })} />
-            <div>
-              <label className="block text-sm font-medium text-primary-text mb-2">Priority</label>
-              <select value={taskData.priority} onChange={(e) => setTaskData({ ...taskData, priority: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none">
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => { setIsAddTaskModalOpen(false); setTaskData({ title: '', description: '', due_date: '', priority: 'Medium' }) }}>Cancel</Button>
-            <Button variant="primary" onClick={handleAddTask}>Add Task</Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setIsAddTaskModalOpen(false)}
+        onSave={async () => {
+          await fetchTasks()
+        }}
+        relatedToType="project"
+        relatedToId={proposal?.project_id}
+        companyId={companyId}
+      />
 
       {/* Add Reminder Modal */}
       <Modal
         isOpen={isAddReminderModalOpen}
-        onClose={() => { setIsAddReminderModalOpen(false); setReminderData({ title: '', description: '', reminder_date: '', reminder_time: '' }) }}
+        onClose={() => setIsAddReminderModalOpen(false)}
         title="Add Reminder"
-        size="md"
       >
         <div className="space-y-4">
-          <Input label="Reminder Title" value={reminderData.title} onChange={(e) => setReminderData({ ...reminderData, title: e.target.value })} placeholder="Enter reminder title" required />
-          <div>
-            <label className="block text-sm font-medium text-primary-text mb-2">Description</label>
-            <textarea value={reminderData.description} onChange={(e) => setReminderData({ ...reminderData, description: e.target.value })} placeholder="Reminder description" rows={3} className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-accent focus:border-primary-accent outline-none resize-none" />
+          <Input
+            label="Title"
+            value={reminderData.title}
+            onChange={(e) => setReminderData({ ...reminderData, title: e.target.value })}
+          />
+          <div className="flex flex-col gap-1.5 text-sm">
+            <label className="font-medium text-gray-700">Message</label>
+            <textarea
+              className="p-3 border rounded-lg focus:ring-2 focus:ring-primary-accent outline-none border-gray-300"
+              rows={3}
+              value={reminderData.description}
+              onChange={(e) => setReminderData({ ...reminderData, description: e.target.value })}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Date" type="date" value={reminderData.reminder_date} onChange={(e) => setReminderData({ ...reminderData, reminder_date: e.target.value })} />
-            <Input label="Time" type="time" value={reminderData.reminder_time} onChange={(e) => setReminderData({ ...reminderData, reminder_time: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Date"
+              type="date"
+              value={reminderData.reminder_date}
+              onChange={(e) => setReminderData({ ...reminderData, reminder_date: e.target.value })}
+            />
+            <Input
+              label="Time"
+              type="time"
+              value={reminderData.reminder_time}
+              onChange={(e) => setReminderData({ ...reminderData, reminder_time: e.target.value })}
+            />
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => { setIsAddReminderModalOpen(false); setReminderData({ title: '', description: '', reminder_date: '', reminder_time: '' }) }}>Cancel</Button>
-            <Button variant="primary" onClick={handleAddReminder}>Add Reminder</Button>
-          </div>
+          <Button variant="primary" className="w-full py-3" onClick={handleAddReminder}>Set Reminder</Button>
         </div>
       </Modal>
     </div>

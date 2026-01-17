@@ -342,10 +342,18 @@ const create = async (req, res) => {
     else if (status === 'draft') mappedStatus = 'Draft';
     else if (status) mappedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
+    // Map discount_type to valid ENUM values: '%' or 'fixed'
+    let mappedDiscountType = '%';
+    if (discount_type === 'fixed' || discount_type === 'Fixed' || discount_type === 'amount' || discount_type === 'flat') {
+      mappedDiscountType = 'fixed';
+    } else if (discount_type === '%' || discount_type === 'percent' || discount_type === 'percentage') {
+      mappedDiscountType = '%';
+    }
+
     // Calculate totals if items exist
     let totals = { sub_total: 0, discount_amount: 0, tax_amount: 0, total: 0 };
     if (items && Array.isArray(items) && items.length > 0) {
-      totals = calculateTotals(items, discount, discount_type);
+      totals = calculateTotals(items, discount, mappedDiscountType);
     }
 
     // Use title in description if no description provided
@@ -373,7 +381,7 @@ const create = async (req, res) => {
         finalDescription,
         (terms && terms !== '') ? terms : 'Thank you for your business.',
         discount || 0,
-        discount_type || '%',
+        mappedDiscountType,
         totals.sub_total,
         totals.discount_amount,
         totals.tax_amount,
@@ -470,6 +478,16 @@ const update = async (req, res) => {
       mappedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
     }
 
+    // Map discount_type to valid ENUM values: '%' or 'fixed'
+    let mappedDiscountType = null;
+    if (discount_type !== undefined) {
+      if (discount_type === 'fixed' || discount_type === 'Fixed' || discount_type === 'amount' || discount_type === 'flat') {
+        mappedDiscountType = 'fixed';
+      } else {
+        mappedDiscountType = '%';
+      }
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -489,7 +507,7 @@ const update = async (req, res) => {
       if (terms !== undefined) updateFields.push('terms = ?'), updateValues.push(terms);
       if (mappedStatus !== null) updateFields.push('status = ?'), updateValues.push(mappedStatus);
       if (discount !== undefined) updateFields.push('discount = ?'), updateValues.push(discount);
-      if (discount_type !== undefined) updateFields.push('discount_type = ?'), updateValues.push(discount_type);
+      if (mappedDiscountType !== null) updateFields.push('discount_type = ?'), updateValues.push(mappedDiscountType);
 
       // Handle Items if provided
       if (items && Array.isArray(items)) {
@@ -517,7 +535,7 @@ const update = async (req, res) => {
         }
 
         // Calculate Totals
-        const totals = calculateTotals(items, discount, discount_type); // Make sure calculateTotals is accessible or define it inside
+        const totals = calculateTotals(items, discount, mappedDiscountType || '%'); // Make sure calculateTotals is accessible or define it inside
 
         updateFields.push('sub_total = ?'); updateValues.push(totals.sub_total);
         updateFields.push('discount_amount = ?'); updateValues.push(totals.discount_amount);
@@ -737,20 +755,133 @@ const getPDF = async (req, res) => {
     );
     proposal.items = items;
 
-    // For now, return JSON. In production, you would generate actual PDF using libraries like pdfkit or puppeteer
-    // This is a placeholder that returns the proposal data
+    // For now, return HTML or JSON. In production, you would generate actual PDF using libraries like pdfkit or puppeteer
     if (req.query.download === '1') {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename=proposal-${proposal.estimate_number}.json`);
-    } else {
-      res.setHeader('Content-Type', 'application/json');
+      return res.json({
+        success: true,
+        data: proposal,
+        message: 'JSON data for download'
+      });
     }
 
-    res.json({
-      success: true,
-      data: proposal,
-      message: 'PDF generation will be implemented with pdfkit or puppeteer'
-    });
+    // Return HTML view for browser
+    const subtotal = proposal.sub_total || 0;
+    const discountAmount = proposal.discount_amount || 0;
+    const taxAmount = proposal.tax_amount || 0;
+    const total = proposal.total || 0;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Proposal ${proposal.estimate_number}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; max-width: 900px; margin: 0 auto; line-height: 1.6; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+          .logo { font-size: 24px; font-weight: bold; color: #4f46e5; }
+          .proposal-info { text-align: right; }
+          .proposal-info h1 { margin: 0; color: #111; font-size: 28px; }
+          .section { display: flex; justify-content: space-between; margin-bottom: 40px; }
+          .col { width: 45%; }
+          .col h3 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; color: #666; font-size: 14px; text-transform: uppercase; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          th { background-color: #f9fafb; text-align: left; padding: 12px 15px; border-bottom: 2px solid #edf2f7; font-weight: 600; font-size: 13px; color: #4a5568; }
+          td { padding: 12px 15px; border-bottom: 1px solid #edf2f7; font-size: 14px; }
+          .text-right { text-align: right; }
+          .totals { width: 300px; margin-left: auto; margin-top: 20px; }
+          .total-row { display: flex; justify-content: space-between; padding: 8px 0; }
+          .total-row.grand-total { border-top: 2px solid #edf2f7; margin-top: 10px; padding-top: 15px; font-weight: bold; font-size: 18px; color: #111; }
+          .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; }
+          @media print { body { padding: 20px; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="margin-bottom: 20px; text-align: right;">
+          <button onclick="window.print()" style="padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 5px; cursor: pointer;">Print / Save as PDF</button>
+        </div>
+
+        <div class="header">
+          <div class="logo">${proposal.company_name || 'CRM WORKSUITE'}</div>
+          <div class="proposal-info">
+            <h1>PROPOSAL</h1>
+            <p><strong>${proposal.estimate_number}</strong></p>
+            <p>Date: ${new Date(proposal.proposal_date || proposal.created_at).toLocaleDateString()}</p>
+            ${proposal.valid_till ? `<p>Valid Until: ${new Date(proposal.valid_till).toLocaleDateString()}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="col">
+            <h3>From:</h3>
+            <p><strong>${proposal.company_name || 'Our Company'}</strong></p>
+          </div>
+          <div class="col">
+            <h3>To:</h3>
+            <p><strong>${proposal.client_name || 'Valued Client'}</strong></p>
+          </div>
+        </div>
+
+        ${proposal.description ? `<div style="margin-bottom: 30px;"><h3>Description:</h3><p>${proposal.description}</p></div>` : ''}
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item & Description</th>
+              <th class="text-right">Qty</th>
+              <th class="text-right">Rate</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(proposal.items || []).map(item => `
+              <tr>
+                <td>
+                  <strong>${item.item_name || '-'}</strong><br/>
+                  <span style="font-size: 12px; color: #718096;">${item.description || ''}</span>
+                </td>
+                <td class="text-right">${item.quantity || 1} ${item.unit || 'PC'}</td>
+                <td class="text-right">$${parseFloat(item.unit_price).toFixed(2)}</td>
+                <td class="text-right">$${parseFloat(item.amount).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div class="total-row">
+            <span>Sub Total:</span>
+            <span>$${parseFloat(subtotal).toFixed(2)}</span>
+          </div>
+          ${discountAmount > 0 ? `
+            <div class="total-row">
+              <span>Discount (${proposal.discount}${proposal.discount_type}):</span>
+              <span>-$${parseFloat(discountAmount).toFixed(2)}</span>
+            </div>
+          ` : ''}
+          ${taxAmount > 0 ? `
+            <div class="total-row">
+              <span>Tax:</span>
+              <span>$${parseFloat(taxAmount).toFixed(2)}</span>
+            </div>
+          ` : ''}
+          <div class="total-row grand-total">
+            <span>Total:</span>
+            <span>$${parseFloat(total).toFixed(2)}</span>
+          </div>
+        </div>
+
+        ${proposal.terms ? `<div style="margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px;"><h3>Terms & Conditions:</h3><p style="font-size: 13px;">${proposal.terms}</p></div>` : ''}
+
+        <div class="footer">
+          <p>Thank you for your business!</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    res.send(html);
   } catch (error) {
     console.error('Get proposal PDF error:', error);
     res.status(500).json({ success: false, error: 'Failed to generate PDF' });

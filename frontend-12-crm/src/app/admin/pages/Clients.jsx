@@ -1166,7 +1166,7 @@ const Clients = () => {
           e.preventDefault()
           e.stopPropagation()
           if (row && row.id) {
-            handleDelete(row.id)
+            handleDelete(row)
           } else {
             console.error('Invalid row data:', row)
           }
@@ -2218,7 +2218,7 @@ const Clients = () => {
             {/* Company Information */}
             <div>
               <h4 className="font-semibold text-primary-text mb-3">Company Information</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <label className="text-secondary-text">Email</label>
                   <p className="text-primary-text font-medium">{selectedClient.email || 'N/A'}</p>

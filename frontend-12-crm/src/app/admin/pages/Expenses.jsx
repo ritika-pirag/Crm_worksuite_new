@@ -1113,7 +1113,7 @@ const Expenses = () => {
       >
         {selectedExpense && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Expense #</label>
                 <p className="text-primary-text font-medium">{selectedExpense.expense_number || `EXP#${selectedExpense.id}`}</p>
@@ -1130,7 +1130,7 @@ const Expenses = () => {
                 </Badge>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{formatDate(selectedExpense.expense_date)}</p>
@@ -1267,7 +1267,7 @@ const Expenses = () => {
 
           <div>
             <label className="block text-sm font-medium text-primary-text mb-2">Date Range</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
                 type="date"
                 value={startDate}

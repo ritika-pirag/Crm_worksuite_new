@@ -928,7 +928,7 @@ const Orders = () => {
                         <IoTrash size={16} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-secondary-text">Quantity</label>
                         <Input
@@ -1064,7 +1064,7 @@ const Orders = () => {
       >
         {selectedOrder && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-secondary-text">Client</label>
                 <p className="text-primary-text">{selectedOrder.client_name || '-'}</p>

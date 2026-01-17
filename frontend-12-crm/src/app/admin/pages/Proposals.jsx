@@ -114,7 +114,9 @@ const Proposals = () => {
     terms: '',
     items: [],
     amount: 0,
-    currency: 'USD'
+    currency: 'USD',
+    discount: 0,
+    discount_type: '%'
   })
 
   // Catalog items from /api/v1/items
@@ -841,6 +843,8 @@ const Proposals = () => {
         terms: formData.terms || null,
         status: 'draft',
         currency: 'USD',
+        discount: formData.discount || 0,
+        discount_type: formData.discount_type || '%',
         items: formData.items,
       }
 
@@ -920,15 +924,10 @@ const Proposals = () => {
       label: 'Proposal',
       render: (value, row) => (
         <button
-          onClick={() => handleSort('estimate_number')}
-          className="flex items-center gap-1 hover:text-primary-accent font-semibold text-primary-text text-left"
+          onClick={() => navigate(`/app/admin/proposals/${row.id}`)}
+          className="hover:text-[#4F46E5] font-bold text-gray-900 transition-colors"
         >
           {value || '--'}
-          {sortColumn === 'estimate_number' ? (
-            sortDirection === 'desc' ? <IoChevronDown size={14} /> : <IoChevronUp size={14} />
-          ) : (
-            <IoChevronDown size={14} className="opacity-30" />
-          )}
         </button>
       ),
     },
@@ -1440,19 +1439,25 @@ const Proposals = () => {
                   {columns.map((column, idx) => (
                     <th
                       key={idx}
-                      className={`px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap ${
-                        column.key === 'estimate_number' ? 'w-36' :
-                        column.key === 'client_name' ? 'w-40' :
-                        column.key === 'proposal_date' ? 'w-32' :
-                        column.key === 'valid_till' ? 'w-32' :
-                        column.key === 'last_email_seen' ? 'w-44' :
-                        column.key === 'last_preview_seen' ? 'w-44' :
-                        column.key === 'total' ? 'w-28' :
-                        column.key === 'status' ? 'w-28' :
-                        column.key === 'actions' ? 'w-32' : ''
-                      }`}
+                      onClick={() => column.key !== 'actions' && handleSort(column.key)}
+                      className={`px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap transition-colors ${column.key !== 'actions' ? 'cursor-pointer hover:bg-gray-200' : ''
+                        } ${column.key === 'estimate_number' ? 'w-40' :
+                          column.key === 'client_name' ? 'w-44' :
+                            column.key === 'proposal_date' ? 'w-36' :
+                              column.key === 'valid_till' ? 'w-36' :
+                                column.key === 'last_email_seen' ? 'w-48' :
+                                  column.key === 'last_preview_seen' ? 'w-48' :
+                                    column.key === 'total' ? 'w-32' :
+                                      column.key === 'status' ? 'w-32' :
+                                        column.key === 'actions' ? 'w-44' : ''
+                        }`}
                     >
-                      {column.label}
+                      <div className="flex items-center gap-1">
+                        {column.label}
+                        {column.key !== 'actions' && sortColumn === column.key && (
+                          sortDirection === 'desc' ? <IoChevronDown size={14} /> : <IoChevronUp size={14} />
+                        )}
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -1610,7 +1615,7 @@ const Proposals = () => {
             <p className="text-[10px] text-blue-500 mt-2">Selecting a template will auto-fill the Background and Scope sections.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Proposal Date */}
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">

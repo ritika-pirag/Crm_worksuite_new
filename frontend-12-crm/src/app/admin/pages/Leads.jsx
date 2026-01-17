@@ -1213,11 +1213,6 @@ const Leads = () => {
       render: (value, row) => {
         const labelNames = Array.isArray(value) ? [...value] : (value ? [value] : [])
 
-        // Add probability as a label if it exists
-        if (row.probability) {
-          labelNames.push(`${row.probability}% Probability`)
-        }
-
         // Add Call this week badge
         if (row.callThisWeek) {
           labelNames.push('Call this week')
@@ -1230,21 +1225,6 @@ const Leads = () => {
         return (
           <div className="flex flex-wrap gap-1">
             {labelNames.map((labelName, idx) => {
-              // Special case for probability label
-              if (labelName.includes('% Probability')) {
-                const prob = parseInt(labelName);
-                const probColor = prob >= 90 ? '#22c55e' : (prob >= 50 ? '#eab308' : '#3b82f6');
-                return (
-                  <span
-                    key={`prob-${idx}`}
-                    className="px-2 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap"
-                    style={{ backgroundColor: probColor }}
-                  >
-                    {labelName}
-                  </span>
-                )
-              }
-
               // Special case for Call this week
               if (labelName === 'Call this week') {
                 return (
@@ -1274,6 +1254,25 @@ const Leads = () => {
               )
             })}
           </div>
+        )
+      },
+    },
+    {
+      key: 'probability',
+      label: 'Probability',
+      render: (value, row) => {
+        if (!value) {
+          return <span className="text-secondary-text">-</span>
+        }
+        const prob = parseInt(value)
+        const probColor = prob >= 90 ? '#22c55e' : (prob >= 50 ? '#eab308' : '#3b82f6')
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-white text-xs font-medium whitespace-nowrap"
+            style={{ backgroundColor: probColor }}
+          >
+            {prob}% Probability
+          </span>
         )
       },
     },
@@ -3146,7 +3145,7 @@ const Leads = () => {
                   onChange={(e) => setConvertFormData({ ...convertFormData, address: e.target.value })}
                   placeholder="Enter address"
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="City"
                     value={convertFormData.city}
@@ -3160,7 +3159,7 @@ const Leads = () => {
                     placeholder="Enter state"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Zip Code"
                     value={convertFormData.zip}
@@ -3214,7 +3213,7 @@ const Leads = () => {
             <div className="border-b border-gray-200 pb-4">
               <h3 className="text-lg font-semibold text-primary-text mb-3">Billing Points</h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="VAT Number"
                     value={convertFormData.vatNumber}
@@ -4204,7 +4203,7 @@ const Leads = () => {
                 placeholder="Enter description"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Start Date *"
                 type="date"
@@ -4227,7 +4226,7 @@ const Leads = () => {
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="End Date *"
                 type="date"

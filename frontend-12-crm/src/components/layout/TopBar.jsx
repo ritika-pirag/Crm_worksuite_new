@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useSettings } from "../../context/SettingsContext";
 import { useNavigate } from "react-router-dom";
 import {
   IoMenu,
@@ -23,6 +24,7 @@ import { notificationsAPI } from "../../api";
 const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const { theme } = useTheme();
+  const { getCompanyInfo, getCompanyLogoUrl, settings } = useSettings();
   const isDark = theme.mode === "dark";
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -35,6 +37,11 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
 
   const profileMenuRef = useRef(null);
   const dashboardMenuRef = useRef(null);
+  
+  // Get company info from settings context
+  const companyInfo = getCompanyInfo();
+  const companyLogoUrl = getCompanyLogoUrl();
+  const systemName = settings?.system_name || companyInfo?.name || 'Develo';
 
   useEffect(() => {
     fetchNotifications();
@@ -136,18 +143,31 @@ const TopBar = ({ onMenuClick, isSidebarCollapsed, onToggleSidebar }) => {
         <div className="px-3 lg:px-4 py-2 flex items-center justify-between w-full h-full gap-3">
           {/* LEFT SIDE */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
-            {/* Logo */}
+            {/* Logo - Dynamic from Settings */}
             <div
               className="flex items-center gap-3 cursor-pointer flex-shrink-0 group"
               onClick={() => navigate("/app/admin/dashboard")}
             >
-              <div className="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-primary-accent to-info rounded-lg flex items-center justify-center flex-shrink-0 shadow-card group-hover:shadow-elevated transition-all duration-200">
+              {companyLogoUrl ? (
+                <img 
+                  src={companyLogoUrl} 
+                  alt={systemName}
+                  className="w-7 h-7 lg:w-8 lg:h-8 object-contain rounded-lg flex-shrink-0"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextElementSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div 
+                className={`w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-br from-primary-accent to-info rounded-lg items-center justify-center flex-shrink-0 shadow-card group-hover:shadow-elevated transition-all duration-200 ${companyLogoUrl ? 'hidden' : 'flex'}`}
+              >
                 <span className="text-white font-bold text-xs lg:text-sm">
-                  D
+                  {systemName?.charAt(0)?.toUpperCase() || 'D'}
                 </span>
               </div>
               <span className="text-base lg:text-lg font-bold text-primary-text whitespace-nowrap hidden sm:block">
-                Develo
+                {systemName}
               </span>
             </div>
 

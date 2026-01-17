@@ -1,23 +1,40 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
+import { useSettings } from "../../../context/SettingsContext";
 import DataTable from "../../../components/ui/DataTable";
-import RightSideModal from "../../../components/ui/RightSideModal";
-import Badge from "../../../components/ui/Badge";
-import Button from "../../../components/ui/Button";
 import { proposalsAPI } from "../../../api";
-import { IoEye, IoDownload, IoCheckmark, IoClose } from "react-icons/io5";
+import { 
+  IoEye, 
+  IoDownload, 
+  IoCheckmark, 
+  IoClose, 
+  IoPrint,
+  IoChevronDown,
+  IoChevronUp,
+  IoFilter,
+  IoSearch
+} from "react-icons/io5";
 
 const Proposals = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const navigate = useNavigate();
+  
   const userId = user?.id || localStorage.getItem("userId");
   const companyId = user?.company_id || localStorage.getItem("companyId");
-  // For clients, client_id is stored separately from user_id
   const clientId = user?.client_id || localStorage.getItem("clientId");
+  const primaryColor = theme?.primaryAccent || '#0891b2';
 
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState(null);
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState({ start: "", end: "" });
 
   useEffect(() => {
     if (companyId) {
@@ -28,13 +45,25 @@ const Proposals = () => {
   const fetchProposals = async () => {
     try {
       setLoading(true);
-      // Use client_id if available (for client role), otherwise use user_id
       const response = await proposalsAPI.getAll({
         company_id: companyId,
         client_id: clientId || userId,
       });
       if (response.data.success) {
-        setProposals(response.data.data || []);
+        const fetchedProposals = response.data.data || [];
+        const transformed = fetchedProposals.map((p) => ({
+          ...p,
+          id: p.id,
+          title: p.title || `Proposal #${p.id}`,
+          proposal_number: p.proposal_number || `PROP-${String(p.id).padStart(4, '0')}`,
+          total: parseFloat(p.total || 0),
+          status: p.status || "Pending",
+          valid_till: p.valid_till,
+          created_at: p.created_at,
+          description: p.description || "",
+          client_name: p.client_name || user?.name || "Client",
+        }));
+        setProposals(transformed);
       }
     } catch (error) {
       console.error("Error fetching proposals:", error);
@@ -44,21 +73,16 @@ const Proposals = () => {
   };
 
   const handleView = (proposal) => {
-    setSelectedProposal(proposal);
-    setIsViewModalOpen(true);
+    navigate(`/app/client/proposals/${proposal.id}`);
   };
 
-  const handleAccept = async (id) => {
+  const handleAccept = async (id, e) => {
+    e.stopPropagation();
     if (window.confirm("Are you sure you want to accept this proposal?")) {
       try {
-        await proposalsAPI.updateStatus(
-          id,
-          { status: "Accepted" },
-          { company_id: companyId }
-        );
+        await proposalsAPI.updateStatus(id, "Accepted", { company_id: companyId });
         alert("Proposal accepted successfully!");
         fetchProposals();
-        setIsViewModalOpen(false);
       } catch (error) {
         console.error("Error accepting proposal:", error);
         alert("Failed to accept proposal");
@@ -66,17 +90,13 @@ const Proposals = () => {
     }
   };
 
-  const handleReject = async (id) => {
+  const handleReject = async (id, e) => {
+    e.stopPropagation();
     if (window.confirm("Are you sure you want to reject this proposal?")) {
       try {
-        await proposalsAPI.updateStatus(
-          id,
-          { status: "Rejected" },
-          { company_id: companyId }
-        );
+        await proposalsAPI.updateStatus(id, "Rejected", { company_id: companyId });
         alert("Proposal rejected!");
         fetchProposals();
-        setIsViewModalOpen(false);
       } catch (error) {
         console.error("Error rejecting proposal:", error);
         alert("Failed to reject proposal");
@@ -84,160 +104,123 @@ const Proposals = () => {
     }
   };
 
-  const handleDownload = async (proposal) => {
-    try {
-      // Create printable PDF version
-      const printWindow = window.open("", "_blank");
-      const content = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Proposal - ${proposal.title || proposal.id}</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-              .header h1 { margin: 0; color: #333; }
-              .details { margin-bottom: 30px; }
-              .details-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-              .label { font-weight: bold; color: #666; }
-              .value { color: #333; }
-              .amount { font-size: 24px; font-weight: bold; color: #2563eb; text-align: center; margin: 30px 0; }
-              .description { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-              .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; }
-              @media print { button { display: none; } }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>PROPOSAL</h1>
-              <p>${proposal.title || "Proposal #" + proposal.id}</p>
-            </div>
-            <div class="details">
-              <div class="details-row">
-                <span class="label">Status:</span>
-                <span class="value">${proposal.status || "Pending"}</span>
-              </div>
-              <div class="details-row">
-                <span class="label">Valid Till:</span>
-                <span class="value">${
-                  proposal.valid_till
-                    ? new Date(proposal.valid_till).toLocaleDateString()
-                    : "N/A"
-                }</span>
-              </div>
-              <div class="details-row">
-                <span class="label">Created:</span>
-                <span class="value">${
-                  proposal.created_at
-                    ? new Date(proposal.created_at).toLocaleDateString()
-                    : "N/A"
-                }</span>
-              </div>
-            </div>
-            <div class="amount">
-              Total: $${parseFloat(proposal.total || 0).toFixed(2)}
-            </div>
-            ${
-              proposal.description
-                ? `<div class="description"><strong>Description:</strong><br/>${proposal.description}</div>`
-                : ""
-            }
-            <div class="footer">
-              <p>Generated on ${new Date().toLocaleDateString()}</p>
-            </div>
-            <script>window.onload = function() { window.print(); }</script>
-          </body>
-        </html>
-      `;
-      printWindow.document.write(content);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Error downloading proposal:", error);
-      alert("Failed to download proposal");
+  // Filter proposals
+  const filteredProposals = proposals.filter((p) => {
+    let matches = true;
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      matches = matches && (
+        p.title?.toLowerCase().includes(query) ||
+        p.proposal_number?.toLowerCase().includes(query) ||
+        p.description?.toLowerCase().includes(query)
+      );
     }
+    
+    if (statusFilter) {
+      matches = matches && p.status === statusFilter;
+    }
+    
+    if (dateFilter.start) {
+      matches = matches && new Date(p.created_at) >= new Date(dateFilter.start);
+    }
+    
+    if (dateFilter.end) {
+      matches = matches && new Date(p.created_at) <= new Date(dateFilter.end);
+    }
+    
+    return matches;
+  });
+
+  const getStatusBadge = (status) => {
+    const statusStyles = {
+      Draft: { bg: "bg-gray-100", text: "text-gray-600" },
+      Sent: { bg: "bg-blue-100", text: "text-blue-600" },
+      Pending: { bg: "bg-yellow-100", text: "text-yellow-600" },
+      Accepted: { bg: "bg-green-100", text: "text-green-600" },
+      Rejected: { bg: "bg-red-100", text: "text-red-600" },
+    };
+    const style = statusStyles[status] || statusStyles.Pending;
+    return (
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+        {status}
+      </span>
+    );
   };
 
   const columns = [
     {
+      key: "proposal_number",
+      label: "Proposal #",
+      render: (value, row) => (
+        <span 
+          className="font-semibold cursor-pointer hover:underline"
+          style={{ color: primaryColor }}
+          onClick={() => handleView(row)}
+        >
+          {value}
+        </span>
+      ),
+    },
+    {
       key: "title",
       label: "Title",
-      render: (value, row) => value || `Proposal #${row.id}`,
+      render: (value) => <span className="font-medium">{value}</span>,
     },
     {
       key: "total",
       label: "Amount",
-      render: (value) => `$${parseFloat(value || 0).toFixed(2)}`,
+      render: (value) => (
+        <span className="font-semibold">${parseFloat(value || 0).toLocaleString()}</span>
+      ),
     },
     {
       key: "status",
       label: "Status",
-      render: (value) => {
-        const statusColors = {
-          Sent: "info",
-          Accepted: "success",
-          Rejected: "danger",
-          Draft: "default",
-          Pending: "warning",
-        };
-        return (
-          <Badge variant={statusColors[value] || "default"}>
-            {value || "Pending"}
-          </Badge>
-        );
-      },
+      render: (value) => getStatusBadge(value),
     },
     {
       key: "valid_till",
       label: "Valid Till",
-      render: (value) => (value ? new Date(value).toLocaleDateString() : "N/A"),
+      render: (value) => (
+        <span className="text-sm text-secondary-text">
+          {value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
+        </span>
+      ),
     },
     {
       key: "created_at",
       label: "Date",
-      render: (value) => (value ? new Date(value).toLocaleDateString() : "N/A"),
+      render: (value) => (
+        <span className="text-sm text-secondary-text">
+          {value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A"}
+        </span>
+      ),
     },
   ];
 
   const actions = (row) => (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-1">
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleView(row);
-        }}
-        className="p-2 text-primary-accent hover:bg-primary-accent hover:bg-opacity-10 rounded transition-colors"
+        onClick={(e) => { e.stopPropagation(); handleView(row); }}
+        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        style={{ color: primaryColor }}
         title="View"
       >
         <IoEye size={18} />
       </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleDownload(row);
-        }}
-        className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-        title="Download"
-      >
-        <IoDownload size={18} />
-      </button>
       {row.status === "Sent" && (
         <>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAccept(row.id);
-            }}
-            className="p-2 text-green-600 hover:bg-green-100 rounded transition-colors"
+            onClick={(e) => handleAccept(row.id, e)}
+            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
             title="Accept"
           >
             <IoCheckmark size={18} />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleReject(row.id);
-            }}
-            className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
+            onClick={(e) => handleReject(row.id, e)}
+            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="Reject"
           >
             <IoClose size={18} />
@@ -249,135 +232,118 @@ const Proposals = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-primary-text">Proposals</h1>
-        <p className="text-secondary-text mt-1">
-          View and respond to proposals
-        </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary-text">Proposals</h1>
+          <p className="text-secondary-text mt-1">View and respond to proposals</p>
+        </div>
+        
+        {/* Filter Button */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              isFilterOpen ? 'text-white border-transparent' : 'bg-white border-gray-300 hover:bg-gray-50'
+            }`}
+            style={isFilterOpen ? { backgroundColor: primaryColor } : {}}
+          >
+            <IoFilter size={18} />
+            <span className="text-sm font-medium">Filters</span>
+            {isFilterOpen ? <IoChevronUp size={16} /> : <IoChevronDown size={16} />}
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8">
-          <p className="text-secondary-text">Loading proposals...</p>
-        </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={proposals}
-          searchPlaceholder="Search proposals..."
-          filters={true}
-          filterConfig={[
-            {
-              key: "status",
-              label: "Status",
-              type: "select",
-              options: ["Sent", "Accepted", "Rejected", "Draft", "Pending"],
-            },
-          ]}
-          actions={actions}
-          bulkActions={false}
-          emptyMessage="No proposals found"
-        />
-      )}
-
-      <RightSideModal
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-        title="Proposal Details"
-      >
-        {selectedProposal && (
-          <div className="space-y-4">
+      {/* Filter Panel */}
+      {isFilterOpen && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="text-sm font-medium text-secondary-text">
-                Title
-              </label>
-              <p className="text-primary-text mt-1">
-                {selectedProposal.title || `Proposal #${selectedProposal.id}`}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-secondary-text">
-                Amount
-              </label>
-              <p className="text-primary-text mt-1 text-xl font-bold">
-                ${parseFloat(selectedProposal.total || 0).toFixed(2)}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-secondary-text">
-                Status
-              </label>
-              <div className="mt-1">
-                <Badge
-                  variant={
-                    selectedProposal.status === "Accepted"
-                      ? "success"
-                      : selectedProposal.status === "Rejected"
-                      ? "danger"
-                      : selectedProposal.status === "Sent"
-                      ? "info"
-                      : "default"
-                  }
-                >
-                  {selectedProposal.status || "Pending"}
-                </Badge>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <div className="relative">
+                <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search proposals..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                  style={{ '--tw-ring-color': primaryColor }}
+                />
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-secondary-text">
-                Valid Till
-              </label>
-              <p className="text-primary-text mt-1">
-                {selectedProposal.valid_till
-                  ? new Date(selectedProposal.valid_till).toLocaleDateString()
-                  : "N/A"}
-              </p>
-            </div>
-            {selectedProposal.description && (
-              <div>
-                <label className="text-sm font-medium text-secondary-text">
-                  Description
-                </label>
-                <p className="text-primary-text mt-1 whitespace-pre-wrap">
-                  {selectedProposal.description}
-                </p>
-              </div>
-            )}
-
-            {selectedProposal.status === "Sent" && (
-              <div className="flex gap-3 pt-4 border-t">
-                <Button
-                  variant="primary"
-                  onClick={() => handleAccept(selectedProposal.id)}
-                  className="flex-1 flex items-center justify-center gap-2"
-                >
-                  <IoCheckmark size={18} />
-                  Accept
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleReject(selectedProposal.id)}
-                  className="flex-1 flex items-center justify-center gap-2 text-red-600 border-red-600 hover:bg-red-50"
-                >
-                  <IoClose size={18} />
-                  Reject
-                </Button>
-              </div>
-            )}
-
-            <div className="pt-4">
-              <Button
-                variant="outline"
-                onClick={() => handleDownload(selectedProposal.id)}
-                className="w-full flex items-center justify-center gap-2"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
               >
-                <IoDownload size={18} />
-                Download PDF
-              </Button>
+                <option value="">All Status</option>
+                <option value="Sent">Sent</option>
+                <option value="Pending">Pending</option>
+                <option value="Accepted">Accepted</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                value={dateFilter.start}
+                onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                value={dateFilter.end}
+                onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+              />
             </div>
           </div>
-        )}
-      </RightSideModal>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("");
+                setDateFilter({ start: "", end: "" });
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Proposals Table */}
+      {loading ? (
+        <div className="text-center py-12">
+          <div 
+            className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-transparent"
+            style={{ borderColor: `${primaryColor} transparent ${primaryColor} ${primaryColor}` }}
+          ></div>
+          <p className="text-secondary-text mt-4">Loading proposals...</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <DataTable
+            columns={columns}
+            data={filteredProposals}
+            searchPlaceholder="Search proposals..."
+            filters={false}
+            actions={actions}
+            bulkActions={false}
+            emptyMessage="No proposals found"
+            onRowClick={handleView}
+          />
+        </div>
+      )}
     </div>
   );
 };

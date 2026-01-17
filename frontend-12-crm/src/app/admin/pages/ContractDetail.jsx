@@ -8,6 +8,7 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
 import RichTextEditor from '../../../components/ui/RichTextEditor'
+import TaskFormModal from '../../../components/ui/TaskFormModal'
 import {
   IoArrowBack,
   IoBriefcase,
@@ -324,13 +325,243 @@ const ContractDetail = () => {
   }
 
   const handleViewPDF = () => {
-    const pdfUrl = `${baseUrl}/api/v1/contracts/${id}/pdf?company_id=${companyId}`
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer')
+    // Generate a PDF-like preview in a new window
+    const pdfWindow = window.open('', '_blank')
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Contract ${contract.contract_number}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background: #f5f5f5; }
+          .pdf-container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; }
+          .header h1 { color: #3b82f6; font-size: 28px; margin-bottom: 10px; }
+          .header h2 { color: #333; font-size: 20px; }
+          .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+          .info-box { padding: 15px; background: #f9fafb; border-radius: 8px; }
+          .info-box label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 5px; }
+          .info-box span { font-size: 14px; color: #111827; font-weight: 500; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th { background: #3b82f6; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
+          td { border-bottom: 1px solid #e5e7eb; padding: 12px; font-size: 14px; }
+          .total-row { background: #f3f4f6; font-weight: 600; }
+          .total-row td { border-top: 2px solid #3b82f6; }
+          .content-section { margin-top: 30px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; }
+          .content-section h3 { color: #374151; margin-bottom: 15px; font-size: 16px; }
+          .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+          .status-draft { background: #9ca3af; color: white; }
+          .status-sent { background: #3b82f6; color: white; }
+          .status-accepted { background: #10b981; color: white; }
+          .status-declined { background: #ef4444; color: white; }
+          .print-btn { position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+          .print-btn:hover { background: #2563eb; }
+          @media print { .print-btn { display: none; } body { padding: 20px; background: white; } .pdf-container { box-shadow: none; padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+        <div class="pdf-container">
+          <div class="header">
+            <h1>CONTRACT</h1>
+            <h2>${contract.contract_number}</h2>
+            <p style="margin-top: 10px;"><span class="status-badge status-${contract.status}">${contract.status}</span></p>
+          </div>
+          
+          <h3 style="font-size: 18px; color: #111827; margin-bottom: 20px;">${contract.title}</h3>
+          
+          <div class="info-section">
+            <div class="info-box">
+              <label>Client</label>
+              <span>${contract.client_name}</span>
+            </div>
+            <div class="info-box">
+              <label>Project</label>
+              <span>${contract.project_name || 'N/A'}</span>
+            </div>
+            <div class="info-box">
+              <label>Contract Date</label>
+              <span>${localFormatDate(contract.contract_date)}</span>
+            </div>
+            <div class="info-box">
+              <label>Valid Until</label>
+              <span>${localFormatDate(contract.valid_until)}</span>
+            </div>
+          </div>
+          
+          ${contract.items && contract.items.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Description</th>
+                  <th style="text-align: right;">Qty</th>
+                  <th style="text-align: right;">Rate</th>
+                  <th style="text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${contract.items.map(item => `
+                  <tr>
+                    <td>${item.item_name || '-'}</td>
+                    <td>${item.description || '-'}</td>
+                    <td style="text-align: right;">${item.quantity || 0} ${item.unit || ''}</td>
+                    <td style="text-align: right;">${localFormatCurrency(item.unit_price || 0)}</td>
+                    <td style="text-align: right;">${localFormatCurrency(item.amount || (item.quantity * item.unit_price) || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
+                  <td style="text-align: right;"><strong>${localFormatCurrency(calculateTotal())}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          ` : '<p style="color: #6b7280; text-align: center; padding: 20px;">No items in this contract</p>'}
+          
+          ${editorContent ? `
+            <div class="content-section">
+              <h3>Contract Terms & Conditions</h3>
+              <div>${editorContent}</div>
+            </div>
+          ` : ''}
+          
+          ${contract.note ? `
+            <div class="content-section">
+              <h3>Notes</h3>
+              <p style="color: #4b5563;">${contract.note}</p>
+            </div>
+          ` : ''}
+        </div>
+      </body>
+      </html>
+    `
+    pdfWindow.document.write(pdfContent)
+    pdfWindow.document.close()
   }
 
   const handleDownloadPDF = () => {
-    const pdfUrl = `${baseUrl}/api/v1/contracts/${id}/pdf?company_id=${companyId}&download=1`
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer')
+    // Generate and trigger download using print dialog (Save as PDF)
+    const pdfWindow = window.open('', '_blank')
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Contract ${contract.contract_number}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; }
+          .pdf-container { max-width: 800px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; }
+          .header h1 { color: #3b82f6; font-size: 28px; margin-bottom: 10px; }
+          .header h2 { color: #333; font-size: 20px; }
+          .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+          .info-box { padding: 15px; background: #f9fafb; border-radius: 8px; }
+          .info-box label { font-size: 12px; color: #6b7280; display: block; margin-bottom: 5px; }
+          .info-box span { font-size: 14px; color: #111827; font-weight: 500; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th { background: #3b82f6; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
+          td { border-bottom: 1px solid #e5e7eb; padding: 12px; font-size: 14px; }
+          .total-row { background: #f3f4f6; font-weight: 600; }
+          .total-row td { border-top: 2px solid #3b82f6; }
+          .content-section { margin-top: 30px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; }
+          .content-section h3 { color: #374151; margin-bottom: 15px; font-size: 16px; }
+          .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+          .status-draft { background: #9ca3af; color: white; }
+          .status-sent { background: #3b82f6; color: white; }
+          .status-accepted { background: #10b981; color: white; }
+          .status-declined { background: #ef4444; color: white; }
+          @media print { @page { margin: 20mm; } }
+        </style>
+      </head>
+      <body>
+        <div class="pdf-container">
+          <div class="header">
+            <h1>CONTRACT</h1>
+            <h2>${contract.contract_number}</h2>
+            <p style="margin-top: 10px;"><span class="status-badge status-${contract.status}">${contract.status}</span></p>
+          </div>
+          
+          <h3 style="font-size: 18px; color: #111827; margin-bottom: 20px;">${contract.title}</h3>
+          
+          <div class="info-section">
+            <div class="info-box">
+              <label>Client</label>
+              <span>${contract.client_name}</span>
+            </div>
+            <div class="info-box">
+              <label>Project</label>
+              <span>${contract.project_name || 'N/A'}</span>
+            </div>
+            <div class="info-box">
+              <label>Contract Date</label>
+              <span>${localFormatDate(contract.contract_date)}</span>
+            </div>
+            <div class="info-box">
+              <label>Valid Until</label>
+              <span>${localFormatDate(contract.valid_until)}</span>
+            </div>
+          </div>
+          
+          ${contract.items && contract.items.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Description</th>
+                  <th style="text-align: right;">Qty</th>
+                  <th style="text-align: right;">Rate</th>
+                  <th style="text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${contract.items.map(item => `
+                  <tr>
+                    <td>${item.item_name || '-'}</td>
+                    <td>${item.description || '-'}</td>
+                    <td style="text-align: right;">${item.quantity || 0} ${item.unit || ''}</td>
+                    <td style="text-align: right;">${localFormatCurrency(item.unit_price || 0)}</td>
+                    <td style="text-align: right;">${localFormatCurrency(item.amount || (item.quantity * item.unit_price) || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
+                  <td style="text-align: right;"><strong>${localFormatCurrency(calculateTotal())}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          ` : ''}
+          
+          ${editorContent ? `
+            <div class="content-section">
+              <h3>Contract Terms & Conditions</h3>
+              <div>${editorContent}</div>
+            </div>
+          ` : ''}
+          
+          ${contract.note ? `
+            <div class="content-section">
+              <h3>Notes</h3>
+              <p style="color: #4b5563;">${contract.note}</p>
+            </div>
+          ` : ''}
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          }
+        </script>
+      </body>
+      </html>
+    `
+    pdfWindow.document.write(pdfContent)
+    pdfWindow.document.close()
   }
 
   const handleSendEmail = async () => {
@@ -824,7 +1055,7 @@ const ContractDetail = () => {
 
           {/* Action Buttons Grid */}
           <Card className="p-4">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -1103,7 +1334,7 @@ const ContractDetail = () => {
         size="md"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Discount"
               type="number"
@@ -1144,7 +1375,7 @@ const ContractDetail = () => {
             <p className="text-xl text-gray-600">{contract.contract_number}</p>
             <p className="text-lg text-gray-700">{contract.title}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <p><strong>Client:</strong> {contract.client_name}</p>
               <p><strong>Contract Date:</strong> {localFormatDate(contract.contract_date)}</p>
@@ -1224,7 +1455,7 @@ const ContractDetail = () => {
       >
         <div className="space-y-4">
           <p className="text-gray-600 mb-4">Select new status for this contract:</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {statusOptions.map((status) => (
               <button
                 key={status}
@@ -1247,37 +1478,17 @@ const ContractDetail = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal */}
-      <Modal
+      {/* Add Task Modal - Using unified TaskFormModal */}
+      <TaskFormModal
         isOpen={isAddTaskModalOpen}
-        onClose={() => { setIsAddTaskModalOpen(false); setNewTask({ title: '', due_date: '' }) }}
-        title="Add Task"
-        size="md"
-      >
-        <div className="space-y-4">
-          <Input
-            label="Task Title"
-            value={newTask.title}
-            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-            placeholder="Enter task title"
-            required
-          />
-          <Input
-            label="Due Date"
-            type="date"
-            value={newTask.due_date}
-            onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-          />
-          <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="outline" onClick={() => { setIsAddTaskModalOpen(false); setNewTask({ title: '', due_date: '' }) }}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddTask}>
-              Add Task
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setIsAddTaskModalOpen(false)}
+        onSave={() => {
+          // Refresh tasks
+        }}
+        relatedToType="client"
+        relatedToId={contract?.client_id}
+        companyId={companyId}
+      />
     </div>
   )
 }

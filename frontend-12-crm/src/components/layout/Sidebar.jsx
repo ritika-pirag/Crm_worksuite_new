@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useModules } from '../../context/ModulesContext'
 import { IoClose, IoChevronDown, IoLogOut, IoChevronForward } from 'react-icons/io5'
 import adminSidebarData from '../../config/adminSidebarData'
 import employeeSidebarData from '../../config/employeeSidebarData'
@@ -14,88 +15,218 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const { user, logout } = useAuth()
   const { theme } = useTheme()
   const { t } = useLanguage()
+  const { clientMenus, employeeMenus } = useModules()
   const isDark = theme.mode === 'dark'
   const location = useLocation()
   const navigate = useNavigate()
-  const [expandedItems, setExpandedItems] = useState({})
+  
+  /**
+   * ACCORDION STATE - Single source of truth
+   * Only ONE dropdown can be open at a time
+   * Value: string (menu path) or null (all closed)
+   */
+  const [activeMenu, setActiveMenu] = useState(null)
+  
+  /**
+   * Track previous pathname to detect actual route changes
+   * This prevents auto-expand from overriding user clicks
+   */
+  const prevPathnameRef = useRef(null) // Start with null to trigger initial expand
+  
+  /**
+   * Track if this is the first mount - for initial auto-expand
+   */
+  const isFirstMountRef = useRef(true)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
+  // Check if a path matches the current location
   const isActive = (path) => {
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
+  // Close mobile sidebar when menu item is clicked
   const handleMenuItemClick = () => {
     if (window.innerWidth < 1024) {
       onClose()
     }
   }
 
-  const toggleSubmenu = (path) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [path]: !prev[path],
-    }))
-  }
+  /**
+   * ACCORDION TOGGLE LOGIC
+   * - If clicking the currently active menu → close it (set to null)
+   * - If clicking a different menu → open it (close previous automatically)
+   * This ensures only ONE dropdown is open at any time
+   */
+  const toggleSubmenu = useCallback((menuPath) => {
+    setActiveMenu((currentActive) => {
+      // If this menu is already open, close it
+      if (currentActive === menuPath) {
+        return null
+      }
+      // Otherwise, open this menu (automatically closes any other)
+      return menuPath
+    })
+  }, [])
 
-  const getSidebarData = () => {
+  /**
+   * Filter menu items based on module settings
+   * @param {Array} menuItems - Raw menu items from sidebar data
+   * @param {Object} moduleSettings - Module settings (clientMenus or employeeMenus)
+   * @returns {Array} Filtered menu items
+   */
+  const filterMenusByModuleSettings = useCallback((menuItems, moduleSettings) => {
+    if (!moduleSettings) return menuItems
+
+    return menuItems.filter(item => {
+      // Keep section dividers (items with only 'section' property)
+      if (item.section && !item.label) {
+        return true
+      }
+
+      // Check if this menu has a moduleKey and if it's enabled
+      if (item.moduleKey) {
+        const isEnabled = moduleSettings[item.moduleKey] !== false
+        if (!isEnabled) return false
+      }
+
+      // For parent menus with children, filter children as well
+      if (item.children && item.children.length > 0) {
+        const filteredChildren = item.children.filter(child => {
+          if (child.moduleKey) {
+            return moduleSettings[child.moduleKey] !== false
+          }
+          return true
+        })
+
+        // If no children remain, hide the parent too
+        if (filteredChildren.length === 0) return false
+
+        // Return item with filtered children
+        item.children = filteredChildren
+      }
+
+      return true
+    }).filter((item, index, arr) => {
+      // Remove orphaned section dividers (sections with no following items)
+      if (item.section && !item.label) {
+        const nextItem = arr[index + 1]
+        // Keep section only if next item exists and has the same section
+        return nextItem && nextItem.section === item.section
+      }
+      return true
+    })
+  }, [])
+
+  // Get sidebar data based on user role with module filtering
+  const getSidebarData = useCallback(() => {
     if (!user) return []
     if (user.role === 'SUPERADMIN') return superAdminSidebarData
     if (user.role === 'ADMIN') return adminSidebarData
     if (user.role === 'EMPLOYEE') return employeeSidebarData
     if (user.role === 'CLIENT') return clientSidebarData
     return []
-  }
+  }, [user])
 
-  const menuData = getSidebarData()
+  /**
+   * Filtered menu data based on role and module settings
+   * - SUPERADMIN and ADMIN see all menus (no filtering)
+   * - CLIENT menus filtered by clientMenus settings
+   * - EMPLOYEE menus filtered by employeeMenus settings
+   */
+  const menuData = useMemo(() => {
+    const rawData = getSidebarData()
+    
+    if (!user) return rawData
+    
+    // Apply module filtering for CLIENT and EMPLOYEE only
+    if (user.role === 'CLIENT') {
+      return filterMenusByModuleSettings([...rawData.map(item => ({...item, children: item.children ? [...item.children] : undefined}))], clientMenus)
+    }
+    
+    if (user.role === 'EMPLOYEE') {
+      return filterMenusByModuleSettings([...rawData.map(item => ({...item, children: item.children ? [...item.children] : undefined}))], employeeMenus)
+    }
+    
+    // SUPERADMIN and ADMIN see everything
+    return rawData
+  }, [getSidebarData, user, clientMenus, employeeMenus, filterMenusByModuleSettings])
 
-  // Auto-expand parent menu if any child is active
+  /**
+   * AUTO-EXPAND: When navigating to a child page, auto-expand its parent
+   * - On first mount: Always expand parent of active child
+   * - On route change: Only expand if route actually changed
+   * - Does NOT run on user clicks (prevents override of manual toggles)
+   */
   useEffect(() => {
-    setExpandedItems((prev) => {
-      const newExpandedItems = { ...prev }
-      let hasChanges = false
-
-      menuData.forEach((item) => {
+    // Check if this is first mount OR if pathname actually changed
+    const isFirstMount = isFirstMountRef.current
+    const pathnameChanged = prevPathnameRef.current !== location.pathname
+    
+    if (isFirstMount || pathnameChanged) {
+      // Find which parent menu contains the active child route
+      const activeParent = menuData.find((item) => {
         if (item.children && item.children.length > 0) {
-          const hasActiveChild = item.children.some((child) => {
-            return location.pathname === child.path || location.pathname.startsWith(child.path + '/')
+          return item.children.some((child) => {
+            return location.pathname === child.path || 
+                   location.pathname.startsWith(child.path + '/')
           })
-          if (hasActiveChild && !newExpandedItems[item.path]) {
-            newExpandedItems[item.path] = true
-            hasChanges = true
-          }
         }
+        return false
       })
 
-      return hasChanges ? newExpandedItems : prev
-    })
+      // If we found a parent with active child, expand it
+      if (activeParent) {
+        setActiveMenu(activeParent.path)
+      }
+      
+      // Update refs
+      prevPathnameRef.current = location.pathname
+      isFirstMountRef.current = false
+    }
   }, [location.pathname, menuData])
 
-  // Close all submenus when sidebar is collapsed
+  /**
+   * COLLAPSE EFFECT: Close all dropdowns when sidebar is collapsed
+   */
   useEffect(() => {
     if (isCollapsed) {
-      setExpandedItems({})
+      setActiveMenu(null)
     }
   }, [isCollapsed])
 
+  /**
+   * RENDER MENU ITEM
+   * Handles both parent menus (with children) and standalone items
+   */
   const renderMenuItem = (item, level = 0) => {
+    // Skip section-only items without labels
     if (item.section && !item.label) {
       return null
     }
 
-    // Menu Item with children (submenu)
+    // PARENT MENU: Menu item with children (dropdown submenu)
     if (item.label && item.icon && item.children && item.children.length > 0) {
       const Icon = item.icon
       const hasActiveChild = item.children.some((child) => isActive(child.path))
-      const isExpanded = expandedItems[item.path] || false
+      
+      /**
+       * Check if THIS menu is the currently expanded one
+       * Uses the single activeMenu state for accordion behavior
+       */
+      const isExpanded = activeMenu === item.path
 
       return (
         <li key={item.path} className="mb-0.5">
+          {/* Parent Menu Button */}
           <button
-            onClick={() => {
+            onClick={(e) => {
+              // Prevent event bubbling
+              e.stopPropagation()
+              // Only toggle if sidebar is not collapsed
               if (!isCollapsed) {
                 toggleSubmenu(item.path)
               }
@@ -108,9 +239,24 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
                 : ''
               }`}
             style={{
-              color: hasActiveChild ? '#ffffff' : (isDark ? '#e0e0e0' : '#6B7280'),
+              color: hasActiveChild ? '#ffffff' : (isDark ? '#e0e0e0' : '#4B5563'),
+              backgroundColor: hasActiveChild ? undefined : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              if (!hasActiveChild && !isCollapsed) {
+                e.currentTarget.style.backgroundColor = isDark ? '#374151' : '#f3f4f6'
+                e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!hasActiveChild && !isCollapsed) {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = isDark ? '#e0e0e0' : '#4B5563'
+              }
             }}
             title={isCollapsed ? t(item.label) : ''}
+            aria-expanded={isExpanded}
+            aria-haspopup="true"
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Icon size={18} className="flex-shrink-0" />
@@ -118,6 +264,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
                 <span className="truncate text-sm font-medium">{t(item.label)}</span>
               )}
             </div>
+            {/* Chevron indicator - rotates when expanded */}
             {!isCollapsed && (
               <IoChevronDown
                 size={14}
@@ -126,27 +273,59 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
               />
             )}
           </button>
+          
+          {/* Submenu Children - Only show when expanded and not collapsed */}
           {!isCollapsed && isExpanded && (
-            <div className="overflow-hidden animate-slideDown">
-              <ul className="space-y-0.5 pl-3 mt-0.5">
+            <div 
+              className="overflow-hidden"
+              style={{
+                marginTop: '4px',
+                marginLeft: '12px',
+                paddingLeft: '8px',
+                borderLeft: isDark ? '2px solid #4B5563' : '2px solid #D1D5DB',
+              }}
+            >
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                 {item.children.map((child) => {
                   const childActive = isActive(child.path)
                   const ChildIcon = child.icon
                   return (
-                    <li key={child.path}>
+                    <li key={child.path} style={{ marginBottom: '2px' }}>
                       <Link
                         to={child.path}
                         onClick={handleMenuItemClick}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 text-sm ${childActive
-                          ? 'text-primary-accent font-semibold bg-primary-accent/10'
-                          : ''
-                          }`}
                         style={{
-                          color: childActive ? undefined : (isDark ? '#b0b0b0' : '#6B7280'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          textDecoration: 'none',
+                          fontWeight: childActive ? '600' : '400',
+                          color: childActive 
+                            ? '#ffffff'
+                            : (isDark ? '#D1D5DB' : '#1F2937'),
+                          backgroundColor: childActive 
+                            ? 'var(--color-primary-accent, #217E45)' 
+                            : 'transparent',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!childActive) {
+                            e.currentTarget.style.backgroundColor = isDark ? '#374151' : '#F3F4F6'
+                            e.currentTarget.style.color = isDark ? '#ffffff' : '#111827'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!childActive) {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                            e.currentTarget.style.color = isDark ? '#D1D5DB' : '#1F2937'
+                          }
                         }}
                       >
-                        {ChildIcon && <ChildIcon size={16} className="flex-shrink-0" />}
-                        <span className="truncate">{t(child.label)}</span>
+                        {ChildIcon && <ChildIcon size={16} style={{ flexShrink: 0 }} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t(child.label)}</span>
                       </Link>
                     </li>
                   )
@@ -158,7 +337,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
       )
     }
 
-    // Regular Menu Item (no children)
+    // STANDALONE MENU ITEM: No children, direct link
     if (item.label && item.icon) {
       const Icon = item.icon
       const active = isActive(item.path)
@@ -176,7 +355,20 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
                 : ''
               }`}
             style={{
-              color: active ? '#ffffff' : (isDark ? '#e0e0e0' : '#6B7280'),
+              color: active ? '#ffffff' : (isDark ? '#e0e0e0' : '#4B5563'),
+              backgroundColor: active ? undefined : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              if (!active) {
+                e.currentTarget.style.backgroundColor = isDark ? '#374151' : '#f3f4f6'
+                e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!active) {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = isDark ? '#e0e0e0' : '#4B5563'
+              }
             }}
             title={isCollapsed ? t(item.label) : ''}
           >

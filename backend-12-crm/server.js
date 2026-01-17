@@ -42,6 +42,7 @@ const socialMediaIntegrationRoutes = require('./routes/socialMediaIntegrationRou
 const reportRoutes = require('./routes/reportRoutes');
 const emailTemplateRoutes = require('./routes/emailTemplateRoutes');
 const financeTemplateRoutes = require('./routes/financeTemplateRoutes');
+const projectTemplateRoutes = require('./routes/projectTemplateRoutes');
 const creditNoteRoutes = require('./routes/creditNoteRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const bankAccountRoutes = require('./routes/bankAccountRoutes');
@@ -52,6 +53,7 @@ const pwaRoutes = require('./routes/pwaRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const itemRoutes = require('./routes/itemRoutes');
+const moduleSettingsRoutes = require('./routes/moduleSettingsRoutes');
 
 
 const app = express();
@@ -163,6 +165,7 @@ app.use(`${apiBase}/social-media-integrations`, socialMediaIntegrationRoutes);
 app.use(`${apiBase}/reports`, reportRoutes);
 app.use(`${apiBase}/email-templates`, emailTemplateRoutes);
 app.use(`${apiBase}/finance-templates`, financeTemplateRoutes);
+app.use(`${apiBase}/project-templates`, projectTemplateRoutes);
 app.use(`${apiBase}/credit-notes`, creditNoteRoutes);
 app.use(`${apiBase}/superadmin`, superAdminRoutes);
 app.use(`${apiBase}/bank-accounts`, bankAccountRoutes);
@@ -176,6 +179,7 @@ app.use(`${apiBase}/notes`, noteRoutes);
 app.use(`${apiBase}/orders`, orderRoutes);
 app.use(`${apiBase}/items`, itemRoutes);
 app.use(`${apiBase}/pwa`, pwaRoutes);
+app.use(`${apiBase}/module-settings`, moduleSettingsRoutes);
 
 // 404 handler
 app.use((req, res) => {

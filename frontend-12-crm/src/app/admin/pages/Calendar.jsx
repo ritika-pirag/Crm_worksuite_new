@@ -803,7 +803,7 @@ const CalendarPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-primary-text mb-2">
                 Starts On Date <span className="text-red-500">*</span>
@@ -1042,7 +1042,7 @@ const CalendarPage = () => {
               <div className="w-4 h-4 rounded-full" style={{ backgroundColor: selectedEvent.label_color || '#3B82F6' }}></div>
               <h3 className="text-lg font-semibold text-primary-text">{selectedEvent.event_name}</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Date</label>
                 <p className="text-primary-text">{new Date(selectedEvent.starts_on_date).toLocaleDateString()}</p>
@@ -1052,7 +1052,7 @@ const CalendarPage = () => {
                 <p className="text-primary-text">{selectedEvent.starts_on_time?.slice(0, 5)} - {selectedEvent.ends_on_time?.slice(0, 5)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-text mb-1">Location</label>
                 <p className="text-primary-text">{selectedEvent.where || '-'}</p>

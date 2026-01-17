@@ -139,6 +139,11 @@ const adminSidebarData = [
         icon: IoDocument,
         path: '/app/admin/finance-templates',
       },
+      {
+        label: 'Project Templates',
+        icon: IoFolderOpen,
+        path: '/app/admin/project-templates',
+      },
     ],
   },
   {
@@ -266,6 +271,10 @@ const adminSidebarData = [
       {
         label: 'System Settings',
         path: '/app/admin/settings',
+      },
+      {
+        label: 'Module Settings',
+        path: '/app/admin/settings/modules',
       },
       // {
       //   label: 'System Health',

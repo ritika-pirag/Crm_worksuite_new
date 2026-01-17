@@ -443,7 +443,7 @@ const CompanyPackages = () => {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g., Pro, Basic, Free"
           />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Price"
               type="number"

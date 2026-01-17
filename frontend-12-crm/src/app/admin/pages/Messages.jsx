@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../../../context/AuthContext'
 import Card from '../../../components/ui/Card'
 import Badge from '../../../components/ui/Badge'
@@ -11,7 +11,11 @@ import {
   IoCheckmarkDone,
   IoPerson,
   IoPeople,
-  IoBriefcase
+  IoBriefcase,
+  IoTrash,
+  IoArchive,
+  IoVolumeOff,
+  IoFlag
 } from 'react-icons/io5'
 
 const Messages = () => {
@@ -29,6 +33,21 @@ const Messages = () => {
   const [sending, setSending] = useState(false)
   const [newMessageText, setNewMessageText] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showChatMenu, setShowChatMenu] = useState(false)
+  const chatMenuRef = useRef(null)
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(event.target)) {
+        setShowChatMenu(false)
+      }
+    }
+    if (showChatMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showChatMenu])
 
   useEffect(() => {
     if (userId && companyId && userRole) {
@@ -242,9 +261,61 @@ const Messages = () => {
                       </p>
                     </div>
                   </div>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg">
-                    <IoEllipsisVertical size={20} />
-                  </button>
+                  <div className="relative" ref={chatMenuRef}>
+                    <button 
+                      onClick={() => setShowChatMenu(!showChatMenu)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <IoEllipsisVertical size={20} />
+                    </button>
+                    {showChatMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+                        <button
+                          onClick={() => {
+                            alert('Archive conversation feature coming soon!')
+                            setShowChatMenu(false)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                        >
+                          <IoArchive size={16} className="text-gray-500" />
+                          Archive Chat
+                        </button>
+                        <button
+                          onClick={() => {
+                            alert('Mute notifications feature coming soon!')
+                            setShowChatMenu(false)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                        >
+                          <IoVolumeOff size={16} className="text-gray-500" />
+                          Mute Notifications
+                        </button>
+                        <button
+                          onClick={() => {
+                            alert('Mark as important feature coming soon!')
+                            setShowChatMenu(false)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                        >
+                          <IoFlag size={16} className="text-yellow-500" />
+                          Mark Important
+                        </button>
+                        <div className="border-t border-gray-100 my-1"></div>
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this conversation?')) {
+                              alert('Delete conversation feature coming soon!')
+                            }
+                            setShowChatMenu(false)
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                        >
+                          <IoTrash size={16} />
+                          Delete Conversation
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Messages Area */}

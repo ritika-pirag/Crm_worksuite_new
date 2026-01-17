@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Modal from "../../../components/ui/Modal";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
-import AddButton from "../../../components/ui/AddButton";
 import {
   paymentsAPI,
   invoicesAPI,
@@ -14,15 +13,9 @@ import {
   IoAdd,
   IoClose,
   IoSearch,
-  IoFilter,
-  IoDownload,
   IoChevronDown,
-  IoChevronUp,
-  IoEllipsisVertical,
-  IoCheckmarkCircle,
   IoTrash,
   IoCreate,
-  IoEye,
   IoPrint,
   IoGrid,
   IoCheckmark,
@@ -30,16 +23,20 @@ import {
   IoChevronForward,
   IoList,
   IoBarChart,
-  IoCash,
+  IoDownloadOutline,
 } from "react-icons/io5";
+import { useTheme } from "../../../context/ThemeContext";
 
 const Payments = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const primaryColor = theme?.primaryAccent || "#217E45";
+  
   const companyId = parseInt(localStorage.getItem("companyId") || 1, 10);
   const userId = parseInt(localStorage.getItem("userId") || 1, 10);
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState("payment-received");
+  // View state (list or chart)
+  const [activeView, setActiveView] = useState("list");
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -88,6 +85,7 @@ const Payments = () => {
     "Debit Card",
     "UPI",
     "Cheque",
+    "Client Wallet",
   ];
 
   // Currency options
@@ -98,6 +96,9 @@ const Payments = () => {
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
+
+  // Short month names for chart
+  const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   // Fetch functions
   const fetchPayments = useCallback(async () => {
@@ -185,6 +186,7 @@ const Payments = () => {
         if (response.data.success) {
           alert("Payment updated successfully!");
           await fetchPayments();
+          await fetchInvoices();
           setIsEditModalOpen(false);
           setSelectedPayment(null);
           resetForm();
@@ -321,10 +323,6 @@ const Payments = () => {
   };
 
   // Filter handlers
-  const handleApplyFilters = () => {
-    fetchPayments();
-  };
-
   const handleResetFilters = () => {
     setPaymentMethodFilter("All");
     setCurrencyFilter("All");
@@ -336,7 +334,6 @@ const Payments = () => {
     setCustomDateEnd("");
     setSearchQuery("");
     setShowFilterPanel(false);
-    fetchPayments();
   };
 
   // Format helpers
@@ -377,60 +374,61 @@ const Payments = () => {
   };
 
   // Filtered payments
-  const filteredPayments = payments.filter((payment) => {
-    if (!payment) return false;
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+      if (!payment) return false;
 
-    // Search filter
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      const invoiceId = `INV #${payment.invoice_id || payment.id}`.toLowerCase();
-      const note = (payment.note || "").toLowerCase();
-      const method = (payment.payment_method || "").toLowerCase();
-      if (!invoiceId.includes(searchLower) && !note.includes(searchLower) && !method.includes(searchLower)) {
+      // Search filter
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const invoiceId = `INV #${payment.invoice_id || payment.id}`.toLowerCase();
+        const note = (payment.note || "").toLowerCase();
+        const method = (payment.payment_method || "").toLowerCase();
+        if (!invoiceId.includes(searchLower) && !note.includes(searchLower) && !method.includes(searchLower)) {
+          return false;
+        }
+      }
+
+      // Payment method filter
+      if (paymentMethodFilter !== "All" && payment.payment_method !== paymentMethodFilter) {
         return false;
       }
-    }
 
-    // Payment method filter
-    if (paymentMethodFilter !== "All" && payment.payment_method !== paymentMethodFilter) {
-      return false;
-    }
-
-    // Project filter
-    if (projectFilter !== "All") {
-      const projectId = parseInt(projectFilter);
-      if (payment.project_id !== projectId) {
-        return false;
+      // Project filter
+      if (projectFilter !== "All") {
+        const projectId = parseInt(projectFilter);
+        if (payment.project_id !== projectId) {
+          return false;
+        }
       }
-    }
 
-    // Date filters
-    const paymentDate = payment.payment_date ? new Date(payment.payment_date) : null;
+      // Date filters
+      const paymentDate = payment.payment_date ? new Date(payment.payment_date) : null;
 
-    if (periodFilter === "monthly" && paymentDate) {
-      if (paymentDate.getFullYear() !== selectedYear || paymentDate.getMonth() + 1 !== selectedMonth) {
-        return false;
+      if (periodFilter === "monthly" && paymentDate) {
+        if (paymentDate.getFullYear() !== selectedYear || paymentDate.getMonth() + 1 !== selectedMonth) {
+          return false;
+        }
       }
-    }
 
-    if (periodFilter === "yearly" && paymentDate) {
-      if (paymentDate.getFullYear() !== selectedYear) {
-        return false;
+      if (periodFilter === "yearly" && paymentDate) {
+        if (paymentDate.getFullYear() !== selectedYear) {
+          return false;
+        }
       }
-    }
 
-    if (customDateStart && paymentDate) {
-      if (paymentDate < new Date(customDateStart)) return false;
-    }
+      if (periodFilter === "custom" && paymentDate) {
+        if (customDateStart && paymentDate < new Date(customDateStart)) return false;
+        if (customDateEnd) {
+          const endDate = new Date(customDateEnd);
+          endDate.setHours(23, 59, 59, 999);
+          if (paymentDate > endDate) return false;
+        }
+      }
 
-    if (customDateEnd && paymentDate) {
-      const endDate = new Date(customDateEnd);
-      endDate.setHours(23, 59, 59, 999);
-      if (paymentDate > endDate) return false;
-    }
-
-    return true;
-  });
+      return true;
+    });
+  }, [payments, searchQuery, paymentMethodFilter, projectFilter, periodFilter, selectedYear, selectedMonth, customDateStart, customDateEnd]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
@@ -447,57 +445,85 @@ const Payments = () => {
     return dueAmount > 0;
   });
 
+  // Chart data - monthly totals for selected year
+  const chartData = useMemo(() => {
+    const monthlyTotals = Array(12).fill(0);
+    
+    payments.forEach((payment) => {
+      if (!payment.payment_date) return;
+      const date = new Date(payment.payment_date);
+      if (date.getFullYear() === selectedYear) {
+        const month = date.getMonth();
+        monthlyTotals[month] += parseFloat(payment.amount) || 0;
+      }
+    });
+
+    const maxValue = Math.max(...monthlyTotals, 1);
+    
+    return {
+      months: shortMonthNames,
+      values: monthlyTotals,
+      maxValue: Math.ceil(maxValue / 1000) * 1000 || 6000,
+    };
+  }, [payments, selectedYear]);
+
+  // Chart Y-axis labels
+  const getYAxisLabels = (maxValue) => {
+    const labels = [];
+    const step = maxValue / 5;
+    for (let i = 5; i >= 0; i--) {
+      labels.push(Math.round(step * i));
+    }
+    return labels;
+  };
+
   return (
-    <div className="space-y-4 bg-gray-100 min-h-screen p-4">
-      {/* Top Navigation - Tabs */}
+    <div className="space-y-4 bg-main-bg min-h-screen p-4">
+      {/* Top Navigation Bar */}
       <div className="bg-white rounded-lg shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          {/* Left Side - Tabs */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("payment-received")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "payment-received" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
-              }`}
-            >
-              <IoCash className="inline mr-2" size={16} />
-              Payment Received
-            </button>
-            <button
-              onClick={() => setActiveTab("list")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "list" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
-              }`}
-            >
-              <IoList className="inline mr-2" size={16} />
-              List
-            </button>
-            <button
-              onClick={() => setActiveTab("chart")}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "chart" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100 border border-gray-300"
-              }`}
-            >
-              <IoBarChart className="inline mr-2" size={16} />
-              Chart
-            </button>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          {/* Left Side - Title and Tabs */}
+          <div className="flex items-center gap-6">
+            <h1 className="text-lg font-semibold text-primary-accent">Payment Received</h1>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveView("list")}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeView === "list" 
+                    ? "text-primary-text border-primary-accent" 
+                    : "text-secondary-text border-transparent hover:text-primary-text"
+                }`}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setActiveView("chart")}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeView === "chart" 
+                    ? "text-primary-text border-primary-accent" 
+                    : "text-secondary-text border-transparent hover:text-primary-text"
+                }`}
+              >
+                Chart
+              </button>
+            </div>
           </div>
 
           {/* Right Side - Add Button */}
-          <AddButton
+          <button
             onClick={() => {
               resetForm();
               setIsAddModalOpen(true);
             }}
-            label="+ Add payment"
-            className="bg-green-500 hover:bg-green-600"
-          />
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <IoAdd size={18} />
+            Add payment
+          </button>
         </div>
-      </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4">
           {/* Left Side */}
           <div className="flex items-center gap-3">
             <button className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50">
@@ -506,22 +532,52 @@ const Payments = () => {
             <button
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className={`flex items-center gap-2 px-4 py-2 text-sm border rounded-lg transition-colors ${
-                showFilterPanel ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-300 hover:bg-gray-50 text-gray-600"
+                showFilterPanel ? "border-primary-accent bg-primary-accent/5 text-primary-accent" : "border-gray-300 hover:bg-gray-50 text-gray-600"
               }`}
             >
               <IoAdd size={16} />
-              + Add new filter
+              Add new filter
             </button>
           </div>
 
-          {/* Right Side - Filters */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Right Side - Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
+            >
+              Excel
+            </button>
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
+            >
+              Print
+            </button>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search"
+                className="pl-3 pr-9 py-2 text-sm border border-gray-300 rounded-lg w-48 outline-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
+              />
+              <IoSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Panel */}
+      {showFilterPanel && (
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Payment Method Dropdown */}
             <div className="relative">
               <select
                 value={paymentMethodFilter}
                 onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
+                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
               >
                 <option value="All">- Payment method -</option>
                 {paymentMethods.map((method) => (
@@ -536,7 +592,7 @@ const Payments = () => {
               <select
                 value={currencyFilter}
                 onChange={(e) => setCurrencyFilter(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
+                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
               >
                 <option value="All">- Currency -</option>
                 {currencies.map((currency) => (
@@ -551,7 +607,7 @@ const Payments = () => {
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
+                className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
               >
                 <option value="All">- Project -</option>
                 {projects.map((project) => (
@@ -562,13 +618,15 @@ const Payments = () => {
             </div>
 
             {/* Period Buttons */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
               {["monthly", "yearly", "custom", "dynamic"].map((period) => (
                 <button
                   key={period}
                   onClick={() => setPeriodFilter(period)}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    periodFilter === period ? "bg-white shadow text-gray-800" : "text-gray-600 hover:text-gray-800"
+                    periodFilter === period 
+                      ? "bg-white shadow text-primary-text font-medium" 
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   {period.charAt(0).toUpperCase() + period.slice(1)}
@@ -576,11 +634,13 @@ const Payments = () => {
               ))}
             </div>
 
-            {/* Month Selector */}
+            {/* Month/Year Navigation */}
             <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
               <button
                 onClick={() => {
-                  if (selectedMonth === 1) {
+                  if (periodFilter === "yearly") {
+                    setSelectedYear(y => y - 1);
+                  } else if (selectedMonth === 1) {
                     setSelectedMonth(12);
                     setSelectedYear(y => y - 1);
                   } else {
@@ -592,11 +652,13 @@ const Payments = () => {
                 <IoChevronBack size={16} />
               </button>
               <span className="px-4 py-2 text-sm font-medium min-w-[140px] text-center">
-                {monthNames[selectedMonth - 1]} {selectedYear}
+                {periodFilter === "yearly" ? selectedYear : `${monthNames[selectedMonth - 1]} ${selectedYear}`}
               </span>
               <button
                 onClick={() => {
-                  if (selectedMonth === 12) {
+                  if (periodFilter === "yearly") {
+                    setSelectedYear(y => y + 1);
+                  } else if (selectedMonth === 12) {
                     setSelectedMonth(1);
                     setSelectedYear(y => y + 1);
                   } else {
@@ -610,177 +672,329 @@ const Payments = () => {
             </div>
 
             {/* Apply & Reset Buttons */}
-            <button onClick={handleApplyFilters} className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600" title="Apply filters">
+            <button 
+              className="p-2 text-white rounded-lg hover:opacity-90 transition-colors"
+              style={{ backgroundColor: primaryColor }}
+              title="Apply filters"
+            >
               <IoCheckmark size={18} />
             </button>
-            <button onClick={handleResetFilters} className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600" title="Reset filters">
+            <button 
+              onClick={handleResetFilters} 
+              className="p-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors" 
+              title="Reset filters"
+            >
               <IoClose size={18} />
             </button>
           </div>
-        </div>
 
-        {/* Expandable Filter Panel */}
-        {showFilterPanel && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Custom Date Range (visible when custom is selected) */}
+          {periodFilter === "custom" && (
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-200">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search payments..."
-                    className="w-full px-3 py-2 pl-9 text-sm border border-gray-300 rounded-lg outline-none"
-                  />
-                  <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <label className="block text-xs text-gray-500 mb-1">From Date</label>
                 <input
                   type="date"
                   value={customDateStart}
                   onChange={(e) => setCustomDateStart(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none"
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
                 />
               </div>
+              <span className="text-gray-400 mt-5">-</span>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <label className="block text-xs text-gray-500 mb-1">To Date</label>
                 <input
                   type="date"
                   value={customDateEnd}
                   onChange={(e) => setCustomDateEnd(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none"
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
                 />
               </div>
-              <div className="flex items-end gap-2">
-                <button
-                  onClick={() => { setCustomDateStart(""); setCustomDateEnd(""); setSearchQuery(""); }}
-                  className="flex-1 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Content Area */}
+      {activeView === "list" ? (
+        /* List View */
+        <Card className="p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      Invoice ID
+                      <IoChevronDown size={12} className="text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      Payment date
+                      <IoChevronDown size={12} className="text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Payment method</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Note</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Amount</th>
+                  <th className="w-16"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading payments...</td>
+                  </tr>
+                ) : paginatedPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">No payments found</td>
+                  </tr>
+                ) : (
+                  paginatedPayments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleViewInvoice(payment.invoice_id)}
+                          className="font-medium hover:underline"
+                          style={{ color: primaryColor }}
+                        >
+                          INV #{payment.invoice_id || payment.id}
+                        </button>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-gray-600 text-sm">
+                        {formatDate(payment.payment_date)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-gray-700 text-sm">
+                        {payment.payment_method || "-"}
+                      </td>
+                      <td className="px-4 py-4 text-gray-600 text-sm max-w-xs truncate" title={payment.note || ""}>
+                        {payment.note || "-"}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-gray-800 font-medium text-sm">
+                        {formatCurrency(payment.amount)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEdit(payment)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                            title="Edit"
+                          >
+                            <IoCreate size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(payment)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                            title="Delete"
+                          >
+                            <IoTrash size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer with Pagination */}
+          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+            <div className="flex items-center gap-4">
+              <select
+                value={itemsPerPage}
+                onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
+                className="px-2 py-1 text-sm border border-gray-300 rounded"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span className="text-sm text-gray-600">
+                {filteredPayments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, filteredPayments.length)}` : "0"} / {filteredPayments.length}
+              </span>
+            </div>
+            <div className="text-sm font-bold text-gray-700">
+              Total: {formatCurrency(totalAmount)}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={`p-1.5 border border-gray-300 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+              >
+                <IoChevronBack size={16} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className={`p-1.5 border border-gray-300 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+              >
+                <IoChevronForward size={16} />
+              </button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        /* Chart View */
+        <Card className="p-6">
+          {/* Chart Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <IoBarChart className="text-gray-400" size={18} />
+              <span className="text-sm font-medium text-gray-600">Chart</span>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Currency Selector */}
+              <div className="relative">
+                <select
+                  value={currencyFilter}
+                  onChange={(e) => setCurrencyFilter(e.target.value)}
+                  className="appearance-none px-4 py-2 pr-8 text-sm border border-gray-300 rounded-lg outline-none bg-white"
                 >
-                  Clear
+                  <option value="All">Currency</option>
+                  {currencies.map((currency) => (
+                    <option key={currency} value={currency}>{currency}</option>
+                  ))}
+                </select>
+                <IoChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              </div>
+
+              {/* Year Navigation */}
+              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setSelectedYear(y => y - 1)}
+                  className="px-2 py-2 hover:bg-gray-100 border-r border-gray-300"
+                >
+                  <IoChevronBack size={16} />
                 </button>
+                <span className="px-4 py-2 text-sm font-medium min-w-[80px] text-center">
+                  {selectedYear}
+                </span>
                 <button
-                  onClick={() => { handleApplyFilters(); setShowFilterPanel(false); }}
-                  className="flex-1 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                  onClick={() => setSelectedYear(y => y + 1)}
+                  className="px-2 py-2 hover:bg-gray-100 border-l border-gray-300"
                 >
-                  Apply
+                  <IoChevronForward size={16} />
                 </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Payments Table */}
-      <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="w-[15%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Invoice ID</th>
-                <th className="w-[15%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Payment date</th>
-                <th className="w-[20%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Payment method</th>
-                <th className="w-[25%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Note</th>
-                <th className="w-[12%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Amount</th>
-                <th className="w-[13%] px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase"></th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading payments...</td>
-                </tr>
-              ) : paginatedPayments.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">No payments found</td>
-                </tr>
-              ) : (
-                paginatedPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleViewInvoice(payment.invoice_id)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                      >
-                        INV #{payment.invoice_id || payment.id}
-                      </button>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-600">
-                      {formatDate(payment.payment_date)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-700">
-                      {payment.payment_method || "-"}
-                    </td>
-                    <td className="px-4 py-4 text-gray-600 truncate max-w-xs" title={payment.note || ""}>
-                      {payment.note || "-"}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-gray-800 font-medium">
-                      {formatCurrency(payment.amount)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEdit(payment)}
-                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
-                          title="Edit"
-                        >
-                          <IoCreate size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(payment)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                          title="Delete"
-                        >
-                          <IoTrash size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+          {/* Chart */}
+          <div className="relative h-80">
+            {/* Y-Axis */}
+            <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-500">
+              {getYAxisLabels(chartData.maxValue).map((label, idx) => (
+                <span key={idx} className="text-right pr-2">{label}</span>
+              ))}
+            </div>
+
+            {/* Grid Lines */}
+            <div className="absolute left-14 right-0 top-0 bottom-8">
+              {[0, 1, 2, 3, 4, 5].map((_, idx) => (
+                <div
+                  key={idx}
+                  className="absolute w-full border-t border-gray-100"
+                  style={{ top: `${(idx * 100) / 5}%` }}
+                />
+              ))}
+            </div>
+
+            {/* Bars */}
+            <div className="absolute left-14 right-0 top-0 bottom-8 flex items-end justify-around gap-2 px-2">
+              {chartData.values.map((value, idx) => {
+                const heightPercent = chartData.maxValue > 0 ? (value / chartData.maxValue) * 100 : 0;
+                return (
+                  <div key={idx} className="flex-1 flex flex-col items-center">
+                    <div
+                      className="w-full max-w-12 rounded-t transition-all duration-300 hover:opacity-80 cursor-pointer relative group"
+                      style={{
+                        height: `${Math.max(heightPercent, 0)}%`,
+                        backgroundColor: `${primaryColor}40`,
+                        minHeight: value > 0 ? '4px' : '0',
+                      }}
+                    >
+                      {/* Tooltip */}
+                      {value > 0 && (
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                          {formatCurrency(value)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* X-Axis Labels */}
+            <div className="absolute left-14 right-0 bottom-0 h-8 flex items-center justify-around text-xs text-gray-500">
+              {chartData.months.map((month, idx) => (
+                <span key={idx} className="flex-1 text-center">{month}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex justify-center mt-4">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-8 h-3 rounded"
+                style={{ backgroundColor: `${primaryColor}40` }}
+              />
+              <span className="text-xs text-gray-500">Monthly Payments ({selectedYear})</span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Mobile Card View (visible on small screens) */}
+      <div className="md:hidden space-y-3">
+        {activeView === "list" && paginatedPayments.map((payment) => (
+          <Card key={payment.id} className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <button
+                onClick={() => handleViewInvoice(payment.invoice_id)}
+                className="font-medium text-sm"
+                style={{ color: primaryColor }}
+              >
+                INV #{payment.invoice_id || payment.id}
+              </button>
+              <span className="font-bold text-gray-800">{formatCurrency(payment.amount)}</span>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Date:</span>
+                <span className="text-gray-700">{formatDate(payment.payment_date)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Method:</span>
+                <span className="text-gray-700">{payment.payment_method || "-"}</span>
+              </div>
+              {payment.note && (
+                <div className="text-gray-600 text-xs mt-2 pt-2 border-t border-gray-100">
+                  {payment.note}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer with Pagination and Total */}
-        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-4">
-            <select
-              value={itemsPerPage}
-              onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
-              className="px-2 py-1 text-sm border border-gray-300 rounded"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-            <span className="text-sm text-gray-600">
-              {filteredPayments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, filteredPayments.length)}` : "0"} / {filteredPayments.length}
-            </span>
-          </div>
-          <div className="text-sm font-bold text-gray-700">
-            Total: {formatCurrency(totalAmount)}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-1.5 border border-gray-300 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
-            >
-              <IoChevronBack size={16} />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className={`p-1.5 border border-gray-300 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
-            >
-              <IoChevronForward size={16} />
-            </button>
-          </div>
-        </div>
-      </Card>
+            </div>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => handleEdit(payment)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
+              >
+                <IoCreate size={16} /> Edit
+              </button>
+              <button
+                onClick={() => handleDelete(payment)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-red-500 hover:bg-red-50 rounded"
+              >
+                <IoTrash size={16} /> Delete
+              </button>
+            </div>
+          </Card>
+        ))}
+      </div>
 
       {/* Add/Edit Payment Modal */}
       <Modal
@@ -790,12 +1004,12 @@ const Payments = () => {
       >
         <div className="space-y-4">
           {/* Invoice */}
-          <div className="flex items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <label className="w-36 text-sm font-medium text-gray-700">Invoice</label>
             <select
               value={formData.invoice_id}
               onChange={(e) => handleInvoiceSelect(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
             >
               <option value="">Select Invoice</option>
               {invoicesWithDue.map((invoice) => (
@@ -813,12 +1027,12 @@ const Payments = () => {
           </div>
 
           {/* Payment Method */}
-          <div className="flex items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <label className="w-36 text-sm font-medium text-gray-700">Payment method</label>
             <select
               value={formData.payment_method}
               onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
             >
               <option value="">Select Payment Method</option>
               {paymentMethods.map((method) => (
@@ -828,7 +1042,7 @@ const Payments = () => {
           </div>
 
           {/* Payment Date */}
-          <div className="flex items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <label className="w-36 text-sm font-medium text-gray-700">Payment date</label>
             <Input
               type="date"
@@ -839,7 +1053,7 @@ const Payments = () => {
           </div>
 
           {/* Amount */}
-          <div className="flex items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <label className="w-36 text-sm font-medium text-gray-700">Amount</label>
             <Input
               type="number"
@@ -853,14 +1067,14 @@ const Payments = () => {
           </div>
 
           {/* Note */}
-          <div className="flex items-start">
-            <label className="w-36 text-sm font-medium text-gray-700 pt-2">Note</label>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+            <label className="w-36 text-sm font-medium text-gray-700 sm:pt-2">Note</label>
             <textarea
               value={formData.note}
               onChange={(e) => setFormData({ ...formData, note: e.target.value })}
               placeholder="Add a note (optional)..."
               rows={3}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-primary-accent/30 focus:border-primary-accent"
             />
           </div>
 
@@ -870,9 +1084,13 @@ const Payments = () => {
               variant="outline"
               onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedPayment(null); resetForm(); }}
             >
-              Close
+              <IoClose size={16} className="mr-1" /> Close
             </Button>
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button 
+              onClick={handleSave} 
+              className="text-white"
+              style={{ backgroundColor: primaryColor }}
+            >
               <IoCheckmark size={18} className="mr-1" /> Save
             </Button>
           </div>

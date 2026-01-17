@@ -147,10 +147,11 @@ const Attendance = () => {
   // Handle cell click
   const handleCellClick = (employee, day) => {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const currentStatus = employee.attendance[day]
     setMarkFormData({
       employee_id: employee.employee_id,
       date: dateStr,
-      status: employee.attendance[day] || 'present',
+      status: currentStatus ? currentStatus.toLowerCase().replace(' ', '_') : 'present',
       clock_in: '',
       clock_out: '',
       work_from: 'office',
@@ -377,7 +378,8 @@ const Attendance = () => {
                   </td>
                   {daysArray.map(day => {
                     const status = emp.attendance[day]
-                    const config = status ? statusConfig[status] : null
+                    const normalizedStatus = status ? status.toLowerCase().replace(' ', '_') : null
+                    const config = normalizedStatus ? statusConfig[normalizedStatus] : null
                     return (
                       <td
                         key={day}
@@ -446,7 +448,7 @@ const Attendance = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Clock In</label>
               <input

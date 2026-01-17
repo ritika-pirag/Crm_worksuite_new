@@ -57,6 +57,9 @@ export const AuthProvider = ({ children }) => {
             if (userData.company_name) {
               localStorage.setItem('companyName', userData.company_name)
             }
+            if (userData.client_id) {
+              localStorage.setItem('clientId', userData.client_id)
+            }
           }
         } catch (error) {
           console.error('Auth check error:', error)
@@ -127,6 +130,9 @@ export const AuthProvider = ({ children }) => {
         }
         if (userData.company_name) {
           localStorage.setItem('companyName', userData.company_name)
+        }
+        if (userData.client_id) {
+          localStorage.setItem('clientId', userData.client_id)
         }
         
         setUser(userData)

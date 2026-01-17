@@ -374,7 +374,7 @@ const EmployeeDetail = () => {
                         {/* Right Column */}
                         <div className="space-y-6">
                             {/* Stats */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center hover:translate-y-[-2px] transition-transform duration-300">
                                     <p className="text-3xl font-extrabold text-red-500">{attendance.filter(a => a.status === 'late').length}</p>
                                     <p className="text-xs font-medium text-gray-500 mt-1 uppercase tracking-wide">Late Days</p>
