@@ -42,3 +42,9 @@ export * from './notes'
 export * from './orders'
 export * from './items'
 export * from './hr'
+
+// Import individual APIs that don't use named exports
+import notificationSettingsAPI from './notificationSettings'
+
+export { notificationSettingsAPI }
+
