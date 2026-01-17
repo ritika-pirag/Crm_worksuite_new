@@ -181,6 +181,10 @@ app.use(`${apiBase}/items`, itemRoutes);
 app.use(`${apiBase}/pwa`, pwaRoutes);
 app.use(`${apiBase}/module-settings`, moduleSettingsRoutes);
 
+// Notification Settings routes
+const notificationSettingsRoutes = require('./routes/notificationSettingsRoutes');
+app.use(`${apiBase}/notification-settings`, notificationSettingsRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

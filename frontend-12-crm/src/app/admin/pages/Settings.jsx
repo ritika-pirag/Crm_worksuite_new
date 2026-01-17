@@ -605,13 +605,16 @@ const Settings = () => {
       case 'email':
         return <EmailSettings settings={settings} handleChange={handleChange} />
       case 'email-templates':
-        return <EmailTemplatesSettings settings={settings} handleChange={handleChange} />
+        navigate('/app/admin/settings/email-templates')
+        return null
       case 'modules':
-        return <ModulesSettings settings={settings} handleChange={handleChange} />
+        navigate('/app/admin/settings/modules')
+        return null
       case 'left-menu':
         return <LeftMenuSettings settings={settings} handleChange={handleChange} />
       case 'notifications':
-        return <NotificationsSettings settings={settings} handleChange={handleChange} />
+        navigate('/app/admin/settings/notifications')
+        return null
       case 'integration':
         return <IntegrationSettings settings={settings} handleChange={handleChange} />
       case 'cron-job':
@@ -1371,24 +1374,18 @@ const EmailSettings = ({ settings, handleChange }) => {
   )
 }
 
-// Email Templates Settings Component
-const EmailTemplatesSettings = ({ settings, handleChange }) => {
+// Email Templates Settings Component - Redirects to dedicated page
+const EmailTemplatesSettings = ({ navigate }) => {
+  // Auto-navigate to Email Templates page
+  useEffect(() => {
+    navigate('/app/admin/settings/email-templates')
+  }, [navigate])
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-primary-text mb-2">Email Templates</h1>
-        <p className="text-secondary-text text-sm sm:text-base">Manage email templates</p>
-      </div>
-      <div className="text-center py-8 text-secondary-text">
-        <IoDocumentText size={48} className="mx-auto mb-2 text-gray-300" />
-        <p>Email templates are managed in the Email Templates section</p>
-        <Button
-          variant="outline"
-          onClick={() => window.location.href = '/app/admin/email-templates'}
-          className="mt-4"
-        >
-          Go to Email Templates
-        </Button>
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-accent mx-auto"></div>
+        <p className="mt-2 text-secondary-text">Loading Email Templates...</p>
       </div>
     </div>
   )
