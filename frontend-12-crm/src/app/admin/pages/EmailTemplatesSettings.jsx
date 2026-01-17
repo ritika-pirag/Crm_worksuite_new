@@ -55,9 +55,9 @@ const APP_SETTINGS_MENU = [
     children: [
       { id: 'general', label: 'General', path: '/app/admin/settings' },
       { id: 'localization', label: 'Localization', path: '/app/admin/settings' },
-      { 
-        id: 'email', 
-        label: 'Email', 
+      {
+        id: 'email',
+        label: 'Email',
         children: [
           { id: 'email-templates', label: 'Email Templates', path: '/app/admin/settings/email-templates', active: true },
         ]
@@ -258,7 +258,7 @@ const EmailTemplatesSettings = () => {
   const navigate = useNavigate()
   const editorRef = useRef(null)
   const isDark = theme.mode === 'dark'
-  
+
   // State
   const [expandedAppSettings, setExpandedAppSettings] = useState({ 'app-settings': true, 'email': true })
   const [expandedCategories, setExpandedCategories] = useState({ contract: true })
@@ -269,22 +269,25 @@ const EmailTemplatesSettings = () => {
   const [showSourceCode, setShowSourceCode] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [selectedColor, setSelectedColor] = useState('#000000')
-  
+
   // Form state - initialize with default template
   const [formData, setFormData] = useState({
     subject: 'Contract sent',
     body: getDefaultContractTemplate(),
   })
-  
+
   // Update editor content when switching templates or loading from DB
   useEffect(() => {
     // Add a small delay to ensure the editor is mounted
     const timer = setTimeout(() => {
-      if (editorRef.current && formData.body && !showSourceCode) {
-        editorRef.current.innerHTML = formData.body
+      if (editorRef.current && !showSourceCode) {
+        const newContent = formData.body || ''
+        if (editorRef.current.innerHTML !== newContent) {
+          editorRef.current.innerHTML = newContent
+        }
       }
     }, 50)
-    
+
     return () => clearTimeout(timer)
   }, [selectedTemplate.key, showSourceCode, formData.body])
 
@@ -302,7 +305,7 @@ const EmailTemplatesSettings = () => {
       setLoading(true)
       const companyId = getCompanyId()
       const response = await emailTemplatesAPI.getAll({ company_id: companyId })
-      
+
       if (response.data?.success) {
         const templatesMap = {}
         response.data.data.forEach(template => {
@@ -311,7 +314,7 @@ const EmailTemplatesSettings = () => {
           }
         })
         setTemplates(templatesMap)
-        
+
         // Load selected template if exists
         if (templatesMap['contract_sent']) {
           setFormData({
@@ -382,13 +385,13 @@ const EmailTemplatesSettings = () => {
    */
   const execCommand = (command, value = null) => {
     if (!editorRef.current) return
-    
+
     // Focus the editor first
     editorRef.current.focus()
-    
+
     // Execute the command
     document.execCommand(command, false, value)
-    
+
     // Update the formData state with the new content
     setTimeout(() => {
       if (editorRef.current) {
@@ -402,7 +405,7 @@ const EmailTemplatesSettings = () => {
    */
   const insertLink = () => {
     if (!editorRef.current) return
-    
+
     const url = prompt('Enter URL:')
     if (url) {
       const text = window.getSelection()?.toString() || url
@@ -416,12 +419,26 @@ const EmailTemplatesSettings = () => {
    */
   const insertImage = () => {
     if (!editorRef.current) return
-    
-    const url = prompt('Enter image URL:')
-    if (url) {
-      const imgHTML = `<img src="${url}" style="max-width: 100%; height: auto; display: block; margin: 10px 0;" alt="Image" />`
-      execCommand('insertHTML', imgHTML)
+
+    // Create a temporary file input
+    const input = document.createElement('input')
+    input.setAttribute('type', 'file')
+    input.setAttribute('accept', 'image/*')
+
+    input.onchange = async () => {
+      const file = input.files[0]
+      if (file) {
+        // Convert to Base64
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const imgHTML = `<img src="${e.target.result}" style="max-width: 100%; height: auto; display: block; margin: 10px 0;" alt="Image" />`
+          execCommand('insertHTML', imgHTML)
+        }
+        reader.readAsDataURL(file)
+      }
     }
+
+    input.click()
   }
 
   /**
@@ -429,7 +446,7 @@ const EmailTemplatesSettings = () => {
    */
   const insertTable = () => {
     if (!editorRef.current) return
-    
+
     const rows = prompt('Number of rows:', '3')
     const cols = prompt('Number of columns:', '3')
     if (rows && cols) {
@@ -453,13 +470,13 @@ const EmailTemplatesSettings = () => {
     execCommand('foreColor', color)
     setShowColorPicker(false)
   }
-  
+
   /**
    * Insert merge tag
    */
   const insertMergeTag = (tag) => {
     if (!editorRef.current) return
-    
+
     const tagHTML = `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px; font-family: monospace; color: #1976d2;">{${tag}}</span>&nbsp;`
     execCommand('insertHTML', tagHTML)
   }
@@ -469,14 +486,14 @@ const EmailTemplatesSettings = () => {
    */
   const handleSave = async () => {
     if (!selectedTemplate) return
-    
+
     // Get content from editor
     const content = showSourceCode ? formData.body : (editorRef.current?.innerHTML || formData.body || '')
-    
+
     try {
       setSaving(true)
       const companyId = getCompanyId()
-      
+
       const templateData = {
         company_id: parseInt(companyId),
         name: selectedTemplate.label,
@@ -486,7 +503,7 @@ const EmailTemplatesSettings = () => {
       }
 
       const existingTemplate = templates[selectedTemplate.key]
-      
+
       let response
       if (existingTemplate?.id) {
         response = await emailTemplatesAPI.update(existingTemplate.id, templateData)
@@ -563,7 +580,7 @@ const EmailTemplatesSettings = () => {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] -m-4 sm:-m-6">
       {/* App Settings Sidebar */}
-      <div 
+      <div
         className="w-52 flex-shrink-0 border-r overflow-y-auto"
         style={{
           backgroundColor: isDark ? '#1F2937' : '#ffffff',
@@ -573,7 +590,7 @@ const EmailTemplatesSettings = () => {
         <div className="p-4 border-b" style={{ borderColor: isDark ? '#374151' : '#E5E7EB' }}>
           <h2 className="font-semibold text-primary-text">Settings</h2>
         </div>
-        
+
         {APP_SETTINGS_MENU.map((section) => (
           <div key={section.id}>
             <button
@@ -651,7 +668,7 @@ const EmailTemplatesSettings = () => {
       </div>
 
       {/* Email Templates Categories Sidebar */}
-      <div 
+      <div
         className="w-52 flex-shrink-0 border-r overflow-y-auto"
         style={{
           backgroundColor: isDark ? '#1F2937' : '#ffffff',
@@ -678,7 +695,7 @@ const EmailTemplatesSettings = () => {
                       : 'transparent',
                   }}
                 >
-                  <span 
+                  <span
                     className="text-sm"
                     style={{ color: isDark ? '#E5E7EB' : '#374151' }}
                   >
@@ -702,7 +719,7 @@ const EmailTemplatesSettings = () => {
                           onClick={() => handleSelectTemplate(template.key, template.label, category.id)}
                           className="w-full text-left pl-8 pr-4 py-2 text-sm transition-colors"
                           style={{
-                            backgroundColor: isSelected 
+                            backgroundColor: isSelected
                               ? (isDark ? 'rgba(33, 126, 69, 0.15)' : 'rgba(33, 126, 69, 0.08)')
                               : 'transparent',
                             color: isSelected
@@ -727,7 +744,7 @@ const EmailTemplatesSettings = () => {
         {selectedTemplate ? (
           <>
             {/* Header */}
-            <div 
+            <div
               className="flex items-center justify-between px-6 py-3 border-b"
               style={{
                 backgroundColor: isDark ? '#1F2937' : '#ffffff',
@@ -745,7 +762,7 @@ const EmailTemplatesSettings = () => {
 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div 
+              <div
                 className="rounded-lg border overflow-hidden"
                 style={{
                   backgroundColor: isDark ? '#1F2937' : '#ffffff',
@@ -771,69 +788,69 @@ const EmailTemplatesSettings = () => {
                 </div>
 
                 {/* Rich Text Editor Toolbar */}
-                <div 
+                <div
                   className="flex items-center gap-0.5 px-2 py-2 border-b flex-wrap"
-                  style={{ 
+                  style={{
                     borderColor: isDark ? '#374151' : '#E5E7EB',
                     backgroundColor: isDark ? '#374151' : '#F9FAFB',
                   }}
                 >
                   {/* Undo */}
-                  <button 
-                    onClick={() => execCommand('undo')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('undo')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Undo"
                   >
                     <IoArrowUndo size={16} />
                   </button>
-                  
+
                   {/* Bold */}
-                  <button 
-                    onClick={() => execCommand('bold')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors font-bold" 
+                  <button
+                    onClick={() => execCommand('bold')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors font-bold"
                     title="Bold"
                   >
                     B
                   </button>
-                  
+
                   {/* Italic */}
-                  <button 
-                    onClick={() => execCommand('italic')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors italic" 
+                  <button
+                    onClick={() => execCommand('italic')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors italic"
                     title="Italic"
                   >
                     I
                   </button>
-                  
+
                   {/* Underline */}
-                  <button 
-                    onClick={() => execCommand('underline')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors underline" 
+                  <button
+                    onClick={() => execCommand('underline')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors underline"
                     title="Underline"
                   >
                     U
                   </button>
-                  
+
                   {/* Strikethrough */}
-                  <button 
-                    onClick={() => execCommand('strikeThrough')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors line-through" 
+                  <button
+                    onClick={() => execCommand('strikeThrough')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors line-through"
                     title="Strikethrough"
                   >
                     S
                   </button>
-                  
+
                   {/* Text Color */}
                   <div className="relative">
-                    <button 
-                      onClick={() => setShowColorPicker(!showColorPicker)} 
-                      className="p-2 hover:bg-gray-200 rounded transition-colors text-red-500 font-bold" 
+                    <button
+                      onClick={() => setShowColorPicker(!showColorPicker)}
+                      className="p-2 hover:bg-gray-200 rounded transition-colors text-red-500 font-bold"
                       title="Text Color"
                     >
                       A
                     </button>
                     {showColorPicker && (
-                      <div 
+                      <div
                         className="absolute top-full left-0 mt-1 p-2 rounded-lg shadow-lg z-50 grid grid-cols-6 gap-1"
                         style={{ backgroundColor: isDark ? '#1F2937' : '#ffffff' }}
                       >
@@ -850,123 +867,123 @@ const EmailTemplatesSettings = () => {
                   </div>
 
                   <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  
+
                   {/* Bullet List */}
-                  <button 
-                    onClick={() => execCommand('insertUnorderedList')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('insertUnorderedList')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Bullet List"
                   >
                     •≡
                   </button>
-                  
+
                   {/* Numbered List */}
-                  <button 
-                    onClick={() => execCommand('insertOrderedList')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('insertOrderedList')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Numbered List"
                   >
                     1≡
                   </button>
 
                   <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  
+
                   {/* Alignment */}
-                  <button 
-                    onClick={() => execCommand('justifyLeft')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('justifyLeft')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Align Left"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M0 2h16v2H0V2zm0 4h10v2H0V6zm0 4h16v2H0v-2zm0 4h10v2H0v-2z"/>
+                      <path d="M0 2h16v2H0V2zm0 4h10v2H0V6zm0 4h16v2H0v-2zm0 4h10v2H0v-2z" />
                     </svg>
                   </button>
-                  
-                  <button 
-                    onClick={() => execCommand('justifyCenter')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+
+                  <button
+                    onClick={() => execCommand('justifyCenter')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Align Center"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M0 2h16v2H0V2zm3 4h10v2H3V6zm-3 4h16v2H0v-2zm3 4h10v2H3v-2z"/>
+                      <path d="M0 2h16v2H0V2zm3 4h10v2H3V6zm-3 4h16v2H0v-2zm3 4h10v2H3v-2z" />
                     </svg>
                   </button>
-                  
-                  <button 
-                    onClick={() => execCommand('justifyRight')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+
+                  <button
+                    onClick={() => execCommand('justifyRight')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Align Right"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M0 2h16v2H0V2zm6 4h10v2H6V6zm-6 4h16v2H0v-2zm6 4h10v2H6v-2z"/>
+                      <path d="M0 2h16v2H0V2zm6 4h10v2H6V6zm-6 4h16v2H0v-2zm6 4h10v2H6v-2z" />
                     </svg>
                   </button>
 
                   <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  
+
                   {/* Table */}
-                  <button 
-                    onClick={insertTable} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={insertTable}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Insert Table"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M0 2h16v12H0V2zm1 1v3h4V3H1zm5 0v3h4V3H6zm5 0v3h4V3h-4zM1 7v3h4V7H1zm5 0v3h4V7H6zm5 0v3h4V7h-4zM1 11v2h4v-2H1zm5 0v2h4v-2H6zm5 0v2h4v-2h-4z"/>
+                      <path d="M0 2h16v12H0V2zm1 1v3h4V3H1zm5 0v3h4V3H6zm5 0v3h4V3h-4zM1 7v3h4V7H1zm5 0v3h4V7H6zm5 0v3h4V7h-4zM1 11v2h4v-2H1zm5 0v2h4v-2H6zm5 0v2h4v-2h-4z" />
                     </svg>
                   </button>
 
                   <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  
+
                   {/* Link */}
-                  <button 
-                    onClick={insertLink} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={insertLink}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Insert Link"
                   >
                     <IoLink size={16} />
                   </button>
-                  
+
                   {/* Horizontal Line */}
-                  <button 
-                    onClick={() => execCommand('insertHorizontalRule')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('insertHorizontalRule')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Horizontal Line"
                   >
                     —
                   </button>
-                  
+
                   {/* Image */}
-                  <button 
-                    onClick={insertImage} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={insertImage}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Insert Image"
                   >
                     <IoImage size={16} />
                   </button>
-                  
+
                   {/* Clear Formatting */}
-                  <button 
-                    onClick={() => execCommand('removeFormat')} 
-                    className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                  <button
+                    onClick={() => execCommand('removeFormat')}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
                     title="Clear Formatting"
                   >
                     <IoClose size={16} />
                   </button>
 
                   <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                  
+
                   {/* Text Color */}
                   <div className="relative">
-                    <button 
-                      onClick={() => setShowColorPicker(!showColorPicker)} 
-                      className="p-2 hover:bg-gray-200 rounded transition-colors" 
+                    <button
+                      onClick={() => setShowColorPicker(!showColorPicker)}
+                      className="p-2 hover:bg-gray-200 rounded transition-colors"
                       title="Text Color"
                     >
                       <IoColorPalette size={16} />
                     </button>
-                    
+
                     {showColorPicker && (
-                      <div 
+                      <div
                         className="absolute top-full left-0 mt-1 p-3 rounded shadow-lg z-50"
                         style={{
                           backgroundColor: isDark ? '#1F2937' : '#ffffff',
@@ -979,7 +996,7 @@ const EmailTemplatesSettings = () => {
                               key={color}
                               onClick={() => applyTextColor(color)}
                               className="w-6 h-6 rounded border hover:scale-110 transition-transform"
-                              style={{ 
+                              style={{
                                 backgroundColor: color,
                                 border: '1px solid #ccc'
                               }}
@@ -990,10 +1007,10 @@ const EmailTemplatesSettings = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Source Code */}
-                  <button 
-                    onClick={toggleSourceCode} 
+                  <button
+                    onClick={toggleSourceCode}
                     className={`p-2 hover:bg-gray-200 rounded transition-colors ${showSourceCode ? 'bg-gray-300' : ''}`}
                     title="View Source Code"
                   >
@@ -1013,7 +1030,7 @@ const EmailTemplatesSettings = () => {
                     }}
                   />
                 ) : formData.body ? (
-                  <div 
+                  <div
                     key={selectedTemplate.key}
                     ref={editorRef}
                     contentEditable
@@ -1029,7 +1046,8 @@ const EmailTemplatesSettings = () => {
                     }}
                     onInput={(e) => {
                       if (e.currentTarget) {
-                        setFormData(prev => ({ ...prev, body: e.currentTarget.innerHTML }))
+                        const content = e.currentTarget.innerHTML
+                        setFormData(prev => ({ ...prev, body: content }))
                       }
                     }}
                     onPaste={(e) => {
@@ -1145,7 +1163,7 @@ function getDefaultTemplate(key, label) {
 </div>
     `.trim(),
   }
-  
+
   return templates[key] || `
 <div style="padding: 30px;">
   <h2 style="color: #333;">${label}</h2>

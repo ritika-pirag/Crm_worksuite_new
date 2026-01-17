@@ -2,31 +2,32 @@ import React from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
+const modules = {
+    toolbar: [
+        [{ 'header': [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        ['image', 'link'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        [{ 'indent': '-1' }, { 'indent': '+1' }],
+        ['clean']
+    ],
+};
+
+const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'image', 'link',
+    'color', 'background',
+    'list', 'bullet',
+    'indent'
+];
+
 /**
  * RichTextEditor Component
  * A reusable rich text editor powered by ReactQuill
  */
 const RichTextEditor = ({ value, onChange, placeholder, className = '' }) => {
-    const modules = {
-        toolbar: [
-            [{ 'header': [1, 2, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            ['image', 'link'],
-            [{ 'color': [] }, { 'background': [] }],
-            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-            [{ 'indent': '-1' }, { 'indent': '+1' }],
-            ['clean']
-        ],
-    };
-
-    const formats = [
-        'header',
-        'bold', 'italic', 'underline', 'strike',
-        'image', 'link',
-        'color', 'background',
-        'list', 'bullet',
-        'indent'
-    ];
 
     return (
         <div className={`rich-text-editor-container ${className}`}>
