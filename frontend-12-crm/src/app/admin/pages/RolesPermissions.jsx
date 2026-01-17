@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import AddButton from '../../../components/ui/AddButton'
 import DataTable from '../../../components/ui/DataTable'
@@ -6,11 +7,16 @@ import RightSideModal from '../../../components/ui/RightSideModal'
 import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
 import Card from '../../../components/ui/Card'
-import { IoCreate, IoTrash, IoEye, IoSettingsOutline, IoChevronDown, IoChevronUp, IoCheckmarkCircle } from 'react-icons/io5'
+import { IoCreate, IoTrash, IoEye, IoSettingsOutline, IoChevronDown, IoChevronUp, IoCheckmarkCircle, IoArrowBack } from 'react-icons/io5'
 import Badge from '../../../components/ui/Badge'
 import rolesAPI from '../../../api/roles'
 
 const RolesPermissions = () => {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const moduleParam = searchParams.get('module')
+  const typeParam = searchParams.get('type')
+  
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -39,6 +45,26 @@ const RolesPermissions = () => {
   useEffect(() => {
     fetchRoles()
   }, [])
+
+  // Auto-open permission modal if moduleParam is provided and roles are loaded
+  useEffect(() => {
+    if (moduleParam && roles.length > 0 && !isPermissionModalOpen) {
+      // Find CLIENT or EMPLOYEE role based on typeParam
+      const roleToOpen = roles.find(r => {
+        const roleName = r.role_name?.toUpperCase()
+        if (typeParam === 'client') {
+          return roleName === 'CLIENT'
+        } else if (typeParam === 'employee') {
+          return roleName === 'EMPLOYEE'
+        }
+        return false
+      })
+      
+      if (roleToOpen) {
+        openPermissionModal(roleToOpen)
+      }
+    }
+  }, [moduleParam, roles, typeParam])
 
   const fetchRoles = async () => {
     try {
@@ -112,6 +138,11 @@ const RolesPermissions = () => {
           }
         })
       }
+      // Auto-expand the module if moduleParam is provided
+      if (moduleParam && initialPerms[moduleParam]) {
+        initialPerms[moduleParam].expanded = true
+      }
+      
       setPermissionsData(initialPerms)
       setIsPermissionModalOpen(true)
     } catch (error) {
@@ -143,6 +174,11 @@ const RolesPermissions = () => {
       }
     }))
   }
+
+  // Filter modules if moduleParam is provided
+  const filteredModules = moduleParam 
+    ? modules.filter(m => m === moduleParam)
+    : modules
 
   const toggleExpand = (module) => {
     setPermissionsData(prev => ({
@@ -208,11 +244,30 @@ const RolesPermissions = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-primary-text">Roles & Permissions</h1>
-          <p className="text-secondary-text mt-1">Manage user roles and granular access controls</p>
+        <div className="flex items-center gap-4">
+          {moduleParam && (
+            <button
+              onClick={() => navigate('/app/admin/settings/modules')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Back to Module Settings"
+            >
+              <IoArrowBack size={20} />
+            </button>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold text-primary-text">
+              {moduleParam ? `Permissions: ${moduleParam.charAt(0).toUpperCase() + moduleParam.slice(1).replace('_', ' ')}` : 'Roles & Permissions'}
+            </h1>
+            <p className="text-secondary-text mt-1">
+              {moduleParam 
+                ? `Manage role permissions for ${typeParam === 'client' ? 'Client' : 'Employee'} - ${moduleParam.replace('_', ' ')} module`
+                : 'Manage user roles and granular access controls'}
+            </p>
+          </div>
         </div>
-        <AddButton onClick={() => setIsAddModalOpen(true)} label="Add New Role" />
+        {!moduleParam && (
+          <AddButton onClick={() => setIsAddModalOpen(true)} label="Add New Role" />
+        )}
       </div>
 
       <DataTable
@@ -276,7 +331,7 @@ const RolesPermissions = () => {
             </div>
 
             {/* Modules List */}
-            {modules.map(module => {
+            {filteredModules.map(module => {
               const data = permissionsData[module] || { can_view: false, expanded: false }
               // Determine if "All" is selected (if all granular are true)
               const isAll = data.can_view && data.can_add && data.can_edit && data.can_delete
@@ -295,6 +350,7 @@ const RolesPermissions = () => {
                           if (input) input.indeterminate = isAny && !isAll
                         }}
                         onChange={(e) => toggleModuleAll(module, e.target.checked)}
+                        title="Full Access - Enable all permissions"
                       />
                       <span className="font-medium text-gray-900 capitalize">{module.replace('_', ' ')}</span>
                     </div>
@@ -313,44 +369,56 @@ const RolesPermissions = () => {
                     </div>
                   </div>
 
-                  {/* Expanded Details */}
-                  {data.expanded && (
+                  {/* Expanded Details - Always show if moduleParam is set */}
+                  {(data.expanded || moduleParam) && (
                     <div className="px-4 pb-4 pl-12 grid grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-1">
-                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-50 border border-gray-100">
+                      <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-blue-50 border border-gray-200 transition-colors">
                         <input
                           type="checkbox"
                           checked={data.can_view}
                           onChange={(e) => handlePermissionChange(module, 'can_view', e.target.checked)}
-                          className="rounded border-gray-300 text-primary-accent"
+                          className="rounded border-gray-300 text-primary-accent h-4 w-4"
                         />
-                        <span className="text-sm">View</span>
+                        <div>
+                          <span className="text-sm font-medium block">View</span>
+                          <span className="text-xs text-gray-500">Read access</span>
+                        </div>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-50 border border-gray-100">
+                      <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-green-50 border border-gray-200 transition-colors">
                         <input
                           type="checkbox"
                           checked={data.can_add}
                           onChange={(e) => handlePermissionChange(module, 'can_add', e.target.checked)}
-                          className="rounded border-gray-300 text-primary-accent"
+                          className="rounded border-gray-300 text-primary-accent h-4 w-4"
                         />
-                        <span className="text-sm">Add</span>
+                        <div>
+                          <span className="text-sm font-medium block">Create</span>
+                          <span className="text-xs text-gray-500">Add new</span>
+                        </div>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-50 border border-gray-100">
+                      <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-yellow-50 border border-gray-200 transition-colors">
                         <input
                           type="checkbox"
                           checked={data.can_edit}
                           onChange={(e) => handlePermissionChange(module, 'can_edit', e.target.checked)}
-                          className="rounded border-gray-300 text-primary-accent"
+                          className="rounded border-gray-300 text-primary-accent h-4 w-4"
                         />
-                        <span className="text-sm">Edit</span>
+                        <div>
+                          <span className="text-sm font-medium block">Update</span>
+                          <span className="text-xs text-gray-500">Modify existing</span>
+                        </div>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-50 border border-gray-100">
+                      <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-red-50 border border-gray-200 transition-colors">
                         <input
                           type="checkbox"
                           checked={data.can_delete}
                           onChange={(e) => handlePermissionChange(module, 'can_delete', e.target.checked)}
-                          className="rounded border-gray-300 text-primary-accent"
+                          className="rounded border-gray-300 text-primary-accent h-4 w-4"
                         />
-                        <span className="text-sm">Delete</span>
+                        <div>
+                          <span className="text-sm font-medium block">Delete</span>
+                          <span className="text-xs text-gray-500">Remove items</span>
+                        </div>
                       </label>
                     </div>
                   )}

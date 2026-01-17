@@ -411,7 +411,8 @@ const OrderDetail = () => {
 
   const handleViewPdf = async () => {
     try {
-      const pdfUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/v1/orders/${id}/pdf?company_id=${companyId}`
+      // Use relative URL to leverage Vite proxy
+      const pdfUrl = `/api/v1/orders/${id}/pdf?company_id=${companyId}`
       window.open(pdfUrl, '_blank')
     } catch (error) {
       console.error('Error viewing PDF:', error)
@@ -421,7 +422,8 @@ const OrderDetail = () => {
 
   const handleDownloadPdf = async () => {
     try {
-      const pdfUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/v1/orders/${id}/pdf?company_id=${companyId}&download=1`
+      // Use relative URL to leverage Vite proxy
+      const pdfUrl = `/api/v1/orders/${id}/pdf?company_id=${companyId}&download=1`
       const response = await fetch(pdfUrl)
       const data = await response.json()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
