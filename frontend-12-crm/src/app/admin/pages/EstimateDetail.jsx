@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { estimatesAPI, clientsAPI, projectsAPI, companiesAPI, itemsAPI } from '../../../api'
+import { estimatesAPI, clientsAPI, projectsAPI, companiesAPI, itemsAPI, emailTemplatesAPI } from '../../../api'
 import baseUrl from '../../../api/baseUrl'
 import { useSettings } from '../../../context/SettingsContext'
 import Card from '../../../components/ui/Card'
@@ -9,6 +9,7 @@ import Badge from '../../../components/ui/Badge'
 import Input from '../../../components/ui/Input'
 import Modal from '../../../components/ui/Modal'
 import TaskFormModal from '../../../components/ui/TaskFormModal'
+import RichTextEditor from '../../../components/ui/RichTextEditor'
 import {
   IoArrowBack,
   IoBriefcase,
@@ -50,12 +51,12 @@ const EstimateDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { formatDate: settingsFormatDate, formatCurrency: settingsFormatCurrency, getCompanyInfo } = useSettings()
-  
+
   const [estimate, setEstimate] = useState(null)
   const [loading, setLoading] = useState(true)
   const [company, setCompany] = useState(null)
   const [client, setClient] = useState(null)
-  
+
   // Stored items for dropdown
   const [storedItems, setStoredItems] = useState([])
   const [itemSearchQuery, setItemSearchQuery] = useState('')
@@ -68,6 +69,18 @@ const EstimateDetail = () => {
   const [isEditDiscountModalOpen, setIsEditDiscountModalOpen] = useState(false)
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false)
   const [isAddReminderModalOpen, setIsAddReminderModalOpen] = useState(false)
+
+  // Email state
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    template: '',
+    to: '',
+    cc: '',
+    bcc: '',
+    subject: '',
+    message: ''
+  });
 
   // Form states
   const [editingItem, setEditingItem] = useState(null)
@@ -99,7 +112,19 @@ const EstimateDetail = () => {
   useEffect(() => {
     fetchEstimate()
     fetchStoredItems()
+    fetchEmailTemplates()
   }, [id])
+
+  const fetchEmailTemplates = async () => {
+    try {
+      const response = await emailTemplatesAPI.getAll();
+      if (response.data.success) {
+        setEmailTemplates(response.data.data.filter(t => t.type === 'estimate') || []);
+      }
+    } catch (error) {
+      console.error('Error fetching email templates:', error);
+    }
+  }
 
   const fetchStoredItems = async () => {
     try {
@@ -164,7 +189,14 @@ const EstimateDetail = () => {
           try {
             const clientResponse = await clientsAPI.getById(data.client_id, { company_id: companyId })
             if (clientResponse.data && clientResponse.data.success) {
-              setClient(clientResponse.data.data)
+              const clientData = clientResponse.data.data
+              setClient(clientData)
+              // Update email form with client email
+              setEmailForm(prev => ({
+                ...prev,
+                to: clientData.email || '',
+                subject: `Estimate ${data.estimate_number || ''}`
+              }))
             }
           } catch (err) {
             console.log('Client not found:', err.response?.status)
@@ -203,6 +235,46 @@ const EstimateDetail = () => {
     }).format(amount || 0)
   }
 
+  const parseTemplateVariables = (content) => {
+    if (!content) return ''
+    let parsed = content
+    const variables = {
+      '{ESTIMATE_NUMBER}': estimate?.estimate_number || '',
+      '{CLIENT_NAME}': client?.name || estimate?.client_name || 'Client',
+      '{PROJECT_NAME}': estimate?.project_name || '',
+      '{ESTIMATE_DATE}': formatDate(estimate?.estimate_date),
+      '{VALID_UNTIL}': formatDate(estimate?.valid_till),
+      '{TOTAL_AMOUNT}': formatCurrency(estimate?.total),
+      '{ESTIMATE_URL}': `${window.location.origin}/public/estimates/${estimate?.id}`, // Adjusted URL
+      '{COMPANY_NAME}': company?.name || getCompanyInfo()?.name || '',
+      // Add common aliases
+      '{CONTACT_FIRST_NAME}': (client?.name || '').split(' ')[0],
+      '{CONTACT_LAST_NAME}': (client?.name || '').split(' ').slice(1).join(' '),
+      '{SIGNATURE}': '', // Can be improved
+    }
+
+    Object.keys(variables).forEach(key => {
+      const regex = new RegExp(key, 'g')
+      parsed = parsed.replace(regex, variables[key])
+    })
+    return parsed
+  }
+
+  const handleTemplateSelect = (e) => {
+    const templateId = e.target.value
+    const template = emailTemplates.find(t => t.id === parseInt(templateId))
+    if (template) {
+      setEmailForm(prev => ({
+        ...prev,
+        template: templateId,
+        subject: parseTemplateVariables(template.subject || prev.subject),
+        message: parseTemplateVariables(template.content || '')
+      }))
+    } else {
+      setEmailForm(prev => ({ ...prev, template: '' }))
+    }
+  }
+
   const isExpired = () => {
     if (!estimate?.valid_till || estimate.valid_till === '--') return false
     const validDate = new Date(estimate.valid_till)
@@ -227,7 +299,7 @@ const EstimateDetail = () => {
     const companyAddress = company?.address || getCompanyInfo()?.address || ''
     const companyPhone = company?.phone || getCompanyInfo()?.phone || ''
     const companyEmail = company?.email || getCompanyInfo()?.email || ''
-    
+
     return `
       <!DOCTYPE html>
       <html>
@@ -367,14 +439,17 @@ const EstimateDetail = () => {
 
   const handleSendEmail = async () => {
     try {
-      if (!client?.email) {
-        alert('Client email not found.')
+      if (!emailForm.to) {
+        alert('To email is required')
         return
       }
+      setSendingEmail(true)
       const response = await estimatesAPI.send(id, {
-        to: client.email,
-        subject: `Estimate ${estimate.estimate_number}`,
-        message: `Please find the attached estimate ${estimate.estimate_number}.`
+        to: emailForm.to,
+        cc: emailForm.cc,
+        bcc: emailForm.bcc,
+        subject: emailForm.subject,
+        message: emailForm.message
       })
       if (response.data.success) {
         alert('Email sent successfully!')
@@ -384,7 +459,9 @@ const EstimateDetail = () => {
       }
     } catch (error) {
       console.error('Error sending email:', error)
-      alert('Failed to send email')
+      alert(error.response?.data?.error || 'Failed to send email')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -760,7 +837,7 @@ const EstimateDetail = () => {
             {estimate.description && (
               <div className="mt-8 border-t pt-6 overflow-hidden">
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">DESCRIPTION</h3>
-                <div className="text-gray-700 prose max-w-full break-words overflow-wrap-anywhere text-sm" 
+                <div className="text-gray-700 prose max-w-full break-words overflow-wrap-anywhere text-sm"
                   style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                   dangerouslySetInnerHTML={{ __html: estimate.description }} />
               </div>
@@ -770,7 +847,7 @@ const EstimateDetail = () => {
             {estimate.terms && (
               <div className="mt-6 border-t pt-6 overflow-hidden">
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">TERMS & CONDITIONS</h3>
-                <div className="text-gray-700 prose max-w-full break-words overflow-wrap-anywhere text-sm" 
+                <div className="text-gray-700 prose max-w-full break-words overflow-wrap-anywhere text-sm"
                   style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                   dangerouslySetInnerHTML={{ __html: estimate.terms }} />
               </div>
@@ -1111,23 +1188,98 @@ const EstimateDetail = () => {
       </Modal>
 
       {/* Send Email Modal */}
+      {/* Send Email Modal */}
       <Modal
         isOpen={isSendEmailModalOpen}
         onClose={() => setIsSendEmailModalOpen(false)}
-        title="Send Estimate"
+        title="Send to client"
+        size="lg"
       >
-        <div className="space-y-6">
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-6">
-            <p className="text-slate-600 leading-relaxed">
-              You are about to send estimate <strong className="text-slate-800">#{estimate.estimate_number}</strong> to <strong className="text-blue-600">{client?.email || estimate.client_name}</strong>.
-            </p>
+        <div className="space-y-4">
+          {/* Template Selection */}
+          {emailTemplates.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Template</label>
+              <select
+                value={emailForm.template}
+                onChange={handleTemplateSelect}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-accent focus:border-transparent outline-none transition-all"
+              >
+                <option value="">Select a template...</option>
+                {emailTemplates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* To, CC, BCC */}
+          <div className="grid grid-cols-1 gap-4">
+            <Input
+              label="To"
+              value={emailForm.to}
+              onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
+              placeholder="Client email"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="CC"
+                value={emailForm.cc}
+                onChange={(e) => setEmailForm({ ...emailForm, cc: e.target.value })}
+                placeholder="CC"
+              />
+              <Input
+                label="BCC"
+                value={emailForm.bcc}
+                onChange={(e) => setEmailForm({ ...emailForm, bcc: e.target.value })}
+                placeholder="BCC"
+              />
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setIsSendEmailModalOpen(false)} className="flex-1 bg-white border-gray-200 text-slate-500 hover:bg-gray-50">
+
+          {/* Subject */}
+          <Input
+            label="Subject"
+            value={emailForm.subject}
+            onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+            placeholder="Email subject"
+          />
+
+          {/* Message Body */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+            <RichTextEditor
+              value={emailForm.message}
+              onChange={(content) => setEmailForm({ ...emailForm, message: content })}
+              placeholder="Enter email message..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button
+              variant="outline"
+              onClick={() => setIsSendEmailModalOpen(false)}
+              className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              disabled={sendingEmail}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSendEmail} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20">
-              Send Email Now
+            <Button
+              onClick={handleSendEmail}
+              className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 flex items-center gap-2"
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <IoMailOutline size={18} />
+                  Send Email
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -1190,8 +1342,8 @@ const EstimateDetail = () => {
                 const desc = (item.description || '').toLowerCase()
                 return title.includes(search) || desc.includes(search)
               }).length === 0 && (
-                <div className="p-4 text-center text-gray-400 text-sm">No items found</div>
-              )}
+                  <div className="p-4 text-center text-gray-400 text-sm">No items found</div>
+                )}
             </div>
           )}
 

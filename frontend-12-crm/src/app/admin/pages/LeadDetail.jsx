@@ -921,7 +921,7 @@ const LeadDetail = () => {
       category: '',
       labels: [],
       color: '#3b82f6',
-      file: null
+      files: []
     })
     setIsAddNoteModalOpen(true)
   }
@@ -999,32 +999,25 @@ const LeadDetail = () => {
         color: noteFormData.color || ''
       })
 
-      const payload = {
-        company_id: parseInt(companyId),
-        user_id: user?.id || parseInt(localStorage.getItem('userId') || 1),
-        lead_id: parseInt(id),
-        title: noteFormData.title || null,
-        content
+      const fd = new FormData()
+      fd.append('company_id', parseInt(companyId))
+      fd.append('user_id', user?.id || parseInt(localStorage.getItem('userId') || 1))
+      fd.append('lead_id', parseInt(id))
+      fd.append('title', noteFormData.title || 'Note')
+      fd.append('content', content)
+
+      if (noteFormData.files && noteFormData.files.length > 0) {
+        Array.from(noteFormData.files).forEach(file => {
+          fd.append('files', file)
+        })
       }
 
-      const response = await notesAPI.create(payload)
+      const response = await notesAPI.create(fd)
+
       if (response.data.success) {
-        if (noteFormData.file) {
-          try {
-            const uploadFormData = new FormData()
-            uploadFormData.append('company_id', companyId)
-            uploadFormData.append('lead_id', id)
-            uploadFormData.append('title', noteFormData.title || 'Note Attachment')
-            uploadFormData.append('category', noteFormData.category || 'Note')
-            uploadFormData.append('description', description)
-            uploadFormData.append('file', noteFormData.file)
-            await documentsAPI.create(uploadFormData)
-          } catch (e) {
-            console.error('Error uploading note attachment:', e)
-          }
-        }
+        alert('Note added successfully!')
         setIsAddNoteModalOpen(false)
-        await fetchNotes()
+        fetchNotes()
       } else {
         alert(response.data.error || 'Failed to create note')
       }
@@ -1950,11 +1943,10 @@ const LeadDetail = () => {
                             <div className={`w-3 h-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' : task.status === 'Doing' ? 'bg-yellow-500' : 'bg-blue-400'}`}></div>
                             <span className="font-medium text-gray-700">{task.title}</span>
                           </div>
-                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                            task.status === 'Done' ? 'bg-green-100 text-green-700' :
+                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${task.status === 'Done' ? 'bg-green-100 text-green-700' :
                             task.status === 'Doing' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-blue-100 text-blue-700'
-                          }`}>{task.status || 'Pending'}</span>
+                              'bg-blue-100 text-blue-700'
+                            }`}>{task.status || 'Pending'}</span>
                         </div>
                       ))
                     )}
@@ -1995,6 +1987,39 @@ const LeadDetail = () => {
                             <IoTime className="text-amber-400" size={14} />
                             <p className="text-xs text-amber-600 font-medium">{note.created_at ? new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Just now'}</p>
                           </div>
+                          {/* File Attachments */}
+                          {note.files && note.files.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {note.files.map((file, fIdx) => (
+                                <div key={fIdx} className="flex items-center justify-between p-2 bg-amber-50 rounded-lg text-xs">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <IoDocumentText className="text-amber-500 flex-shrink-0" size={16} />
+                                    <span className="truncate text-gray-700 font-medium">{file.file_name}</span>
+                                    <span className="text-gray-400">({(file.file_size / 1024).toFixed(1)} KB)</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <a
+                                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/${file.file_path}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 hover:bg-amber-100 rounded text-amber-600"
+                                      title="View"
+                                    >
+                                      <IoEye size={14} />
+                                    </a>
+                                    <a
+                                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/${file.file_path}`}
+                                      download
+                                      className="p-1 hover:bg-amber-100 rounded text-amber-600"
+                                      title="Download"
+                                    >
+                                      <IoDownload size={14} />
+                                    </a>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
@@ -3113,17 +3138,45 @@ const LeadDetail = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-              <span className="text-sm text-gray-700">Upload File</span>
-              <input
-                type="file"
-                onChange={(e) => setNoteFormData({ ...noteFormData, file: e.target.files?.[0] || null })}
-                className="hidden"
-              />
-            </label>
-            {noteFormData.file && (
-              <span className="text-sm text-gray-600">{noteFormData.file.name}</span>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors bg-white shadow-sm">
+                <span className="text-sm text-gray-700 font-medium flex items-center gap-2">
+                  <IoAdd size={16} />
+                  Attach Files
+                </span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || []);
+                    setNoteFormData(prev => ({
+                      ...prev,
+                      files: [...(prev.files || []), ...newFiles]
+                    }))
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            {/* Selected Files List */}
+            {noteFormData.files && noteFormData.files.length > 0 && (
+              <div className="grid grid-cols-1 gap-2">
+                {Array.from(noteFormData.files).map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm border border-gray-100">
+                    <span className="truncate text-gray-700 max-w-[80%]">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                    <button
+                      onClick={() => setNoteFormData(prev => ({
+                        ...prev,
+                        files: prev.files.filter((_, i) => i !== idx)
+                      }))}
+                      className="text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <IoClose size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
