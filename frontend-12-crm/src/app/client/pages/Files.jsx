@@ -120,9 +120,8 @@ const Files = () => {
 
   const handleDownload = async (file) => {
     try {
-      // Use backend URL for download
-      const backendUrl = 'http://localhost:5000'
-      window.open(`${backendUrl}/api/v1/documents/${file.id}/download?company_id=${companyId}`, '_blank')
+      // Use relative URL to leverage Vite proxy
+      window.open(`/api/v1/documents/${file.id}/download?company_id=${companyId}`, '_blank')
     } catch (error) {
       console.error('Error downloading file:', error)
       alert('Failed to download file')

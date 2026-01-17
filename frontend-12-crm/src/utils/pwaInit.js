@@ -5,8 +5,17 @@
 
 // Base URL for API calls
 const getApiBaseUrl = () => {
-    // Try to get from env or use localhost
-    return import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000';
+    // In development, use empty string to leverage Vite proxy
+    // In production, use environment variable or default
+    if (import.meta.env?.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL
+    }
+    // Development mode - use empty string for Vite proxy
+    if (import.meta.env?.MODE === 'development' || import.meta.env?.DEV) {
+        return ''
+    }
+    // Production fallback
+    return 'http://localhost:5000'
 };
 
 // Check if service workers are supported
