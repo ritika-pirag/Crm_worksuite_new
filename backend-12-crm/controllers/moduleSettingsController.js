@@ -4,7 +4,7 @@
  * Company-specific settings
  */
 
-const pool = require('../config/database');
+const pool = require('../config/db');
 
 // Default module settings - all menus enabled by default
 const DEFAULT_CLIENT_MENUS = {
