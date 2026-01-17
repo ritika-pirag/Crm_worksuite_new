@@ -71,6 +71,7 @@ import SocialMediaLeads from '../app/admin/pages/SocialMediaLeads'
 import SystemHealth from '../app/admin/pages/SystemHealth'
 import Settings from '../app/admin/pages/Settings'
 import ModuleSettings from '../app/admin/pages/ModuleSettings'
+import NotificationSettings from '../app/admin/pages/NotificationSettings'
 import EmailTemplatesSettings from '../app/admin/pages/EmailTemplatesSettings'
 import CompanyPackages from '../app/admin/pages/CompanyPackages'
 import LicenseManagement from '../app/admin/pages/LicenseManagement'
@@ -294,6 +295,7 @@ function AppRoutes() {
         <Route path="admin/settings" element={<Settings />} />
         <Route path="admin/settings/modules" element={<ModuleSettings />} />
         <Route path="admin/settings/email-templates" element={<EmailTemplatesSettings />} />
+        <Route path="admin/settings/notifications" element={<NotificationSettings />} />
 
         {/* Employee Routes */}
         <Route path="employee/dashboard" element={<EmployeeDashboard />} />
