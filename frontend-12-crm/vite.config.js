@@ -9,11 +9,6 @@ export default defineConfig({
         target: 'http://localhost:8001',
         changeOrigin: true,
         secure: false,
-      },
-      '/manifest.json': {
-        target: 'http://localhost:8001',
-        changeOrigin: true,
-        rewrite: () => '/api/v1/pwa/manifest',
       }
     }
   }
