@@ -93,6 +93,7 @@ export const ModulesProvider = ({ children }) => {
       if (data.success && data.data) {
         setClientMenus({ ...DEFAULT_CLIENT_MENUS, ...data.data.client_menus })
         setEmployeeMenus({ ...DEFAULT_EMPLOYEE_MENUS, ...data.data.employee_menus })
+        // Module permissions will be handled in ModuleSettings component
       }
     } catch (err) {
       console.error('Error fetching module settings:', err)

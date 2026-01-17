@@ -276,6 +276,10 @@ const adminSidebarData = [
         label: 'Module Settings',
         path: '/app/admin/settings/modules',
       },
+      {
+        label: 'Email Templates',
+        path: '/app/admin/settings/email-templates',
+      },
       // {
       //   label: 'System Health',
       //   path: '/app/admin/system-health',

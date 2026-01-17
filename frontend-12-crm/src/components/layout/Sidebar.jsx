@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useModules } from '../../context/ModulesContext'
+import { usePermissions } from '../../context/PermissionsContext'
 import { IoClose, IoChevronDown, IoLogOut, IoChevronForward } from 'react-icons/io5'
 import adminSidebarData from '../../config/adminSidebarData'
 import employeeSidebarData from '../../config/employeeSidebarData'
@@ -16,6 +17,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const { theme } = useTheme()
   const { t } = useLanguage()
   const { clientMenus, employeeMenus } = useModules()
+  const { canView, loading: permissionsLoading, modulePermissions } = usePermissions()
   const isDark = theme.mode === 'dark'
   const location = useLocation()
   const navigate = useNavigate()
@@ -73,7 +75,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   }, [])
 
   /**
-   * Filter menu items based on module settings
+   * Filter menu items based on permissions
    * @param {Array} menuItems - Raw menu items from sidebar data
    * @param {Object} moduleSettings - Module settings (clientMenus or employeeMenus)
    * @returns {Array} Filtered menu items
@@ -87,17 +89,41 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
         return true
       }
 
-      // Check if this menu has a moduleKey and if it's enabled
+      // Check if this menu has a moduleKey and if user has view permission
       if (item.moduleKey) {
+        // Check if module is enabled in module settings
         const isEnabled = moduleSettings[item.moduleKey] !== false
-        if (!isEnabled) return false
+        if (!isEnabled) {
+          console.log(`🚫 Module disabled: ${item.label} (${item.moduleKey})`)
+          return false
+        }
+        
+        // Check if user has view permission (for EMPLOYEE and CLIENT only)
+        // SUPERADMIN and ADMIN see all menus
+        if (user && (user.role === 'EMPLOYEE' || user.role === 'CLIENT') && !permissionsLoading) {
+          const hasViewPermission = canView(item.moduleKey)
+          console.log(`👁️ ${item.label} (${item.moduleKey}) - canView: ${hasViewPermission}`)
+          // Only hide if explicitly false - if true or undefined (default), show menu
+          if (hasViewPermission === false) {
+            console.log(`❌ HIDING: ${item.label} (${item.moduleKey})`)
+            return false
+          }
+        }
       }
 
       // For parent menus with children, filter children as well
       if (item.children && item.children.length > 0) {
         const filteredChildren = item.children.filter(child => {
           if (child.moduleKey) {
-            return moduleSettings[child.moduleKey] !== false
+            const isEnabled = moduleSettings[child.moduleKey] !== false
+            if (!isEnabled) return false
+            
+            // Check if user has view permission (for EMPLOYEE and CLIENT only)
+            if (user && (user.role === 'EMPLOYEE' || user.role === 'CLIENT') && !permissionsLoading) {
+              const hasViewPermission = canView(child.moduleKey)
+              // Only hide if explicitly false - if true or undefined (default), show menu
+              if (hasViewPermission === false) return false
+            }
           }
           return true
         })
@@ -119,7 +145,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
       }
       return true
     })
-  }, [])
+  }, [canView, user])
 
   // Get sidebar data based on user role with module filtering
   const getSidebarData = useCallback(() => {

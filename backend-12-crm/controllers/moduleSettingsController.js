@@ -47,17 +47,42 @@ const VALID_EMPLOYEE_MENUS = Object.keys(DEFAULT_EMPLOYEE_MENUS);
  */
 const ensureTableExists = async () => {
   try {
+    // Create table with module_permissions field
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS module_settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
         company_id INT NOT NULL,
         client_menus JSON,
         employee_menus JSON,
+        module_permissions JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY unique_company (company_id)
       )
     `);
+    
+    // Add module_permissions column if it doesn't exist (for existing tables)
+    try {
+      // Check if column exists first
+      const [columns] = await pool.execute(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'module_settings' 
+        AND COLUMN_NAME = 'module_permissions'
+      `);
+      
+      if (columns.length === 0) {
+        await pool.execute(`
+          ALTER TABLE module_settings 
+          ADD COLUMN module_permissions JSON
+        `);
+      }
+    } catch (alterError) {
+      // Column might already exist, ignore error
+      console.log('Note: module_permissions column check:', alterError.message);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error creating module_settings table:', error);
@@ -104,6 +129,7 @@ const getModuleSettings = async (req, res) => {
     const settings = rows[0];
     let clientMenus = DEFAULT_CLIENT_MENUS;
     let employeeMenus = DEFAULT_EMPLOYEE_MENUS;
+    let modulePermissions = {};
 
     try {
       if (settings.client_menus) {
@@ -127,6 +153,17 @@ const getModuleSettings = async (req, res) => {
       console.error('Error parsing employee_menus:', e);
     }
 
+    try {
+      if (settings.module_permissions) {
+        const parsed = typeof settings.module_permissions === 'string' 
+          ? JSON.parse(settings.module_permissions) 
+          : settings.module_permissions;
+        modulePermissions = parsed || {};
+      }
+    } catch (e) {
+      console.error('Error parsing module_permissions:', e);
+    }
+
     return res.json({
       success: true,
       data: {
@@ -134,6 +171,7 @@ const getModuleSettings = async (req, res) => {
         company_id: settings.company_id,
         client_menus: clientMenus,
         employee_menus: employeeMenus,
+        module_permissions: modulePermissions,
         created_at: settings.created_at,
         updated_at: settings.updated_at,
       }
@@ -158,7 +196,7 @@ const updateModuleSettings = async (req, res) => {
     await ensureTableExists();
 
     const companyId = req.body.company_id || req.query.company_id || req.user?.company_id;
-    const { client_menus, employee_menus } = req.body;
+    const { client_menus, employee_menus, module_permissions } = req.body;
 
     if (!companyId) {
       return res.status(400).json({
@@ -208,27 +246,44 @@ const updateModuleSettings = async (req, res) => {
       [companyId]
     );
 
+    // Prepare module_permissions (only for enabled modules)
+    const finalModulePermissions = module_permissions || {};
+    
+    // Filter permissions - only keep enabled modules
+    const filteredPermissions = {};
+    Object.keys(finalModulePermissions).forEach(moduleKey => {
+      // Check if module is enabled in either client or employee menus
+      const isClientEnabled = finalClientMenus[moduleKey] !== false;
+      const isEmployeeEnabled = finalEmployeeMenus[moduleKey] !== false;
+      
+      if (isClientEnabled || isEmployeeEnabled) {
+        filteredPermissions[moduleKey] = finalModulePermissions[moduleKey];
+      }
+    });
+
     if (existing.length > 0) {
       // Update existing
       await pool.execute(
         `UPDATE module_settings 
-         SET client_menus = ?, employee_menus = ?, updated_at = NOW()
+         SET client_menus = ?, employee_menus = ?, module_permissions = ?, updated_at = NOW()
          WHERE company_id = ?`,
         [
           JSON.stringify(finalClientMenus),
           JSON.stringify(finalEmployeeMenus),
+          JSON.stringify(filteredPermissions),
           companyId
         ]
       );
     } else {
       // Insert new
       await pool.execute(
-        `INSERT INTO module_settings (company_id, client_menus, employee_menus)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO module_settings (company_id, client_menus, employee_menus, module_permissions)
+         VALUES (?, ?, ?, ?)`,
         [
           companyId,
           JSON.stringify(finalClientMenus),
-          JSON.stringify(finalEmployeeMenus)
+          JSON.stringify(finalEmployeeMenus),
+          JSON.stringify(filteredPermissions)
         ]
       );
     }
@@ -249,6 +304,7 @@ const updateModuleSettings = async (req, res) => {
         company_id: settings.company_id,
         client_menus: finalClientMenus,
         employee_menus: finalEmployeeMenus,
+        module_permissions: filteredPermissions,
         updated_at: settings.updated_at,
       }
     });
